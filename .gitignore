@@ -1,0 +1,7 @@
+# databases (contain salaries and bank details)
+data/
+node_modules/
+.env
+.env.*
+!.env.example
+.vercel
