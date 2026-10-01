@@ -327,10 +327,14 @@ class Database {
 
 // ---- drivers
 function pgDriver(url) {
-  const pg = require("pg");
+  // Neon: use its driver, which speaks Postgres over a WebSocket on port 443. Some networks reset
+  // direct Postgres connections on port 5432; HTTPS-port traffic gets through, and it suits serverless.
+  const neon = /\.neon\.tech/.test(url) && process.env.PG_DRIVER !== "tcp";
+  const pg = neon ? require("@neondatabase/serverless") : require("pg");
+  if (neon) pg.neonConfig.webSocketConstructor = globalThis.WebSocket;
   pg.types.setTypeParser(20, (v) => Number(v));   // int8 / bigint
   pg.types.setTypeParser(1700, (v) => Number(v)); // numeric (SUM of bigint)
-  const pool = new pg.Pool({
+  const pool = new pg.Pool(neon ? { connectionString: url, max: Number(process.env.PG_POOL_MAX || 5) } : {
     connectionString: url,
     max: Number(process.env.PG_POOL_MAX || 5),
     ssl: /sslmode=disable/.test(url) || /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: true },
