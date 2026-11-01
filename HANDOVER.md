@@ -74,10 +74,10 @@ distributor target 100,000, fixed basic 25,000, food 150/day always; base commis
 ### Not done
 
 - **Manager rules are unchanged** because the Excel files contradict each other (see section 6).
-- **Uncommitted work in `public/`** (not from the last session): a header/accessibility redesign touching
-  `css/app.css`, `js/app.js`, `charts.js`, `ui.js`, `pages/{shared,breakdown,daily,login,payroll}.js`. The user has not
-  decided to commit it. Do not commit it without asking. That redesign removed `#page-title`, so
-  `pages/employee.js` now guards that line.
+- **UI redesign** (commit `71dfa21`, "Redesign UI: light warm palette..."): not from the last session. It is committed
+  locally but **not pushed**, as is the handover commit, so `origin/master` is still at `8ea4c21` and the live site
+  has neither. That redesign removed `#page-title`, so `pages/employee.js` guards that line. The pay-scheme fields
+  in `pages/employees.js` survived the redesign (checked).
 
 ## 4. Hosting status: the open problem
 
@@ -110,7 +110,7 @@ redeployed. Treat the old password as compromised.
 ## 5. Working agreements with this user
 
 - Keep payroll work in `D:\payroll-system`; do not touch `helans-pos`.
-- Commit only your own changes; leave the unrelated `public/` redesign alone unless asked.
+- Commit only your own changes; check `git status` first, other sessions may have uncommitted work.
 - Never create accounts, passwords or tokens for them, and never ask them to paste secrets into chat.
 - Confirm before pushing, deploying or changing hosted settings.
 - Verify claims (run tests, open the page) before saying something works; say plainly when something is unverified.
@@ -131,7 +131,8 @@ and inconsistent per day/sheet, stale dates, role matched on the misspelling `su
 ## 7. What to upload to the new account
 
 - This file (`D:\payroll-system\HANDOVER.md`) and `C:\Users\T.BRAYNKANTH\PAYROLL\process-and-data-model.md`.
-- The repo is on GitHub (`BRAYNKANTH/payroll-system`, branch `master`, at least commit `8ea4c21`), so the code does not
-  need uploading, only cloning. The uncommitted `public/` redesign exists only on `D:\payroll-system`; copy the folder if it matters.
+- The repo is on GitHub (`BRAYNKANTH/payroll-system`, branch `master`), but only up to commit `8ea4c21`. Commits
+  `71dfa21` (UI redesign) and the handover commit exist only on `D:\payroll-system` until pushed. Push them, or copy
+  the folder, before switching accounts.
 - The ten Excel files only if the new session must re-read them. They hold real names and business figures, so share deliberately.
 - Do **not** upload `.env`, any connection string, or the Neon password.
