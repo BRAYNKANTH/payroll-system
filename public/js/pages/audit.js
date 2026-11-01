@@ -2,7 +2,7 @@ import { get, qs } from "../api.js";
 import { $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
 
 const MONEY = new Set(["business_amount", "settled_amount", "settle_up_minus", "personal_minus", "business_total", "rent", "hub_fee", "security_cost",
-  "personal_draw", "unit_price", "shortfall_value", "amount", "basic_pay", "target"]);
+  "personal_draw", "unit_price", "shortfall_value", "amount", "basic_pay", "target", "food_per_day"]);
 const HIDE = /^(updated_at|updated_by|created_at|created_by)$/;
 const show = (k, v) => (v == null ? "∅" : MONEY.has(k) && typeof v === "number" ? "Rs " + (v / 100).toLocaleString("en-LK", { minimumFractionDigits: 2 }) : String(v));
 

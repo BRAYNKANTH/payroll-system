@@ -5,7 +5,7 @@ import { $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyS
 let filters = { q: "", role: "", status: "active" };
 
 function parseRule(rule) {
-  const m = /^(fixed|pct_gross|pct_basic):([\d.]+)(?:;cap:([\d.]+))?$/.exec(String(rule || "").trim());
+  const m = /^(fixed|pct_gross|pct_basic|pct_business):([\d.]+)(?:;cap:([\d.]+))?$/.exec(String(rule || "").trim());
   return m ? { kind: m[1], value: m[2], cap: m[3] || "" } : { kind: "none", value: "", cap: "" };
 }
 
@@ -13,7 +13,7 @@ function parseRule(rule) {
 export async function employeeForm(existing, onSaved) {
   const staff = await get("/api/staff");
   const managers = staff.filter((s) => s.role === "manager" && s.status === "active");
-  const e = existing || { role: "guy", status: "active", hub: scopeHub() || state.hubs[0]?.code, security_deduction_rule: "none", commission_rate: 0 };
+  const e = existing || { role: "guy", status: "active", hub: scopeHub() || state.hubs[0]?.code, security_deduction_rule: "none", commission_rate: 0, pay_scheme: "over_target" };
   const rule = parseRule(e.security_deduction_rule);
   const d = drawer({
     title: existing ? `Edit ${existing.name}` : "Add employee",
@@ -32,11 +32,17 @@ export async function employeeForm(existing, onSaved) {
       <div class="form-section" data-guy>Pay setup</div>
       <div class="field" data-guy><label>Reports to (manager)</label><select class="input" name="manager_id"><option value="">—</option>
         ${managers.map((m) => html`<option value="${m.employee_id}" ${m.employee_id === e.manager_id ? "selected" : ""}>${m.name} · ${m.hub}</option>`)}</select></div>
-      <div class="field" data-guy><label>Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"></div>
+      <div class="field" data-guy><label>Pay scheme</label><select class="input" name="pay_scheme">
+        <option value="over_target" ${e.pay_scheme !== "tiered" ? "selected" : ""}>Basic + commission over target</option>
+        <option value="tiered" ${e.pay_scheme === "tiered" ? "selected" : ""}>Tiered (commission under target, fixed basic over it)</option></select></div>
+      <div class="field" data-guy><label id="basic-lbl">Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"></div>
       <div class="field" data-guy><label>Monthly target (Rs)</label><input class="input" name="target" inputmode="decimal" value="${fromCents(e.target)}"></div>
+      <div class="field" data-guy data-tiered><label>Commission on all business when target not reached (%)</label><input class="input" name="base_commission_pct" inputmode="decimal" value="${e.base_commission_rate ? +(e.base_commission_rate * 100).toFixed(4) : ""}"></div>
       <div class="field" data-guy><label>Commission on business over target (%)</label><input class="input" name="commission_pct" inputmode="decimal" value="${e.commission_rate ? +(e.commission_rate * 100).toFixed(4) : ""}"></div>
+      <div class="field" data-guy data-tiered><label>Food allowance (Rs / day worked)</label><input class="input" name="food_per_day" inputmode="decimal" value="${e.food_per_day ? fromCents(e.food_per_day) : ""}"></div>
+      <div class="field" data-guy data-tiered><label>Food paid only after (days worked)</label><input class="input" name="food_min_days" inputmode="numeric" value="${e.food_min_days || ""}" placeholder="0 = always"><span class="hint">Blank or 0 pays food from the first day</span></div>
       <div class="field" data-guy><label>Security deduction</label><select class="input" name="sec_kind">
-        ${[["none", "None"], ["fixed", "Fixed amount / month"], ["pct_gross", "% of gross pay"], ["pct_basic", "% of basic pay"]].map(([v, l]) => html`<option value="${v}" ${rule.kind === v ? "selected" : ""}>${l}</option>`)}</select></div>
+        ${[["none", "None"], ["fixed", "Fixed amount / month"], ["pct_gross", "% of gross pay"], ["pct_basic", "% of basic pay"], ["pct_business", "% of total business"]].map(([v, l]) => html`<option value="${v}" ${rule.kind === v ? "selected" : ""}>${l}</option>`)}</select></div>
       <div class="field" data-guy data-sec><label id="sec-val-lbl">Amount</label><input class="input" name="sec_value" inputmode="decimal" value="${rule.value}"></div>
       <div class="field" data-guy data-sec><label>Stop after total of (Rs)</label><input class="input" name="sec_cap" inputmode="decimal" value="${rule.cap}" placeholder="No cap"><span class="hint">Lifetime cap on security held</span></div>
 
@@ -53,6 +59,9 @@ export async function employeeForm(existing, onSaved) {
   const sync = () => {
     const guy = f.role.value === "guy";
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
+    const tiered = f.pay_scheme.value === "tiered";
+    $$("[data-tiered]", f).forEach((x) => (x.hidden = !guy || !tiered));
+    $("#basic-lbl", f).textContent = tiered ? "Fixed basic when target is exceeded (Rs / month)" : "Basic pay (Rs / month)";
     const k = f.sec_kind.value;
     $$("[data-sec]", f).forEach((x) => (x.hidden = !guy || k === "none"));
     $("#sec-val-lbl", f).textContent = k === "fixed" ? "Amount (Rs / month)" : "Percentage (%)";
@@ -64,10 +73,14 @@ export async function employeeForm(existing, onSaved) {
     const v = Object.fromEntries(new FormData(f));
     const guy = v.role === "guy";
     const secRule = !guy || v.sec_kind === "none" ? "none" : `${v.sec_kind}:${v.sec_value || 0}${v.sec_cap ? `;cap:${v.sec_cap}` : ""}`;
+    const tiered = guy && v.pay_scheme === "tiered";
     const body = {
       name: v.name, role: v.role, hub: v.hub, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
       manager_id: guy ? v.manager_id : "", basic_pay: guy ? v.basic_pay || 0 : 0, target: guy ? v.target || 0 : 0,
       commission_rate: guy && v.commission_pct ? Number(v.commission_pct) / 100 : 0, security_deduction_rule: secRule,
+      pay_scheme: tiered ? "tiered" : "over_target",
+      base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
+      food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };
     const saved = existing ? await put(`/api/staff/${encodeURIComponent(existing.employee_id)}`, body) : await post("/api/staff", { ...body, employee_id: v.employee_id });

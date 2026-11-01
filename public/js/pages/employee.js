@@ -48,8 +48,14 @@ export default {
           <dt>Added by</dt><dd>${s.created_by} · ${dateTime(s.created_at)}</dd></dl></div></div>
         <div class="stack">
           ${s.role === "guy" ? html`<div class="card"><div class="card-head"><h3>Pay setup</h3></div><div class="card-body"><dl class="kv">
-            <dt>Basic pay</dt><dd>Rs ${money(s.basic_pay)} / month</dd><dt>Target</dt><dd>Rs ${money(s.target)} / month</dd>
-            <dt>Commission</dt><dd>${pct(s.commission_rate, 2)} of business over target</dd><dt>Security rule</dt><dd class="mono">${s.security_deduction_rule}</dd></dl></div></div>`
+            ${s.pay_scheme === "tiered" ? html`<dt>Scheme</dt><dd>Tiered</dd>
+            <dt>Under target</dt><dd>${pct(s.base_commission_rate, 2)} of all business, no basic</dd>
+            <dt>Over target</dt><dd>Rs ${money(s.basic_pay)} fixed basic + ${pct(s.commission_rate, 2)} of business over target</dd>
+            <dt>Target</dt><dd>Rs ${money(s.target)} / month</dd>
+            <dt>Food</dt><dd>${s.food_per_day ? html`Rs ${money(s.food_per_day)} / day${s.food_min_days ? ` once ${s.food_min_days}+ days worked` : ""}` : "None"}</dd>`
+            : html`<dt>Basic pay</dt><dd>Rs ${money(s.basic_pay)} / month</dd><dt>Target</dt><dd>Rs ${money(s.target)} / month</dd>
+            <dt>Commission</dt><dd>${pct(s.commission_rate, 2)} of business over target</dd>`}
+            <dt>Security rule</dt><dd class="mono">${s.security_deduction_rule}</dd></dl></div></div>`
             : html`<div class="card"><div class="card-head"><h3>How manager pay works</h3></div><div class="card-body muted">Each week: business × profit % − rent − hub fee − security − personal draw. Each month the company return and the guys' net salaries are charged, and the result is carried as a running balance.</div></div>`}
           <div class="card"><div class="card-head"><h3>Bank</h3>${badge(bankState[0], bankState[1])}</div><div class="card-body"><dl class="kv">
             <dt>Bank</dt><dd>${s.bank_name || "—"}</dd><dt>Bank / branch</dt><dd class="mono">${s.bank_code || "—"} / ${s.branch_code || "—"}</dd>
@@ -97,6 +103,7 @@ export default {
     show();
     $("#edit")?.addEventListener("click", () => employeeForm(s, () => this.render(ctx)));
     document.title = `${s.name} · Payroll`;
-    $("#page-title").textContent = s.name;
+    const title = $("#page-title"); // the redesigned header has no #page-title, only breadcrumbs
+    if (title) title.textContent = s.name;
   },
 };

@@ -4,15 +4,16 @@
 const sum = (rows, f) => rows.reduce((t, r) => t + (typeof f === "function" ? f(r) : r[f]), 0);
 const pct = (amount, rate) => Math.round(amount * rate);
 
-// security_deduction_rule grammar:  none | fixed:<Rs> | pct_gross:<n> | pct_basic:<n>   [;cap:<Rs>]
+// security_deduction_rule grammar:  none | fixed:<Rs> | pct_gross:<n> | pct_basic:<n> | pct_business:<n>   [;cap:<Rs>]
 //   fixed:1500             Rs 1,500 every period
 //   pct_gross:5            5% of gross earnings
 //   pct_basic:5;cap:25000  5% of basic pay until Rs 25,000 has been held in total
+//   pct_business:1         1% of the period's total business
 function parseSecurityRule(rule) {
   const text = String(rule || "none").trim().toLowerCase();
   if (text === "none" || text === "") return { kind: "none", value: 0, cap: null };
   const [main, ...opts] = text.split(";").map((s) => s.trim());
-  const m = /^(fixed|pct_gross|pct_basic):(\d+(?:\.\d+)?)$/.exec(main);
+  const m = /^(fixed|pct_gross|pct_basic|pct_business):(\d+(?:\.\d+)?)$/.exec(main);
   if (!m) throw new Error(`Invalid security_deduction_rule "${rule}"`);
   let cap = null;
   for (const o of opts) {
@@ -24,30 +25,43 @@ function parseSecurityRule(rule) {
   return { kind: m[1], value, cap };
 }
 
-function securityDeduction(rule, { gross, basic, heldToDate }) {
+function securityDeduction(rule, { gross, basic, business = 0, heldToDate }) {
   const r = parseSecurityRule(rule);
   let amount = 0;
   if (r.kind === "fixed") amount = r.value;
   else if (r.kind === "pct_gross") amount = pct(Math.max(0, gross), r.value);
   else if (r.kind === "pct_basic") amount = pct(basic, r.value);
+  else if (r.kind === "pct_business") amount = pct(Math.max(0, business), r.value);
   if (r.cap != null) amount = Math.min(amount, Math.max(0, r.cap - heldToDate));
   return amount;
 }
 
 // Guys / supervisors — monthly.
+// staff.pay_scheme picks how earnings are built:
+//   over_target (default)  basic_pay always, plus commission_rate × business over target.
+//   tiered                 target not exceeded → base_commission_rate × all business, no basic;
+//                          target exceeded     → fixed basic_pay plus commission_rate × business over target.
+//                          Food allowance = food_per_day × days logged, only once food_min_days are worked
+//                          (food_min_days 0 = always paid).
 function computeGuy({ staff, daily, stock, allowances, openingBalance, securityHeldToDate }) {
+  const tiered = staff.pay_scheme === "tiered";
   const totalBusiness = sum(daily, "business_amount");
   const overTarget = Math.max(0, totalBusiness - staff.target);
+  const metTarget = totalBusiness > staff.target;
   const commission = pct(overTarget, staff.commission_rate);
   const allowanceTotal = sum(allowances, "amount");
-  const gross = staff.basic_pay + commission + allowanceTotal;
+  const basic = tiered && !metTarget ? 0 : staff.basic_pay;
+  const baseCommission = tiered && !metTarget ? pct(totalBusiness, staff.base_commission_rate) : 0;
+  const foodDays = daily.length;
+  const food = tiered && staff.food_per_day > 0 && foodDays >= (staff.food_min_days || 0) ? staff.food_per_day * foodDays : 0;
+  const gross = basic + baseCommission + commission + food + allowanceTotal;
 
   const settleUpDaily = sum(daily, "settle_up_minus");
   const stockShortfall = sum(stock, "shortfall_value");
   const settleUp = settleUpDaily + stockShortfall; // stock shortfall feeds settle_up_minus
   const personal = sum(daily, "personal_minus");
   const security = securityDeduction(staff.security_deduction_rule, {
-    gross, basic: staff.basic_pay, heldToDate: securityHeldToDate,
+    gross, basic, business: totalBusiness, heldToDate: securityHeldToDate,
   });
   const totalDeductions = settleUp + personal + security;
   const netPay = gross - totalDeductions;
@@ -70,7 +84,15 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
       target: staff.target,
       over_target_amount: overTarget,
       commission_rate: staff.commission_rate,
-      earnings: [
+      ...(tiered ? { pay_scheme: "tiered", target_met: metTarget, food_allowance: food } : {}),
+      earnings: tiered ? [
+        ...(metTarget ? [{ label: "Basic pay", amount: basic }] : [
+          { label: `Commission (${fmtRate(staff.base_commission_rate)} of Rs ${fmt(totalBusiness)} business)`, amount: baseCommission },
+        ]),
+        { label: `Over-target income (${fmtRate(staff.commission_rate)} of Rs ${fmt(overTarget)} over target)`, amount: commission },
+        { label: `Food allowance (${foodDays} days × Rs ${fmt(staff.food_per_day)})`, amount: food },
+        ...allowances.map((a) => ({ label: `Allowance: ${a.description}`, amount: a.amount })),
+      ] : [
         { label: "Basic pay", amount: staff.basic_pay },
         { label: `Commission (${fmtRate(staff.commission_rate)} of Rs ${fmt(overTarget)} over target)`, amount: commission },
         ...allowances.map((a) => ({ label: `Allowance: ${a.description}`, amount: a.amount })),

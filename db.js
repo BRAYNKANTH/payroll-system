@@ -109,6 +109,12 @@ CREATE TABLE IF NOT EXISTS staff (
   updated_at              text
 );
 
+-- Pay scheme columns (see engine.computeGuy). Added with ALTER so existing databases pick them up.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS pay_scheme text NOT NULL DEFAULT 'over_target' CHECK (pay_scheme IN ('over_target','tiered'));
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS base_commission_rate double precision NOT NULL DEFAULT 0;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_per_day bigint NOT NULL DEFAULT 0;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS daily_log (
   id              bigserial PRIMARY KEY,
   date            text NOT NULL ${DATE_CHECK("date")},

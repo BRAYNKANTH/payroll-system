@@ -142,3 +142,25 @@ test("input validation", async () => {
   await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1, settled_amount: 1 }, "c");
   await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1, settled_amount: 1 }, "c"), (e) => e.status === 409);
 });
+
+test("tiered pay scheme is stored on staff and drives the monthly run", async () => {
+  const d = await setup();
+  await svc.createEntry(d, "staff", {
+    employee_id: "D1", name: "Distributor One", role: "guy", hub: "Colombo", manager_id: "M1", target: 100000,
+    pay_scheme: "tiered", basic_pay: 25000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 0,
+    security_deduction_rule: "pct_business:1", bank_name: "BOC", bank_code: "7010", branch_code: "001", bank_account_no: "2222333344",
+  }, "admin");
+  const days = [[4900, 0], [4900, 3250], [4900, 4900], [4900, 4900], [4900, 4900], [4900, 4900], [4900, 4900], [5000, 5000]];
+  for (const [i, [business, settled]] of days.entries()) {
+    await svc.createEntry(d, "daily", { date: `2026-08-${String(i + 3).padStart(2, "0")}`, employee_id: "D1", business_amount: business, settled_amount: settled }, "clerk");
+  }
+  await svc.runPeriod(d, "2026-08", "clerk");
+  const r = await row(d, "2026-08", "D1");
+  // 25% × 39,300 + 8 days × 150 food − (6,550 settle-up + 1% security 393)
+  assert.equal(r.gross_earnings, 982500 + 120000);
+  assert.equal(r.net_pay, 408200);
+
+  const changed = await svc.updateEntry(d, "staff", "D1", { pay_scheme: "over_target" }, "admin");
+  assert.equal(changed.pay_scheme, "over_target");
+  await assert.rejects(() => svc.updateEntry(d, "staff", "D1", { pay_scheme: "bogus" }, "admin"), /pay_scheme must be one of/);
+});

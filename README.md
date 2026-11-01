@@ -85,14 +85,17 @@ The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` 
 
 | | |
 |---|---|
-| Guy commission | `max(0, business − target) × commission_rate` |
+| Guy commission (`pay_scheme = over_target`, default) | `max(0, business − target) × commission_rate` |
 | Guy gross | `basic + commission + allowances` |
+| Guy, `pay_scheme = tiered` (business > target) | fixed `basic_pay` + `commission_rate × (business − target)` |
+| Guy, `pay_scheme = tiered` (business ≤ target) | `base_commission_rate × all business`, no basic |
+| Guy food allowance (tiered) | `food_per_day × days logged`, only once `food_min_days` are worked (0 = always) |
 | Guy deductions | `Σ settle_up_minus + stock shortfall value + Σ personal_minus + security` |
 | Guy balance | `payable = opening + net`; positive is paid to the bank, negative carries forward |
 | Manager weekly | `business × profit% − rent − hub_fee − security_cost − personal_draw` |
 | Manager closing | `opening + Σ weekly − business × 15% − Σ net pay of their guys` |
 | Stock shortfall | `max(0, opening + issued − sold − counted) × unit_price` |
-| Security rule | none, fixed amount, % of gross or % of basic, with an optional lifetime cap |
+| Security rule | none, fixed amount, % of gross, % of basic or % of business (`pct_business:1`), with an optional lifetime cap |
 
 Flags that need approval: net pay moved by more than 20%; a negative deduction; deductions greater than
 gross; a manager's balance going further negative; bank account different from the verified one (or
