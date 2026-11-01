@@ -512,3 +512,15 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 :root[data-theme="dark"] .btn.primary, :root[data-theme="dark"] .avatar, :root[data-theme="dark"] .brand-mark,
 :root[data-theme="dark"] .step.current .dot, :root[data-theme="dark"] .skip-link { color: #0f1a15; }
 :root[data-theme="dark"] .nav .count { color: #1a0f08; }
+
+/* Phones and touch: controls at least 40px tall so they are easy to hit */
+@media (max-width: 860px) {
+  .period-picker { min-height: 40px; }
+  .period-picker button { min-width: 40px; min-height: 40px; }
+  .period-picker select { min-height: 40px; padding: 0 4px; }
+  .btn.sm, .btn.sm.icon { min-height: 40px; }
+  .btn.sm.icon { min-width: 40px; }
+  .input.sm { height: 40px; }
+  .seg button { min-height: 36px; padding: 6px 14px; }
+  .th-sort { min-height: 32px; }
+}
