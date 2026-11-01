@@ -565,6 +565,26 @@ async function updateSettings(db, body, user) {
     session_hours: (v) => { const n = Number(v); if (!(n >= 1 && n <= 168)) throw httpError(400, "session_hours must be 1–168"); return String(Math.round(n)); },
     company_account_no: (v) => String(v).trim(),
     company_name: (v) => String(v).trim(),
+    // Pay setup pre-filled for new staff at each position. People can still be given their own target and rates.
+    position_defaults: (v) => {
+      let o;
+      try { o = typeof v === "string" ? JSON.parse(v) : v; } catch { throw httpError(400, "position_defaults must be valid JSON"); }
+      if (!o || typeof o !== "object" || Array.isArray(o)) throw httpError(400, "position_defaults must be an object");
+      const out = {};
+      for (const [level, d] of Object.entries(o)) {
+        if (!(level in LEVEL_RANK) || level === "manager") throw httpError(400, `No pay defaults for position ${level}`);
+        const num = (k, max = Infinity) => { const n = Number(d[k] ?? 0); if (!(n >= 0 && n <= max)) throw httpError(400, `${level}: ${k} is invalid`); return n; };
+        const scheme = d.pay_scheme === "tiered" ? "tiered" : "over_target";
+        const rule = String(d.security_deduction_rule || "none");
+        try { engine.parseSecurityRule(rule); } catch (e) { throw httpError(400, `${level}: ${e.message}`); }
+        out[level] = {
+          pay_scheme: scheme, target: num("target"), basic_pay: num("basic_pay"), commission_rate: num("commission_rate", 1),
+          base_commission_rate: num("base_commission_rate", 1), food_per_day: num("food_per_day"), food_min_days: Math.round(num("food_min_days", 31)),
+          security_deduction_rule: rule,
+        };
+      }
+      return JSON.stringify(out);
+    },
   };
   return withUser(db, user, async (t) => {
     for (const [k, v] of Object.entries(body)) {

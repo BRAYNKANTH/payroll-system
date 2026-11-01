@@ -44,3 +44,13 @@ test("legacy role-only records still work and default their level", async () => 
   const moved = await svc.updateEntry(d, "staff", "G1", { upline_id: "M1" }, "admin");
   assert.equal(moved.manager_id, "M1");
 });
+
+test("position pay defaults are validated and stored", async () => {
+  const d = await setup();
+  const good = { supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 24, security_deduction_rule: "pct_business:1" } };
+  const s = await svc.updateSettings(d, { position_defaults: JSON.stringify(good) }, "admin");
+  assert.equal(JSON.parse(s.position_defaults).supervisor.target, 120000);
+  await assert.rejects(() => svc.updateSettings(d, { position_defaults: JSON.stringify({ manager: {} }) }, "admin"), /No pay defaults/);
+  await assert.rejects(() => svc.updateSettings(d, { position_defaults: JSON.stringify({ supervisor: { commission_rate: 5 } }) }, "admin"), /invalid/);
+  await assert.rejects(() => svc.updateSettings(d, { position_defaults: "nope" }, "admin"), /valid JSON/);
+});

@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   session_hours: "12",
   company_account_no: "",
   company_name: "My Company",
+  position_defaults: "{}",             // JSON: pay setup pre-filled when adding someone at each position (see service.updateSettings)
 };
 
 // Timestamps are stored as ISO-8601 UTC text so they compare and serialise exactly like before.

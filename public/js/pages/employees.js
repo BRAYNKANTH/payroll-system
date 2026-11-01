@@ -78,8 +78,24 @@ export async function employeeForm(existing, onSaved) {
     $$("[data-sec]", f).forEach((x) => (x.hidden = !guy || k === "none"));
     $("#sec-val-lbl", f).textContent = k === "fixed" ? "Amount (Rs / month)" : "Percentage (%)";
   };
+  // New staff start from the position's pay defaults (Settings); every field stays editable for this person.
+  const applyDefaults = () => {
+    let all = {};
+    try { all = JSON.parse(state.settings.position_defaults || "{}"); } catch { /* none set */ }
+    const d = all[f.staff_level.value];
+    if (!d) return;
+    const rule = parseRule(d.security_deduction_rule);
+    const set = (n, v) => { f[n].value = v || ""; };
+    f.pay_scheme.value = d.pay_scheme || "over_target";
+    set("target", d.target); set("basic_pay", d.basic_pay);
+    set("commission_pct", d.commission_rate ? +(d.commission_rate * 100).toFixed(4) : "");
+    set("base_commission_pct", d.base_commission_rate ? +(d.base_commission_rate * 100).toFixed(4) : "");
+    set("food_per_day", d.food_per_day); set("food_min_days", d.food_min_days);
+    f.sec_kind.value = rule.kind; set("sec_value", rule.value); set("sec_cap", rule.cap);
+  };
   fillUpline(currentUpline);
-  f.addEventListener("change", (ev) => { if (ev.target === f.staff_level) fillUpline(); sync(); });
+  if (!existing) applyDefaults();
+  f.addEventListener("change", (ev) => { if (ev.target === f.staff_level) { fillUpline(); if (!existing) applyDefaults(); } sync(); });
   sync();
 
   $("#ef-save", d.panel).onclick = (ev) => busy(ev.currentTarget, async () => {
