@@ -83,12 +83,12 @@ export async function navigate(path, replace = false) {
 
 function resolve(pathname) {
   const n = NAV.find((x) => x.path === pathname && x.page);
-  if (n) return { page: n.page, nav: n.path, params: [] };
+  if (n) return { page: n.page, nav: n.path, params: [], perm: n.perm };
   for (const r of EXTRA_ROUTES) {
     const m = r.re.exec(pathname);
     if (m) return { page: r.page, nav: r.nav, params: m.slice(1) };
   }
-  return { page: "dashboard", nav: "/", params: [] };
+  return { page: null, nav: null, params: [] };
 }
 
 // ---------------------------------------------------------------- layout
@@ -283,7 +283,7 @@ let renderSeq = 0;
 export async function render({ moveFocus = false } = {}) {
   const seq = ++renderSeq;
   dirtyCheck = null;
-  const { page, nav, params } = resolve(location.pathname);
+  const { page, nav, params, perm } = resolve(location.pathname);
   $$("#nav a").forEach((a) => {
     const on = a.dataset.nav === nav;
     a.classList.toggle("active", on);
@@ -296,6 +296,15 @@ export async function render({ moveFocus = false } = {}) {
   old.replaceWith(view);
   view.setAttribute("aria-busy", "true");
   view.innerHTML = `<div class="loading-screen"><div class="spinner" role="img" aria-label="Loading"></div></div>`;
+  const blocked = !page ? ["Page not found", "There is no page at this address."] : perm && !can(perm) ? ["No access", `Your role (${state.user.role}) cannot open this page.`] : null;
+  if (blocked) {
+    view.removeAttribute("aria-busy");
+    document.title = `${blocked[0]} · ${state.settings.company_name || "Payroll"}`;
+    $("#crumbs").innerHTML = `<b>${esc(blocked[0])}</b>`;
+    view.innerHTML = `<div class="page-head"><div><h1>${esc(blocked[0])}</h1><p>${esc(blocked[1])}</p></div></div><a class="btn" href="/" data-link>Back to the dashboard</a>`;
+    if (moveFocus) { const h = view.querySelector("h1"); h.tabIndex = -1; h.focus({ preventScroll: true }); }
+    return;
+  }
   try {
     const mod = await loadPage(page);
     if (seq !== renderSeq) return;
