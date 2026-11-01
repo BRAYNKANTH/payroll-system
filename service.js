@@ -33,11 +33,13 @@ const ENTITIES = {
     fields: {
       employee_id: { type: "text", required: true, createOnly: true, check: (v) => { if (!/^[A-Za-z0-9._-]{1,20}$/.test(v)) throw new Error("Employee ID must be 1–20 letters/numbers"); } },
       name: { type: "text", required: true },
-      role: { type: "enum", values: ["guy", "manager"], required: true },
+      role: { type: "enum", values: ["guy", "manager"] }, // derived from staff_level when that is given
       hub: { type: "text", required: true },
       phone: { type: "text" },
       nic: { type: "text" },
       join_date: { type: "date" },
+      staff_level: { type: "enum", values: ["distributor", "supervisor", "group_manager", "manager"] },
+      upline_id: { type: "text" },
       manager_id: { type: "text" },
       basic_pay: { type: "money" },
       target: { type: "money" },
@@ -202,6 +204,37 @@ async function validateRefs(db, kind, row) {
   }
 }
 
+// Chain of command. Payroll only knows two roles (guy, manager); staff_level adds the rungs between them.
+const LEVEL_RANK = { distributor: 0, supervisor: 1, group_manager: 2, manager: 3 };
+const LEVEL_NAME = { distributor: "Distributor", supervisor: "Supervisor", group_manager: "Group manager", manager: "Manager" };
+
+// Keeps role, staff_level, upline_id and manager_id consistent. `row` holds the changes, `existing` the stored record.
+async function applyChain(db, row, existing = {}, id) {
+  const m = { ...existing, ...row };
+  if (!m.role && !m.staff_level) throw httpError(400, "staff_level (position) is required");
+  if (row.staff_level) row.role = m.role = row.staff_level === "manager" ? "manager" : "guy";
+  else if (row.role && row.role !== existing.role) row.staff_level = m.staff_level = row.role === "manager" ? "manager" : "distributor";
+  else if (!m.staff_level) row.staff_level = m.staff_level = m.role === "manager" ? "manager" : "distributor";
+  if (m.role === "manager" && m.upline_id) throw httpError(400, "A manager is at the top of the chain and reports to no one");
+  if (m.upline_id) {
+    if (m.upline_id === id) throw httpError(400, "An employee cannot report to themselves");
+    const up = await db.get("SELECT staff_level FROM staff WHERE employee_id = ?", m.upline_id);
+    if (!up) throw httpError(400, `Unknown upline ${m.upline_id}`);
+    if (LEVEL_RANK[up.staff_level] <= LEVEL_RANK[m.staff_level]) {
+      throw httpError(400, `A ${LEVEL_NAME[m.staff_level].toLowerCase()} must report to someone more senior, not a ${LEVEL_NAME[up.staff_level].toLowerCase()}`);
+    }
+    // The nearest manager above this person is their payroll manager, unless one was set explicitly.
+    if (m.role === "guy" && row.manager_id === undefined && row.upline_id !== undefined) {
+      let cur = m.upline_id;
+      for (let i = 0; cur && i < 10; i++) {
+        const s = await db.get("SELECT role, upline_id FROM staff WHERE employee_id = ?", cur);
+        if (s?.role === "manager") { row.manager_id = cur; break; }
+        cur = s?.upline_id;
+      }
+    }
+  }
+}
+
 // Map Postgres error codes to friendly HTTP errors.
 function sqlError(err) {
   if (err.status) return err;
@@ -220,6 +253,7 @@ async function createEntry(db, kind, body, user, scopeHub) {
   const e = ENTITIES[kind];
   if (!e) throw httpError(404, `Unknown entity ${kind}`);
   const row = clean(e, body, { creating: true });
+  if (kind === "staff") await applyChain(db, row, {}, row.employee_id);
   await validateRefs(db, kind, row);
   await assertScope(db, kind, row, scopeHub);
   row.created_by = user;
@@ -237,6 +271,7 @@ async function updateEntry(db, kind, key, body, user, scopeHub) {
   const existing = await db.get(`SELECT * FROM ${e.table} WHERE ${e.key}::text = ?`, String(key));
   if (!existing) throw httpError(404, "Not found");
   const row = clean(e, body, { creating: false });
+  if (kind === "staff") await applyChain(db, row, existing, String(key));
   await validateRefs(db, kind, { ...existing, ...row });
   await assertScope(db, kind, existing, scopeHub);
   await assertScope(db, kind, { ...existing, ...row }, scopeHub);
@@ -670,17 +705,18 @@ async function dashboard(db, period, hub) {
 }
 
 async function employeeProfile(db, id) {
-  const s = await db.get(`SELECT s.*, h.name AS hub_name, m.name AS manager_name FROM staff s JOIN hubs h ON h.code = s.hub
-    LEFT JOIN staff m ON m.employee_id = s.manager_id WHERE s.employee_id = ?`, id);
+  const s = await db.get(`SELECT s.*, h.name AS hub_name, m.name AS manager_name, u.name AS upline_name FROM staff s JOIN hubs h ON h.code = s.hub
+    LEFT JOIN staff m ON m.employee_id = s.manager_id LEFT JOIN staff u ON u.employee_id = s.upline_id WHERE s.employee_id = ?`, id);
   if (!s) throw httpError(404, "Employee not found");
   const history = (await db.all(`SELECT p.*, COALESCE(x.status,'open') AS period_status FROM pay_period_summary p
       LEFT JOIN periods x USING (period) WHERE employee_id = ? ORDER BY period DESC`, id))
     .map((r) => ({ ...r, detail: JSON.parse(r.detail), flags: JSON.parse(r.flags) }));
   const team = s.role === "manager"
     ? await db.all("SELECT employee_id, name, status, basic_pay, target FROM staff WHERE manager_id = ? ORDER BY employee_id", id) : [];
+  const direct_reports = await db.all("SELECT employee_id, name, staff_level, status FROM staff WHERE upline_id = ? ORDER BY staff_level, employee_id", id);
   const changes = await db.all("SELECT * FROM audit_log WHERE table_name = 'staff' AND row_key = ? ORDER BY id DESC LIMIT 50", id);
   const security_held = history.reduce((t, r) => t + (r.detail.security_deducted || 0), 0);
-  return { staff: s, history, team, changes, security_held };
+  return { staff: s, history, team, direct_reports, changes, security_held };
 }
 
 async function balancesReport(db) {

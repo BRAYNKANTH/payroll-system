@@ -56,6 +56,10 @@ export const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w
 export const statusLabel = (s) => ({ auto_approved: "Auto-approved", pending_review: "Needs review", approved: "Approved", rejected: "Rejected", finalized: "Finalized", open: "Open" }[s] || titleCase(s));
 export const badge = (s, label) => html`<span class="badge ${s}">${label || statusLabel(s)}</span>`;
 export const roleLabel = (r) => (r === "guy" ? "Guy / Supervisor" : r === "manager" ? "Manager" : titleCase(r));
+// Chain of command, lowest to highest. Rank decides who may report to whom.
+export const LEVELS = [["distributor", "Distributor / Guy"], ["supervisor", "Supervisor"], ["group_manager", "Group manager"], ["manager", "Manager"]];
+export const levelRank = (l) => LEVELS.findIndex(([k]) => k === l);
+export const levelLabel = (l) => LEVELS.find(([k]) => k === l)?.[1] || titleCase(l);
 
 // ---- icons (Lucide-style, stroke based)
 const P = {

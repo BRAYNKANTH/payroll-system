@@ -1,6 +1,6 @@
 import { get } from "../api.js";
 import { can, navigate } from "../app.js";
-import { $, $$, html, icon, money, badge, dataTable, emptyState, initials, roleLabel, pct, dateTime, monthName, shortMonth } from "../ui.js";
+import { $, $$, html, icon, money, badge, dataTable, emptyState, initials, roleLabel, levelLabel, pct, dateTime, monthName, shortMonth } from "../ui.js";
 import { lineChart, PALETTE } from "../charts.js";
 import { employeeForm } from "./employees.js";
 import { breakdownDrawer } from "./breakdown.js";
@@ -24,7 +24,7 @@ export default {
           <div class="avatar lg" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div>
           <div style="flex:1;min-width:200px">
             <h2>${s.name}</h2>
-            <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, roleLabel(s.role))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
+            <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
           </div>
           <div class="row" style="gap:28px">
             <div><div class="faint" style="font-size:12px">Latest net pay</div><div style="font-size:20px;font-weight:700" class="num ${last?.net_pay < 0 ? "neg" : ""}">${last ? `Rs ${money(last.net_pay)}` : "—"}</div><div class="faint" style="font-size:12px">${last ? monthName(last.period) : ""}</div></div>
@@ -43,7 +43,9 @@ export default {
       overview: () => html`<div class="grid halves">
         <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="kv">
           <dt>Employee ID</dt><dd class="mono">${s.employee_id}</dd><dt>Hub</dt><dd>${s.hub_name} (${s.hub})</dd>
-          <dt>Role</dt><dd>${roleLabel(s.role)}</dd>${s.role === "guy" ? html`<dt>Manager</dt><dd>${s.manager_id ? html`<a href="/employees/${encodeURIComponent(s.manager_id)}" data-link>${s.manager_name}</a>` : "—"}</dd>` : ""}
+          <dt>Position</dt><dd>${levelLabel(s.staff_level)}</dd>${s.role === "guy" ? html`<dt>Reports to</dt><dd>${s.upline_id ? html`<a href="/employees/${encodeURIComponent(s.upline_id)}" data-link>${s.upline_name}</a>` : "—"}</dd>
+          ${s.manager_id && s.manager_id !== s.upline_id ? html`<dt>Payroll manager</dt><dd><a href="/employees/${encodeURIComponent(s.manager_id)}" data-link>${s.manager_name}</a></dd>` : ""}` : ""}
+          ${p.direct_reports.length ? html`<dt>Direct reports</dt><dd>${p.direct_reports.map((r) => html`<div><a href="/employees/${encodeURIComponent(r.employee_id)}" data-link>${r.name}</a> <span class="faint">${levelLabel(r.staff_level)}</span></div>`)}</dd>` : ""}
           <dt>Phone</dt><dd>${s.phone || "—"}</dd><dt>NIC</dt><dd>${s.nic || "—"}</dd><dt>Joined</dt><dd>${s.join_date || "—"}</dd>
           <dt>Added by</dt><dd>${s.created_by} · ${dateTime(s.created_at)}</dd></dl></div></div>
         <div class="stack">

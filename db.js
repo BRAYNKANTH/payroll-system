@@ -115,6 +115,11 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS base_commission_rate double precision
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_per_day bigint NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAULT 0;
 
+-- Chain of command: distributor/guy -> supervisor -> group manager -> manager. upline_id is who this person reports to.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS staff_level text NOT NULL DEFAULT 'distributor' CHECK (staff_level IN ('distributor','supervisor','group_manager','manager'));
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS upline_id text REFERENCES staff(employee_id);
+UPDATE staff SET staff_level = 'manager' WHERE role = 'manager' AND staff_level = 'distributor';
+
 CREATE TABLE IF NOT EXISTS daily_log (
   id              bigserial PRIMARY KEY,
   date            text NOT NULL ${DATE_CHECK("date")},
