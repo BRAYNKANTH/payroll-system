@@ -40,9 +40,9 @@ export default {
       </div>
       <div class="card">
         <div class="card-head"><form class="row" id="af">
-          <select class="input sm" name="table" style="width:auto">${TABLES.map(([v, l]) => html`<option value="${v}" ${f.table === v ? "selected" : ""}>${l}</option>`)}</select>
-          <input class="input sm" name="user" placeholder="User" value="${f.user}" style="width:130px">
-          <input class="input sm" name="key" placeholder="Record ID" value="${f.key}" style="width:120px">
+          <select class="input sm" name="table" aria-label="Record type" style="width:auto">${TABLES.map(([v, l]) => html`<option value="${v}" ${f.table === v ? "selected" : ""}>${l}</option>`)}</select>
+          <input class="input sm" name="user" aria-label="User" placeholder="User" value="${f.user}" style="width:130px">
+          <input class="input sm" name="key" aria-label="Record ID" placeholder="Record ID" value="${f.key}" style="width:120px">
           <input class="input sm" type="date" name="from" value="${f.from}" style="width:150px" aria-label="From">
           <input class="input sm" type="date" name="to" value="${f.to}" style="width:150px" aria-label="To">
           <button class="btn sm primary">${icon("filter")} Filter</button><button class="btn sm ghost" type="button" id="clear">Clear</button>

@@ -6,7 +6,7 @@
   --surface-2: #f4f1ea;
   --surface-3: #ebe7dd;
   --border: #ddd7ca;
-  --border-strong: #b5ad9b;
+  --border-strong: #8a826f;
   --text: #1d1b17;
   --text-2: #46423a;
   --text-3: #625d52;
@@ -14,7 +14,7 @@
   --primary-2: #134a3a;
   --primary-soft: #e3eee8;
   --primary-text: #134a3a;
-  --accent: #b4531a;
+  --accent: #a64a14;
   --accent-soft: #f8e9dd;
   --success: #1f6b3a;
   --success-soft: #e5f1e8;
@@ -45,7 +45,7 @@
 }
 /* Dark is opt-in through the theme button; light is always the default. */
 :root[data-theme="dark"] {
-  --bg: #16150f; --surface: #1e1c16; --surface-2: #26241c; --surface-3: #312e24; --border: #38352a; --border-strong: #5a5545;
+  --bg: #16150f; --surface: #1e1c16; --surface-2: #26241c; --surface-3: #312e24; --border: #38352a; --border-strong: #857f6b;
   --text: #f1eee6; --text-2: #d3cebf; --text-3: #aca695; --primary: #6fbf9f; --primary-2: #8fd1b6; --primary-soft: #1d3329;
   --primary-text: #a8dcc5; --accent: #e08a52; --accent-soft: #3a2616; --success: #7bd096; --success-soft: #1a2f20; --warning: #e7b755; --warning-soft: #33280f;
   --danger: #f08a82; --danger-soft: #3a1b19; --info: #7fb8e0; --info-soft: #16293a; --sidebar: #110f0b; --sidebar-2: #26241c;
@@ -110,7 +110,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .period-picker button { border: 0; background: none; padding: 7px 9px; color: var(--text-2); cursor: pointer; display: grid; place-items: center; }
 .period-picker button:hover { color: var(--primary); }
 .period-picker input { border: 0; background: none; font: 600 13px var(--font); color: var(--text); padding: 6px 2px; width: 138px; text-align: center; }
-.period-picker input:focus { outline: none; }
+
 .user-chip { display: flex; align-items: center; gap: 9px; padding: 4px 10px 4px 4px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); cursor: pointer; position: relative; }
 .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: var(--primary); flex-shrink: 0; }
 .avatar.lg { width: 56px; height: 56px; font-size: 20px; }
@@ -385,7 +385,7 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 
 /* Visible keyboard focus everywhere (2.4.7) */
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.nav a:focus-visible { outline-color: #a5b4fc; outline-offset: -2px; }
+.nav a:focus-visible { outline-offset: -2px; }
 .sheet input:focus-visible { outline: 2px solid var(--primary); }
 .table-wrap:focus-visible { outline-offset: -2px; }
 

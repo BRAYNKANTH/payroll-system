@@ -219,7 +219,7 @@ async function dayMode(ctx, guys, days, editable) {
   $("#picker").innerHTML = html`
     <div class="row">
       <button class="btn icon sm" id="prev-day" ${idx <= 0 ? "disabled" : ""} aria-label="Previous day">${icon("left")}</button>
-      <input type="date" class="input sm" id="day" value="${currentDate}" min="${days[0]}" max="${days[days.length - 1]}" style="width:160px">
+      <input type="date" class="input sm" id="day" aria-label="Date" value="${currentDate}" min="${days[0]}" max="${days[days.length - 1]}" style="width:160px">
       <button class="btn icon sm" id="next-day" ${idx >= days.length - 1 ? "disabled" : ""} aria-label="Next day">${icon("right")}</button>
       <h3 style="margin-left:6px">${dateLabel(currentDate)}</h3>
     </div>

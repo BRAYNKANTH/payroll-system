@@ -280,6 +280,15 @@ export async function refreshPending() {
 }
 
 let renderSeq = 0;
+// Give every table an accessible name from the nearest heading above it (or the page title).
+function nameTables(root) {
+  root.querySelectorAll("table").forEach((t) => {
+    if (t.querySelector("caption") || t.hasAttribute("aria-label") || t.hasAttribute("aria-labelledby")) return;
+    const h = t.closest(".card")?.querySelector("h3, h2") || root.querySelector("h1");
+    if (h?.textContent.trim()) t.setAttribute("aria-label", h.textContent.trim());
+  });
+}
+
 export async function render({ moveFocus = false } = {}) {
   const seq = ++renderSeq;
   dirtyCheck = null;
@@ -314,6 +323,7 @@ export async function render({ moveFocus = false } = {}) {
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");
+    nameTables(view);
     if (moveFocus) {
       // Move focus to the new page's heading so screen readers announce it and Tab starts at the content.
       const h1 = view.querySelector("h1");

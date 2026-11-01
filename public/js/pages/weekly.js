@@ -69,15 +69,15 @@ export default {
     const grid = $("#grid");
     grid.innerHTML = html`
       <div class="table-wrap"><table class="table sheet">
-        <thead><tr><th>Manager</th><th class="r">Business</th><th class="r">Profit %</th>${MONEY.slice(1).map((f) => html`<th class="r">${f.label}</th>`)}<th class="r">Weekly balance</th></tr></thead>
+        <thead><tr><th scope="col">Manager</th><th scope="col" class="r">Business</th><th scope="col" class="r">Profit %</th>${MONEY.slice(1).map((f) => html`<th class="r">${f.label}</th>`)}<th class="r">Weekly balance</th></tr></thead>
         <tbody>${managers.map((mg, i) => {
           const e = byMgr[mg.employee_id];
           const p = e ? e.profit_percent : lastPct(mg.employee_id);
           return html`<tr data-i="${i}">
-            <td class="name"><b>${mg.name}</b><div class="faint" style="font-size:12px">${mg.employee_id} · ${mg.hub}</div></td>
-            <td><input data-f="business_total" inputmode="decimal" value="${e ? fromCents(e.business_total) : ""}" ${editable ? "" : "disabled"}></td>
-            <td><input data-f="profit_percent" inputmode="decimal" value="${p != null ? +(p * 100).toFixed(4) : ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>
-            ${MONEY.slice(1).map((f) => html`<td><input data-f="${f.k}" inputmode="decimal" value="${e && e[f.k] ? fromCents(e[f.k]) : ""}" ${editable ? "" : "disabled"}></td>`)}
+            <th scope="row" class="name"><b>${mg.name}</b><div class="faint" style="font-size:12px;font-weight:400">${mg.employee_id} · ${mg.hub}</div></th>
+            <td><input data-f="business_total" aria-label="Business, ${mg.name}" inputmode="decimal" value="${e ? fromCents(e.business_total) : ""}" ${editable ? "" : "disabled"}></td>
+            <td><input data-f="profit_percent" aria-label="Profit %, ${mg.name}" inputmode="decimal" value="${p != null ? +(p * 100).toFixed(4) : ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>
+            ${MONEY.slice(1).map((f) => html`<td><input data-f="${f.k}" aria-label="${f.label}, ${mg.name}" inputmode="decimal" value="${e && e[f.k] ? fromCents(e[f.k]) : ""}" ${editable ? "" : "disabled"}></td>`)}
             <td class="calc" data-calc></td></tr>`;
         })}</tbody>
       </table></div>

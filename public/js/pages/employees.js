@@ -107,8 +107,8 @@ export default {
       <div class="card">
         <div class="card-head">
           <div class="row">
-            <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
-            <select class="input sm" id="role" style="width:auto"><option value="">All roles</option><option value="guy" ${filters.role === "guy" ? "selected" : ""}>Guys / supervisors</option><option value="manager" ${filters.role === "manager" ? "selected" : ""}>Managers</option></select>
+            <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
+            <select class="input sm" id="role" aria-label="Filter by role" style="width:auto"><option value="">All roles</option><option value="guy" ${filters.role === "guy" ? "selected" : ""}>Guys / supervisors</option><option value="manager" ${filters.role === "manager" ? "selected" : ""}>Managers</option></select>
             <div class="seg" id="st">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button data-v="${v}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
           </div>
         </div>
