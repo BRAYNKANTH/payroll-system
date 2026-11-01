@@ -7,34 +7,35 @@ export default {
     document.title = needsSetup ? "Set up · Payroll" : "Sign in · Payroll";
     document.body.innerHTML = `
     <div class="auth-wrap">
-      <section class="auth-art">
-        <div class="brand" style="padding:0"><div class="brand-mark">₨</div><div><div class="brand-name">Payroll</div><div class="brand-sub">Multi-hub payroll & accounts</div></div></div>
+      <section class="auth-art" aria-label="About">
+        <div class="brand" style="padding:0"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">Payroll</div><div class="brand-sub">Hub payroll and manager accounts</div></div></div>
         <div>
-          <h1>Every rupee calculated, every change on record.</h1>
-          <p>Daily and weekly entries flow straight into payslips, manager balances and the bank file — no hand-typed salary figures.</p>
-          <ul>
-            <li>${icon("checkCircle")} Automatic commission, deductions and carry-forward balances</li>
-            <li>${icon("shield")} Only exceptions need approval — everything else auto-processes</li>
-            <li>${icon("history")} Full audit trail of who changed what, and when</li>
-            <li>${icon("bank")} Bank disbursement file for the approved batch</li>
-          </ul>
+          <h2 class="art-title">Daily sheets in, payslips and a bank file out.</h2>
+          <p>Staff enter each day's business and settlements. The system works out commission, deductions and balances carried from last month.</p>
+          <ol>
+            <li>Enter the daily sheets for each hub</li>
+            <li>Calculate the month's payroll</li>
+            <li>Review the rows that were flagged</li>
+            <li>Finalize, which locks the month</li>
+            <li>Download the bank file and payslips</li>
+          </ol>
         </div>
-        <div style="font-size:12px;color:#64748b">Amounts in Sri Lankan Rupees (LKR)</div>
+        <div class="note">Amounts are in Sri Lankan rupees (LKR). Every change is recorded in the audit trail.</div>
       </section>
-      <section class="auth-form">
+      <main class="auth-form">
         <div class="auth-card">
-          <h2>${needsSetup ? "Create the admin account" : "Welcome back"}</h2>
+          <h1 class="auth-title">${needsSetup ? "Create the admin account" : "Welcome back"}</h1>
           <p class="muted" style="margin:0">${needsSetup ? "This is the first run. The account you create here will have full access." : "Sign in to continue to your payroll workspace."}</p>
           <form id="auth-form" novalidate>
             ${needsSetup ? `<div class="field"><label for="full_name">Full name</label><input class="input" id="full_name" name="full_name" autocomplete="name" required></div>` : ""}
             <div class="field"><label for="username">Username</label><input class="input" id="username" name="username" autocomplete="username" required autofocus></div>
             <div class="field"><label for="password">Password</label><input class="input" id="password" name="password" type="password" autocomplete="${needsSetup ? "new-password" : "current-password"}" required>
               ${needsSetup ? `<span class="hint">At least 8 characters, with letters and numbers.</span>` : ""}</div>
-            <div id="auth-err" class="alert err" hidden>${icon("alert")}<div></div></div>
+            <div id="auth-err" class="alert err" role="alert" hidden>${icon("alert")}<div></div></div>
             <button class="btn primary" type="submit">${needsSetup ? "Create account & continue" : "Sign in"}</button>
           </form>
         </div>
-      </section>
+      </main>
     </div>`;
     const form = $("#auth-form");
     form.onsubmit = async (e) => {
@@ -49,6 +50,7 @@ export default {
       } catch (err) {
         $("#auth-err div").innerHTML = esc(err.message);
         $("#auth-err").hidden = false;
+        form.querySelector("#password").select();
         btn.classList.remove("loading");
       }
     };

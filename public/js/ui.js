@@ -104,48 +104,142 @@ const P = {
 };
 export const icon = (name, cls = "") => raw(`<svg class="i ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ""}</svg>`);
 
-// ---- toasts
+// ---- live regions & toasts
+// Screen readers only announce changes to live regions that already exist, so both are created up front.
+const live = {};
+function ensureLive() {
+  if (live.polite) return;
+  for (const [k, attrs] of [["polite", 'aria-live="polite" role="status"'], ["assertive", 'aria-live="assertive" role="alert"']]) {
+    const el = document.createElement("div");
+    el.className = "sr-only";
+    el.id = `live-${k}`;
+    el.setAttribute("aria-atomic", "true");
+    attrs.split(" ").forEach((a) => { const [n, v] = a.split("="); el.setAttribute(n, v.replace(/"/g, "")); });
+    document.body.append(el);
+    live[k] = el;
+  }
+  const box = document.createElement("div");
+  box.className = "toasts";
+  document.body.append(box);
+  live.box = box;
+}
+// Announce text to assistive technology without showing anything.
+export function announce(msg, urgent = false) {
+  ensureLive();
+  const el = urgent ? live.assertive : live.polite;
+  el.textContent = "";
+  setTimeout(() => (el.textContent = msg), 60);
+}
+if (document.readyState !== "loading") ensureLive(); else document.addEventListener("DOMContentLoaded", ensureLive);
+
+// Success messages fade after a few seconds; errors and warnings stay until dismissed.
 export function toast(msg, kind = "ok") {
-  let box = $(".toasts");
-  if (!box) { box = document.createElement("div"); box.className = "toasts"; box.setAttribute("role", "status"); document.body.append(box); }
+  ensureLive();
+  if (!document.body.contains(live.box)) { live.polite.remove(); live.assertive.remove(); Object.keys(live).forEach((k) => delete live[k]); ensureLive(); }
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
-  el.innerHTML = `${icon(kind === "ok" ? "checkCircle" : kind === "warn" ? "alert" : "alert")}<div>${esc(msg)}</div>`;
-  box.append(el);
-  setTimeout(() => el.remove(), kind === "err" ? 8000 : 3500);
+  el.innerHTML = `${icon(kind === "ok" ? "checkCircle" : "alert")}<div class="toast-msg">${esc(msg)}</div>
+    <button class="toast-x" type="button" aria-label="Dismiss message">${icon("x")}</button>`;
+  el.querySelector(".toast-x").onclick = () => el.remove();
+  live.box.append(el);
+  announce(msg, kind === "err");
+  if (kind === "ok") setTimeout(() => el.remove(), 4000);
 }
 
-// ---- overlays
-function overlayShell(cls, inner, { onClose } = {}) {
+// ---- overlays (drawers and modals)
+// A stack so Escape closes only the top layer, Tab stays inside it, and the page behind is inert.
+const layers = [];
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])';
+let uid = 0;
+function setBackgroundInert(on) {
+  document.querySelectorAll("body > *:not(.overlay):not(.drawer):not(.modal):not(.toasts):not(.sr-only):not(.chart-tip)").forEach((el) => (el.inert = on));
+  // Only the top layer stays interactive.
+  layers.forEach((l, i) => { l.panel.inert = on && i < layers.length - 1; l.ov.inert = on && i < layers.length - 1; });
+}
+document.addEventListener("keydown", (e) => {
+  const top = layers[layers.length - 1];
+  if (!top) return;
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); top.close(); return; }
+  if (e.key !== "Tab") return;
+  const items = [...top.panel.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null || el.tagName === "IFRAME");
+  if (!items.length) { e.preventDefault(); return; }
+  const first = items[0], last = items[items.length - 1];
+  if (!top.panel.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}, true);
+
+function overlayShell(cls, title, inner, { onClose } = {}) {
   const ov = document.createElement("div");
   ov.className = "overlay";
   const panel = document.createElement("div");
+  const titleId = `dlg-title-${++uid}`;
   panel.className = cls;
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-modal", "true");
-  panel.innerHTML = inner;
+  panel.setAttribute("aria-labelledby", titleId);
+  panel.innerHTML = inner.replace("%TITLE_ID%", titleId);
   document.body.append(ov, panel);
   const prevFocus = document.activeElement;
-  const close = () => { ov.remove(); panel.remove(); document.removeEventListener("keydown", onKey); prevFocus?.focus?.(); onClose?.(); };
-  const onKey = (e) => { if (e.key === "Escape") close(); };
-  document.addEventListener("keydown", onKey);
+  let closed = false;
+  const layer = { panel, ov };
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    ov.remove(); panel.remove();
+    layers.splice(layers.indexOf(layer), 1);
+    setBackgroundInert(layers.length > 0);
+    if (prevFocus && document.contains(prevFocus)) prevFocus.focus?.();
+    onClose?.();
+  };
+  layer.close = close;
+  layers.push(layer);
+  setBackgroundInert(true);
   ov.addEventListener("click", close);
   panel.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));
-  setTimeout(() => panel.querySelector("input:not([disabled]),select,textarea,button.primary")?.focus(), 30);
+  linkLabels(panel);
+  setTimeout(() => (panel.querySelector("input:not([disabled]),select:not([disabled]),textarea,button.primary") || panel.querySelector(FOCUSABLE))?.focus(), 30);
   return { panel, close };
 }
 
 export function drawer({ title, body, foot = "", onClose }) {
-  return overlayShell("drawer", `
-    <div class="drawer-head"><h3>${esc(title)}</h3><button class="btn ghost icon" data-close aria-label="Close">${icon("x")}</button></div>
+  return overlayShell("drawer", title, `
+    <div class="drawer-head"><h3 id="%TITLE_ID%">${esc(title)}</h3><button class="btn ghost icon" data-close aria-label="Close">${icon("x")}</button></div>
     <div class="drawer-body">${body}</div>${foot ? `<div class="drawer-foot">${foot}</div>` : ""}`, { onClose });
 }
 
 export function modal({ title, body, foot = "", wide = false, onClose }) {
-  return overlayShell(`modal${wide ? " wide" : ""}`, `
-    <div class="modal-head"><h3>${esc(title)}</h3><button class="btn ghost icon" data-close aria-label="Close">${icon("x")}</button></div>
+  return overlayShell(`modal${wide ? " wide" : ""}`, title, `
+    <div class="modal-head"><h3 id="%TITLE_ID%">${esc(title)}</h3><button class="btn ghost icon" data-close aria-label="Close">${icon("x")}</button></div>
     <div class="modal-body">${body}</div>${foot ? `<div class="modal-foot">${foot}</div>` : ""}`, { onClose });
 }
+
+// ---- form labels
+// Pages write `<div class="field"><label>Name</label><input …></div>`; this links each label to its
+// control (for/id) so screen readers announce it and clicking the label focuses the field.
+export function linkLabels(root = document) {
+  root.querySelectorAll(".field").forEach((f) => {
+    const label = f.querySelector(":scope > label");
+    if (!label || label.htmlFor || label.querySelector("input,select,textarea")) return;
+    const ctrl = f.querySelector(":scope > input, :scope > select, :scope > textarea, :scope > .search > input");
+    if (!ctrl) return;
+    if (!ctrl.id) ctrl.id = `fld-${++uid}`;
+    label.htmlFor = ctrl.id;
+    const hint = f.querySelector(":scope > .hint");
+    if (hint) { if (!hint.id) hint.id = `hint-${uid}`; ctrl.setAttribute("aria-describedby", hint.id); }
+  });
+  root.querySelectorAll(".field > .lbl").forEach((lbl) => {
+    const group = lbl.parentElement;
+    if (group.getAttribute("role")) return;
+    if (!lbl.id) lbl.id = `grp-${++uid}`;
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-labelledby", lbl.id);
+  });
+}
+// Keep labels linked as pages render.
+new MutationObserver((muts) => {
+  for (const m of muts) m.addedNodes.forEach((n) => { if (n.nodeType === 1 && (n.matches?.(".field") || n.querySelector?.(".field"))) linkLabels(n.parentElement || n); });
+}).observe(document.documentElement, { childList: true, subtree: true });
 
 // Promise-based confirm / prompt dialogs.
 export function confirmDialog({ title, message, confirmText = "Confirm", danger = false, input = null }) {
@@ -169,32 +263,43 @@ export function confirmDialog({ title, message, confirmText = "Confirm", danger 
 }
 
 // ---- tables
-// cols: [{ key, label, align: 'r'|'c', render(row) -> html/raw, sort(row) -> value, total(rows) -> html }]
-export function dataTable({ cols, rows, onRow, empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr }) {
+// cols: [{ key, label, align: 'r'|'c', render(row) -> html/raw, sort(row) -> value | false, total(rows) -> html }]
+// onRow: makes rows clickable for mouse users AND adds a real button per row (rowLabel names it) so the
+// same action works from the keyboard and for screen readers.
+export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "" }) {
   const id = "t" + Math.random().toString(36).slice(2, 8);
   if (!rows.length) return raw(`<div class="empty"><div class="ico">${icon("sheet")}</div><h4>${esc(empty)}</h4></div>`);
-  const head = cols.map((c, i) => `<th class="${c.align || ""} ${sortable && c.sort !== false ? "sortable" : ""}" data-col="${i}">${esc(c.label)}</th>`).join("");
-  const body = rows.map((r, ri) => `<tr data-i="${ri}" class="${onRow ? "clickable" : ""}" ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.align || ""}">${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("");
-  const foot = footer ? `<tfoot><tr>${cols.map((c, i) => `<td class="${c.align || ""}">${c.total ? c.total(rows) : i === 0 ? "Total" : ""}</td>`).join("")}</tr></tfoot>` : "";
+  const sortableCol = (c) => sortable && c.sort !== false && c.label;
+  const head = cols.map((c, i) => sortableCol(c)
+    ? `<th class="${c.align || ""}" scope="col" aria-sort="none" data-col="${i}"><button type="button" class="th-sort">${esc(c.label)}<span class="sort-ind" aria-hidden="true"></span></button></th>`
+    : `<th class="${c.align || ""}" scope="col">${c.label ? esc(c.label) : `<span class="sr-only">${onRow ? "" : "Actions"}</span>`}</th>`).join("")
+    + (onRow ? `<th scope="col"><span class="sr-only">Actions</span></th>` : "");
+  const body = rows.map((r, ri) => `<tr data-i="${ri}" class="${onRow ? "clickable" : ""}" ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.align || ""}">${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}${onRow ? `<td class="r row-act"><button type="button" class="btn sm ghost" data-row-open aria-label="${esc(rowLabel(r))}">${esc(rowAction)} ${icon("right")}</button></td>` : ""}</tr>`).join("");
+  const foot = footer ? `<tfoot><tr>${cols.map((c, i) => `<td class="${c.align || ""}">${c.total ? c.total(rows) : i === 0 ? "Total" : ""}</td>`).join("")}${onRow ? "<td></td>" : ""}</tr></tfoot>` : "";
   queueMicrotask(() => {
     const t = document.getElementById(id);
     if (!t) return;
-    if (onRow) t.querySelectorAll("tbody tr").forEach((tr) => tr.addEventListener("click", (e) => { if (!e.target.closest("button,a,input,select")) onRow(rows[tr.dataset.i]); }));
+    if (onRow) t.querySelectorAll("tbody tr").forEach((tr) => tr.addEventListener("click", (e) => {
+      if (e.target.closest("[data-row-open]") || !e.target.closest("button,a,input,select")) onRow(rows[tr.dataset.i]);
+    }));
     if (sortable) {
-      let dir = 1, last = -1;
-      t.querySelectorAll("th.sortable").forEach((th) => th.addEventListener("click", () => {
+      t.querySelectorAll("th[data-col] .th-sort").forEach((btn) => btn.addEventListener("click", () => {
+        const th = btn.parentElement;
         const c = cols[th.dataset.col];
-        dir = last === +th.dataset.col ? -dir : 1; last = +th.dataset.col;
+        const dir = th.getAttribute("aria-sort") === "ascending" ? -1 : 1;
+        t.querySelectorAll("th[aria-sort]").forEach((x) => x.setAttribute("aria-sort", "none"));
+        th.setAttribute("aria-sort", dir === 1 ? "ascending" : "descending");
         const val = c.sort || ((r) => r[c.key]);
         const tb = t.querySelector("tbody");
         [...tb.rows].sort((a, b) => {
           const x = val(rows[a.dataset.i]), y = val(rows[b.dataset.i]);
           return (x > y ? 1 : x < y ? -1 : 0) * dir;
         }).forEach((tr) => tb.append(tr));
+        announce(`Sorted by ${c.label}, ${dir === 1 ? "ascending" : "descending"}`);
       }));
     }
   });
-  return raw(`<div class="table-wrap"><table class="table ${cls}" id="${id}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div>`);
+  return raw(`<div class="table-wrap" tabindex="0" role="region" aria-label="${esc(caption || "Table")}"><table class="table ${cls}" id="${id}">${caption ? `<caption class="sr-only">${esc(caption)}</caption>` : ""}<thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div>`);
 }
 
 export const emptyState = (title, text = "", ico = "sheet", action = "") =>
@@ -230,12 +335,19 @@ export function parseCsv(text) {
 }
 
 // Button spinner wrapper: disables the button while the promise runs, reports errors as toasts.
+// The button is really disabled (not just styled) so a second Enter/click can't submit twice.
 export async function busy(btn, fn) {
-  if (btn) btn.classList.add("loading");
+  if (btn?.disabled) return;
+  if (btn) { btn.classList.add("loading"); btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
   try { return await fn(); }
   catch (e) { toast(e.message, "err"); }
-  finally { if (btn) btn.classList.remove("loading"); }
+  finally { if (btn && btn.isConnected) { btn.classList.remove("loading"); btn.disabled = false; btn.removeAttribute("aria-busy"); } }
 }
+
+// Amounts typed into sheets may contain thousands separators ("14,751.00").
+export const parseAmount = (v) => (String(v ?? "").trim() === "" ? null : Number(String(v).replace(/,/g, "").trim()));
+export const isAmount = (v) => { const n = parseAmount(v); return n === null || Number.isFinite(n); };
+export const formatAmount = (v) => { const n = parseAmount(v); return n === null || !Number.isFinite(n) ? String(v ?? "") : nf2.format(n); };
 
 export const toCents = (v) => (v === "" || v == null ? null : Math.round(Number(v) * 100));
 export const fromCents = (c) => (c == null ? "" : String(c / 100));

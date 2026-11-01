@@ -1,6 +1,6 @@
 // App shell: auth gate, router, sidebar/topbar layout and shared state.
 import { get, post, setUnauthorizedHandler } from "./api.js";
-import { $, $$, esc, icon, initials, monthName, toast } from "./ui.js";
+import { $, $$, esc, icon, initials, monthName, toast, announce, confirmDialog } from "./ui.js";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -44,6 +44,11 @@ const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
   { re: /^\/account$/, page: "account", nav: null },
 ];
+const groupOf = (path) => {
+  let g = "";
+  for (const n of NAV) { if (n.group) g = n.group; else if (n.path === path) return g; }
+  return "";
+};
 
 const pageCache = {};
 async function loadPage(name) {
@@ -51,10 +56,29 @@ async function loadPage(name) {
   return pageCache[name];
 }
 
-export function navigate(path, replace = false) {
-  if (location.pathname === path && !replace) return render();
+// ---------------------------------------------------------------- unsaved-changes guard
+// Sheet pages register a function returning how many rows have unsaved edits.
+let dirtyCheck = null;
+export const setDirtyCheck = (fn) => (dirtyCheck = fn);
+const dirtyCount = () => { try { return dirtyCheck ? Number(dirtyCheck()) || 0 : 0; } catch { return 0; } };
+async function confirmLeave() {
+  const n = dirtyCount();
+  if (!n) return true;
+  const ok = await confirmDialog({
+    title: "Leave without saving?",
+    message: `${n} row${n > 1 ? "s have" : " has"} unsaved changes on this page. They will be lost if you leave now.`,
+    confirmText: "Discard changes", danger: true,
+  });
+  if (ok) dirtyCheck = null;
+  return !!ok;
+}
+window.addEventListener("beforeunload", (e) => { if (dirtyCount()) { e.preventDefault(); e.returnValue = ""; } });
+
+export async function navigate(path, replace = false) {
+  if (!(await confirmLeave())) return;
+  if (location.pathname === path && !replace) return render({ moveFocus: true });
   history[replace ? "replaceState" : "pushState"]({}, "", path);
-  render();
+  render({ moveFocus: true });
 }
 
 function resolve(pathname) {
@@ -69,89 +93,181 @@ function resolve(pathname) {
 
 // ---------------------------------------------------------------- layout
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const isMobile = () => matchMedia("(max-width: 860px)").matches;
+
+function periodPicker() {
+  const [y, m] = state.period.split("-").map(Number);
+  const now = new Date().getFullYear();
+  const years = [];
+  for (let yy = Math.min(y, now - 3); yy <= Math.max(y, now + 1); yy++) years.push(yy);
+  return `<div class="period-picker" role="group" aria-label="Pay period">
+    <button type="button" id="prev-period" aria-label="Previous month">${icon("left")}</button>
+    <select id="period-month" aria-label="Month">${MONTHS.map((n, i) => `<option value="${i + 1}" ${i + 1 === m ? "selected" : ""}>${n}</option>`).join("")}</select>
+    <span class="sep"></span>
+    <select id="period-year" aria-label="Year">${years.map((yy) => `<option ${yy === y ? "selected" : ""}>${yy}</option>`).join("")}</select>
+    <button type="button" id="next-period" aria-label="Next month">${icon("right")}</button>
+  </div>`;
+}
+
 function shell() {
   const u = state.user;
   const hubOpts = state.hubs.map((h) => `<option value="${esc(h.code)}" ${state.hub === h.code ? "selected" : ""}>${esc(h.name)}</option>`).join("");
   document.body.innerHTML = `
+  <a class="skip-link" href="#view">Skip to main content</a>
   <div class="shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand"><div class="brand-mark">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
-      <nav class="nav" id="nav">${NAV.filter((n) => !n.perm || can(n.perm)).map((n) => n.group
-        ? `<div class="nav-group">${esc(n.group)}</div>`
-        : `<a href="${n.path}" data-link data-nav="${n.path}">${icon(n.icon)}<span>${esc(n.label)}</span>${n.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
+    <aside class="sidebar" id="sidebar" aria-label="Main menu">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
+      <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
+      <nav class="nav" id="nav" aria-label="Sections">${NAV.filter((n) => !n.perm || can(n.perm)).map((n) => n.group
+        ? `<div class="nav-group" aria-hidden="true">${esc(n.group)}</div>`
+        : `<a href="${n.path}" data-link data-nav="${n.path}" title="${esc(n.label)}">${icon(n.icon)}<span>${esc(n.label)}</span>${n.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
       </nav>
-      <div class="sidebar-foot">Signed in as <b style="color:#e2e8f0">${esc(u.username)}</b><br>${esc(u.role)}${u.hub ? ` · hub ${esc(u.hub)}` : ""}</div>
+      <div class="sidebar-foot">Signed in as <b>${esc(u.username)}</b><br>${esc(u.role)}${u.hub ? ` · hub ${esc(u.hub)}` : ""}</div>
     </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <div class="main">
       <header class="topbar">
-        <button class="btn ghost icon menu-btn" id="menu-btn" aria-label="Menu">${icon("menu")}</button>
-        <div><div class="crumb" id="crumb"></div><div class="title" id="page-title"></div></div>
+        <button type="button" class="btn ghost icon menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
+        <div class="crumbs" id="crumbs"></div>
         <div class="spacer"></div>
-        ${u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
-        <select class="input sm" id="hub-filter" style="width:auto;min-width:140px" aria-label="Hub filter">
-          <option value="">All hubs</option>${hubOpts}</select>`}
-        <div class="period-picker" title="Pay period">
-          <button id="prev-period" aria-label="Previous month">${icon("left")}</button>
-          <input type="month" id="period" value="${esc(state.period)}" aria-label="Pay period">
-          <button id="next-period" aria-label="Next month">${icon("right")}</button>
+        <div class="filters" id="filters">
+          ${u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
+          <select class="input sm" id="hub-filter" style="width:auto;min-width:140px" aria-label="Hub filter">
+            <option value="">All hubs</option>${hubOpts}</select>`}
+          ${periodPicker()}
         </div>
-        <button class="btn ghost icon" id="theme-btn" aria-label="Toggle theme">${icon("moon")}</button>
-        <div class="user-chip" id="user-chip" tabindex="0">
-          <div class="avatar">${esc(initials(u.full_name))}</div>
-          <div class="who"><b>${esc(u.full_name)}</b><span>${esc(u.role)}</span></div>
+        <button type="button" class="btn ghost icon" id="theme-btn" aria-label="Switch to dark theme">${icon("moon")}</button>
+        <div class="user-wrap" style="position:relative">
+          <button type="button" class="user-chip" id="user-chip" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu for ${esc(u.full_name)}">
+            <span class="avatar" aria-hidden="true">${esc(initials(u.full_name))}</span>
+            <span class="who"><b>${esc(u.full_name)}</b><span>${esc(u.role)}</span></span>
+          </button>
+          <div class="menu" id="user-menu" hidden>
+            <div style="padding:8px 10px"><b>${esc(u.full_name)}</b><div class="faint" style="font-size:12px">${esc(u.username)} · ${esc(u.role)}</div></div><hr>
+            <a href="/account" data-link id="menu-account">${icon("lock")} Change password</a>
+            <button type="button" id="logout">${icon("logout")} Sign out</button>
+          </div>
         </div>
       </header>
-      <main class="content" id="view"></main>
+      <div class="filterbar" id="filterbar"></div>
+      <main class="content" id="view" tabindex="-1"></main>
     </div>
   </div>`;
 
-  $("#menu-btn").onclick = () => $("#sidebar").classList.toggle("open");
-  $("#period").onchange = (e) => setPeriod(e.target.value);
+  // Mobile: the hub/month filters move below the header so the sticky bar stays one row tall.
+  const placeFilters = () => {
+    const f = $("#filters");
+    if (isMobile()) $("#filterbar").append(f); else $(".topbar .spacer").after(f);
+  };
+  matchMedia("(max-width: 860px)").addEventListener("change", () => { placeFilters(); syncSidebar(); });
+  placeFilters();
+
+  $("#menu-btn").onclick = () => (isMobile() ? setSidebar(true) : setRail(!rail));
+  $("#sidebar-close").onclick = () => setSidebar(false);
+  $("#sidebar-backdrop").onclick = () => setSidebar(false);
+  $("#sidebar").addEventListener("keydown", (e) => { if (e.key === "Escape" && isMobile()) { e.stopPropagation(); setSidebar(false); } });
+  syncSidebar();
+
+  $("#period-month").onchange = $("#period-year").onchange = () =>
+    setPeriod(`${$("#period-year").value}-${String($("#period-month").value).padStart(2, "0")}`);
   $("#prev-period").onclick = () => setPeriod(shift(state.period, -1));
   $("#next-period").onclick = () => setPeriod(shift(state.period, 1));
-  $("#hub-filter")?.addEventListener("change", (e) => { state.hub = e.target.value; store.set("pr.hub", state.hub); render(); });
+  $("#hub-filter")?.addEventListener("change", async (e) => {
+    if (!(await confirmLeave())) { e.target.value = state.hub; return; }
+    state.hub = e.target.value; store.set("pr.hub", state.hub); render();
+  });
   $("#theme-btn").onclick = toggleTheme;
-  $("#user-chip").onclick = userMenu;
+  setupUserMenu();
   applyTheme();
+}
+
+// ---- mobile sidebar
+let sidebarOpen = false;
+let rail = store.get("pr.rail") === "1"; // desktop: icons-only sidebar, frees width for the sheets
+function setRail(on) {
+  rail = on;
+  store.set("pr.rail", on ? "1" : "0");
+  syncSidebar();
+}
+function syncSidebar() {
+  const sb = $("#sidebar");
+  if (!sb) return;
+  const mobile = isMobile();
+  $(".shell").classList.toggle("rail", rail && !mobile);
+  $("#menu-btn").setAttribute("aria-label", mobile ? "Open menu" : rail ? "Expand menu" : "Collapse menu");
+  sb.classList.toggle("open", mobile && sidebarOpen);
+  sb.inert = mobile && !sidebarOpen;                 // closed off-canvas menu: not focusable
+  $("#sidebar-backdrop").classList.toggle("show", mobile && sidebarOpen);
+  $("#menu-btn").setAttribute("aria-expanded", String(mobile ? sidebarOpen : !rail));
+  $$(".shell > .main").forEach((m) => (m.inert = mobile && sidebarOpen)); // page behind the open menu
+}
+function setSidebar(open) {
+  sidebarOpen = open;
+  syncSidebar();
+  if (open) setTimeout(() => $("#nav a.active, #nav a")?.focus(), 50);
+  else if (isMobile()) $("#menu-btn")?.focus();
 }
 
 function shift(p, d) {
   const [y, m] = p.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1 + d, 1)).toISOString().slice(0, 7);
 }
-function setPeriod(p) {
-  if (!/^\d{4}-\d{2}$/.test(p)) return;
+async function setPeriod(p) {
+  if (!/^\d{4}-\d{2}$/.test(p) || p === state.period) return;
+  if (!(await confirmLeave())) { syncPeriodPicker(); return; }
   state.period = p;
   store.set("pr.period", p);
-  $("#period").value = p;
+  syncPeriodPicker();
+  announce(`Pay period ${monthName(p)}`);
   render();
 }
+function syncPeriodPicker() {
+  const [y, m] = state.period.split("-").map(Number);
+  const ys = $("#period-year");
+  if (!ys) return;
+  if (![...ys.options].some((o) => +o.value === y)) ys.insertAdjacentHTML("beforeend", `<option>${y}</option>`);
+  ys.value = String(y);
+  $("#period-month").value = String(m);
+}
 
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t === "dark"; // light unless the user chose dark
+}
 function applyTheme() {
   const t = store.get("pr.theme");
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
-  const dark = t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   const b = $("#theme-btn");
-  if (b) b.innerHTML = icon(dark ? "sun" : "moon");
+  if (b) { b.innerHTML = icon(isDark() ? "sun" : "moon"); b.setAttribute("aria-label", isDark() ? "Switch to light theme" : "Switch to dark theme"); }
 }
 function toggleTheme() {
-  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  store.set("pr.theme", dark ? "light" : "dark");
+  store.set("pr.theme", isDark() ? "light" : "dark");
   applyTheme();
 }
 
-function userMenu(e) {
-  e.stopPropagation();
-  const chip = $("#user-chip");
-  if ($(".menu", chip)) return $(".menu", chip).remove();
-  const m = document.createElement("div");
-  m.className = "menu";
-  m.innerHTML = `<div style="padding:8px 10px"><b>${esc(state.user.full_name)}</b><div class="faint" style="font-size:12px">${esc(state.user.username)} · ${esc(state.user.role)}</div></div><hr>
-    <a href="/account" data-link>${icon("lock")} Change password</a>
-    <button id="logout">${icon("logout")} Sign out</button>`;
-  chip.append(m);
-  m.querySelector("#logout").onclick = async () => { await post("/api/auth/logout").catch(() => {}); location.href = "/"; };
-  setTimeout(() => document.addEventListener("click", () => m.remove(), { once: true }));
+// ---- user menu (disclosure button: Enter/Space opens, Escape closes, focus returns)
+function setupUserMenu() {
+  const btn = $("#user-chip"), menu = $("#user-menu");
+  const items = () => [...menu.querySelectorAll("a, button")];
+  const open = (focusFirst) => { menu.hidden = false; btn.setAttribute("aria-expanded", "true"); if (focusFirst) items()[0].focus(); };
+  const close = (returnFocus) => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); if (returnFocus) btn.focus(); };
+  btn.addEventListener("click", (e) => { e.stopPropagation(); menu.hidden ? open(e.detail === 0) : close(false); });
+  btn.addEventListener("keydown", (e) => { if (e.key === "ArrowDown") { e.preventDefault(); open(true); } });
+  menu.addEventListener("keydown", (e) => {
+    const list = items(), i = list.indexOf(document.activeElement);
+    if (e.key === "Escape") { e.stopPropagation(); close(true); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+    else if (e.key === "Tab" && !e.shiftKey && i === list.length - 1) close(false);
+  });
+  menu.addEventListener("click", (e) => { if (e.target.closest("a")) close(false); });
+  document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest(".user-wrap")) close(false); });
+  $("#logout").onclick = async () => {
+    if (!(await confirmLeave())) return;
+    await post("/api/auth/logout").catch(() => {});
+    location.href = "/";
+  };
 }
 
 export async function refreshPending() {
@@ -159,31 +275,46 @@ export async function refreshPending() {
     const q = await get("/api/review-queue");
     state.pending = q.length;
     const el = $("#pending-count");
-    if (el) { el.textContent = q.length; el.hidden = !q.length; }
+    if (el) { el.textContent = q.length; el.hidden = !q.length; el.setAttribute("aria-label", `${q.length} waiting`); }
   } catch { /* ignore */ }
 }
 
 let renderSeq = 0;
-export async function render() {
+export async function render({ moveFocus = false } = {}) {
   const seq = ++renderSeq;
+  dirtyCheck = null;
   const { page, nav, params } = resolve(location.pathname);
-  $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.nav === nav));
-  $("#sidebar")?.classList.remove("open");
+  $$("#nav a").forEach((a) => {
+    const on = a.dataset.nav === nav;
+    a.classList.toggle("active", on);
+    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  if (sidebarOpen) { sidebarOpen = false; syncSidebar(); }
   // Fresh element each time so listeners attached by the previous page don't pile up.
   const old = $("#view");
   const view = old.cloneNode(false);
   old.replaceWith(view);
-  view.innerHTML = `<div class="loading-screen"><div class="spinner"></div></div>`;
+  view.setAttribute("aria-busy", "true");
+  view.innerHTML = `<div class="loading-screen"><div class="spinner" role="img" aria-label="Loading"></div></div>`;
   try {
     const mod = await loadPage(page);
     if (seq !== renderSeq) return;
-    $("#page-title").textContent = mod.title;
-    $("#crumb").textContent = mod.periodic ? monthName(state.period) : (NAV.find((n) => n.path === nav)?.label === mod.title ? "" : "");
+    const group = groupOf(nav);
+    $("#crumbs").innerHTML = `${group ? `<span class="crumb-group">${esc(group)}</span><span class="crumb-sep" aria-hidden="true">›</span>` : ""}<b>${esc(mod.title)}</b>`;
     document.title = `${mod.title} · ${state.settings.company_name || "Payroll"}`;
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
+    if (seq !== renderSeq) return;
+    view.removeAttribute("aria-busy");
+    if (moveFocus) {
+      // Move focus to the new page's heading so screen readers announce it and Tab starts at the content.
+      const h1 = view.querySelector("h1");
+      if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); } else view.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
   } catch (err) {
     if (seq !== renderSeq) return;
-    view.innerHTML = `<div class="alert err">${icon("alert")}<div><b>Couldn't load this page.</b><br>${esc(err.message)}</div></div>`;
+    view.removeAttribute("aria-busy");
+    view.innerHTML = `<div class="alert err" role="alert">${icon("alert")}<div><b>Couldn't load this page.</b><br>${esc(err.message)}</div></div>`;
   }
 }
 
@@ -195,7 +326,22 @@ document.addEventListener("click", (e) => {
   e.preventDefault();
   navigate(a.getAttribute("href"));
 });
-window.addEventListener("popstate", () => state.user && render());
+// Back/forward: if the page has unsaved edits, stay put unless the user confirms.
+let currentPath = location.pathname;
+const _push = history.pushState.bind(history);
+history.pushState = (s, t, url) => { _push(s, t, url); currentPath = location.pathname; };
+window.addEventListener("popstate", async () => {
+  if (!state.user) return;
+  const target = location.pathname;
+  if (dirtyCount()) {
+    _push({}, "", currentPath);              // undo the URL change while we ask
+    if (!(await confirmLeave())) return;
+    history.pushState({}, "", target);
+  }
+  currentPath = location.pathname;
+  render({ moveFocus: true });
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sidebarOpen) setSidebar(false); });
 setUnauthorizedHandler(() => { if (state.user) { toast("Your session ended — please sign in again", "warn"); state.user = null; boot(); } });
 
 export async function boot() {
@@ -215,5 +361,5 @@ export async function boot() {
 }
 
 boot().catch((e) => {
-  document.body.innerHTML = `<div style="padding:40px;font-family:system-ui">Could not start the app: ${esc(e.message)}</div>`;
+  document.body.innerHTML = `<div style="padding:40px;font-family:system-ui" role="alert">Could not start the app: ${esc(e.message)}</div>`;
 });

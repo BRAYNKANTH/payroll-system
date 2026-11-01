@@ -80,7 +80,7 @@ export function breakdownDrawer(r, { finalized, onChange }) {
       confirmText: "Approve", input: { label: "Note (optional)", placeholder: "How did you check it?" },
     });
     if (note === null) return;
-    await busy(e.target, async () => {
+    await busy(e.target.closest("button"), async () => {
       await post(`/api/payroll/${r.period}/${encodeURIComponent(r.employee_id)}/approve`, { note });
       toast(`${r.name} approved`); dr.close(); refreshPending(); onChange?.();
     });
@@ -92,7 +92,7 @@ export function breakdownDrawer(r, { finalized, onChange }) {
       input: { label: "Reason", placeholder: "What needs fixing?", required: true },
     });
     if (!note) return;
-    await busy(e.target, async () => {
+    await busy(e.target.closest("button"), async () => {
       await post(`/api/payroll/${r.period}/${encodeURIComponent(r.employee_id)}/reject`, { note });
       toast(`${r.name} rejected`, "warn"); dr.close(); refreshPending(); onChange?.();
     });

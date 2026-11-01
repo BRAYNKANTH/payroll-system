@@ -113,7 +113,7 @@ export default {
         message: `Payroll is recalculated one last time, then every entry for ${monthName(p)} is locked. Closing balances become next month's opening balances. This cannot be undone.`,
       });
       if (!ok) return;
-      await busy(e.target, async () => { await post(`/api/payroll/${p}/finalize`); toast(`${monthName(p)} finalized`); this.render(ctx); });
+      await busy(e.target.closest("button"), async () => { await post(`/api/payroll/${p}/finalize`); toast(`${monthName(p)} finalized`); this.render(ctx); });
     });
     $("#bank")?.addEventListener("click", () => {
       const payees = all.filter((r) => r.disbursed_amount > 0);

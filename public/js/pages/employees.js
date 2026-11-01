@@ -120,10 +120,10 @@ export default {
       const rows = staff.filter((s) => (!filters.role || s.role === filters.role) && (!filters.status || s.status === filters.status) &&
         (!q || [s.name, s.employee_id, s.phone || "", s.nic || ""].some((x) => x.toLowerCase().includes(q))));
       $("#list").innerHTML = staff.length ? dataTable({
-        rows, empty: "No employees match these filters",
+        rows, empty: "No employees match these filters", cls: "people", rowAction: "", rowLabel: (s) => `Open ${s.name}`,
         onRow: (s) => navigate(`/employees/${encodeURIComponent(s.employee_id)}`),
         cols: [
-          { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:linear-gradient(135deg,#0ea5e9,#10b981)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? ` · ${s.phone}` : ""}</span></div></div>` },
+          { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
           { key: "role", label: "Role", render: (s) => badge(s.role, roleLabel(s.role)) },
           { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
           { key: "manager_id", label: "Manager", render: (s) => s.manager_id ? byId[s.manager_id]?.name || s.manager_id : html`<span class="faint">—</span>` },

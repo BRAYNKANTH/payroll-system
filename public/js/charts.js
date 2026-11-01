@@ -19,17 +19,43 @@ function niceMax(v) {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
 }
 
+// Tooltips: mouse hover, tap (touch) and arrow keys (when the chart has focus) all show the value.
 function bindTips(container) {
-  container.querySelectorAll("[data-tip]").forEach((el) => {
+  const pts = [...container.querySelectorAll("[data-tip]")];
+  pts.forEach((el) => {
     el.addEventListener("mousemove", (e) => showTip(e, el.dataset.tip));
     el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("click", (e) => { e.stopPropagation(); showTip(e, el.dataset.tip); });
   });
+  const svg = container.querySelector("svg");
+  if (!svg || !pts.length) return;
+  let i = -1;
+  svg.setAttribute("tabindex", "0");
+  svg.addEventListener("keydown", (e) => {
+    if (!["ArrowRight", "ArrowLeft"].includes(e.key)) return;
+    e.preventDefault();
+    i = (i + (e.key === "ArrowRight" ? 1 : -1) + pts.length) % pts.length;
+    const r = pts[i].getBoundingClientRect();
+    showTip({ clientX: r.left + r.width / 2, clientY: r.top + 20 }, pts[i].dataset.tip);
+  });
+  svg.addEventListener("blur", hideTip);
 }
+document.addEventListener("click", hideTip);
+
+// Visually hidden data table so screen-reader users get the same numbers as the chart.
+function srTable(label, headers, rows) {
+  const cell = (c, j) => (j ? `<td>${esc(c)}</td>` : `<th scope="row">${esc(c)}</th>`);
+  return `<table class="sr-only"><caption>${esc(label)}</caption><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join("")}</tr></thead>` +
+    `<tbody>${rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</tbody></table>`;
+}
+const seriesTable = (label, labels, series) =>
+  srTable(label, ["", ...series.map((s) => s.name)], labels.map((l, i) => [l, ...series.map((s) => "Rs " + money(s.values[i] || 0))]));
+const svgLabel = (label) => `${esc(label)}. Use the left and right arrow keys to read values.`;
 
 const legend = (series) => `<div class="legend">${series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("")}</div>`;
 
 // Grouped bar chart. labels: string[], series: [{ name, color, values: cents[] }]
-export function barChart(el, { labels, series, height = 260 }) {
+export function barChart(el, { labels, series, height = 260, label = "Bar chart" }) {
   const W = 640, H = height, L = 52, R = 10, T = 14, B = 30;
   const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values)));
   const min = Math.min(0, ...series.flatMap((s) => s.values));
@@ -53,12 +79,12 @@ export function barChart(el, { labels, series, height = 260 }) {
     });
     g += `<text x="${cx}" y="${H - 10}" text-anchor="middle">${esc(lab.length > 14 ? lab.slice(0, 13) + "…" : lab)}</text>`;
   });
-  el.innerHTML = `${legend(series)}<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">${g}</svg>`;
+  el.innerHTML = `${legend(series)}<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${svgLabel(label)}">${g}</svg>${seriesTable(label, labels, series)}`;
   bindTips(el);
 }
 
 // Line / area chart. series: [{ name, color, values }]
-export function lineChart(el, { labels, series, height = 260, area = true }) {
+export function lineChart(el, { labels, series, height = 260, area = true, label = "Line chart" }) {
   const W = 640, H = height, L = 52, R = 14, T = 14, B = 30;
   const all = series.flatMap((s) => s.values);
   const max = niceMax(Math.max(0, ...all));
@@ -74,8 +100,7 @@ export function lineChart(el, { labels, series, height = 260, area = true }) {
   series.forEach((s, si) => {
     const pts = s.values.map((v, i) => `${x(i)},${y(v)}`).join(" ");
     if (area) {
-      g += `<defs><linearGradient id="lg${si}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity=".22"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient></defs>`;
-      g += `<polygon fill="url(#lg${si})" points="${x(0)},${y(Math.max(lo, 0))} ${pts} ${x(s.values.length - 1)},${y(Math.max(lo, 0))}"/>`;
+      g += `<polygon fill="${s.color}" fill-opacity=".08" points="${x(0)},${y(Math.max(lo, 0))} ${pts} ${x(s.values.length - 1)},${y(Math.max(lo, 0))}"/>`;
     }
     g += `<polyline fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${pts}"/>`;
     s.values.forEach((v, i) => {
@@ -88,12 +113,12 @@ export function lineChart(el, { labels, series, height = 260, area = true }) {
     const tipText = `<b>${esc(lab)}</b>` + series.map((s) => `<br><span style="color:${s.color}">●</span> ${esc(s.name)}: Rs ${money(s.values[i] || 0)}`).join("");
     g += `<rect x="${x(i) - w / 2}" y="${T}" width="${w}" height="${H - T - B}" fill="transparent" data-tip="${esc(tipText)}"/>`;
   });
-  el.innerHTML = `${legend(series)}<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart">${g}</svg>`;
+  el.innerHTML = `${legend(series)}<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${svgLabel(label)}">${g}</svg>${seriesTable(label, labels, series)}`;
   bindTips(el);
 }
 
 // Donut. items: [{ name, value, color }]
-export function donutChart(el, { items, center = "", sub = "" }) {
+export function donutChart(el, { items, center = "", sub = "", label = "Donut chart" }) {
   const total = items.reduce((t, i) => t + Math.max(0, i.value), 0) || 1;
   const R = 70, C = 2 * Math.PI * R;
   let off = 0, g = "";
@@ -104,7 +129,7 @@ export function donutChart(el, { items, center = "", sub = "" }) {
     off += len;
   });
   el.innerHTML = `<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <svg viewBox="0 0 200 200" style="width:170px;height:170px;flex-shrink:0" role="img" aria-label="Donut chart">
+    <svg viewBox="0 0 200 200" style="width:170px;height:170px;flex-shrink:0" role="img" aria-label="${esc(label)}: ${esc(items.map((it) => `${it.name} Rs ${money(it.value)}`).join(", "))}">
       <circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--surface-3)" stroke-width="26"/>${g}
       <text x="100" y="98" text-anchor="middle" style="font:700 18px var(--font);fill:var(--text)">${esc(center)}</text>
       <text x="100" y="118" text-anchor="middle" style="font:11px var(--font);fill:var(--text-3)">${esc(sub)}</text>

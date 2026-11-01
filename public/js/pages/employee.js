@@ -21,7 +21,7 @@ export default {
       <div style="margin-bottom:14px"><a href="/employees" data-link class="muted">${icon("left")} All employees</a></div>
       <div class="card" style="margin-bottom:16px">
         <div class="profile-head">
-          <div class="avatar lg" style="${s.role === "manager" ? "background:linear-gradient(135deg,#0ea5e9,#10b981)" : ""}">${initials(s.name)}</div>
+          <div class="avatar lg" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div>
           <div style="flex:1;min-width:200px">
             <h2>${s.name}</h2>
             <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, roleLabel(s.role))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>

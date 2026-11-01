@@ -1,7 +1,7 @@
 import { get, post, qs } from "../api.js";
-import { state, can, scopeHub } from "../app.js";
-import { $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, raw } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
+import { state, can, scopeHub, setDirtyCheck } from "../app.js";
+import { $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount } from "../ui.js";
+import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons } from "./shared.js";
 
 const FIELDS = [
   { k: "business_amount", label: "Business" },
@@ -76,42 +76,68 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
   const stale = $("#grid");
   const grid = stale.cloneNode(false); // drop listeners from the previous day/employee
   stale.replaceWith(grid);
+  const cents = (v) => Math.round((parseAmount(v) || 0) * 100);
+  const amt = (c) => (c == null ? "" : formatAmount(c / 100));
   const totalsRow = () => {
     const sums = { business_amount: 0, settled_amount: 0, personal_minus: 0 };
-    $$("tbody tr", grid).forEach((tr) => FIELDS.forEach((f) => { sums[f.k] += Math.round(Number(tr.querySelector(`[data-f="${f.k}"]`).value || 0) * 100); }));
+    $$("tbody tr", grid).forEach((tr) => FIELDS.forEach((f) => {
+      const v = tr.querySelector(`[data-f="${f.k}"]`).value;
+      if (isAmount(v)) sums[f.k] += cents(v);
+    }));
     return sums;
   };
+  const cell = (f, r, value) => html`<td><input data-f="${f.k}" data-money inputmode="decimal" autocomplete="off" value="${value}" ${editable ? "" : "disabled"}
+    aria-label="${f.label}, ${r.label}${r.sub ? ", " + r.sub : ""}"></td>`;
   grid.innerHTML = html`
-    <div class="table-wrap"><table class="table sheet">
-      <thead><tr><th>${firstCol}</th>${FIELDS.slice(0, 2).map((f) => html`<th class="r">${f.label}</th>`)}<th class="r">Settle-up minus</th>
-        <th class="r">${FIELDS[2].label}</th><th>Notes</th><th></th></tr></thead>
+    <div class="table-wrap" tabindex="-1"><table class="table sheet">
+      <caption class="sr-only">Daily entries. Enter or arrow keys move between rows.</caption>
+      <thead><tr><th scope="col">${firstCol}</th>${FIELDS.slice(0, 2).map((f) => html`<th scope="col" class="r">${f.label}</th>`)}<th scope="col" class="r">Settle-up minus</th>
+        <th scope="col" class="r">${FIELDS[2].label}</th><th scope="col">Notes</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>
       <tbody>${rows.map((r, i) => html`
-        <tr data-i="${i}" style="${r.muted ? "opacity:.55" : ""}">
-          <td class="name"><b>${r.label}</b><div class="faint" style="font-size:12px">${r.sub}</div></td>
-          ${FIELDS.slice(0, 2).map((f) => html`<td><input data-f="${f.k}" inputmode="decimal" value="${r.existing ? fromCents(r.existing[f.k]) : ""}" ${editable ? "" : "disabled"} aria-label="${f.label}"></td>`)}
-          <td class="calc" data-calc></td>
-          <td><input data-f="personal_minus" inputmode="decimal" value="${r.existing && r.existing.personal_minus ? fromCents(r.existing.personal_minus) : ""}" ${editable ? "" : "disabled"} aria-label="Personal minus"></td>
-          <td><input class="text" data-f="notes" value="${r.existing?.notes || ""}" ${editable ? "" : "disabled"} aria-label="Notes"></td>
+        <tr data-i="${i}" style="${r.muted ? "opacity:.6" : ""}">
+          <th scope="row" class="name"><b>${r.label}</b><div class="faint" style="font-size:12px;font-weight:400">${r.sub}</div></th>
+          ${FIELDS.slice(0, 2).map((f) => cell(f, r, r.existing ? amt(r.existing[f.k]) : ""))}
+          <td class="calc" data-calc aria-live="off"></td>
+          ${cell(FIELDS[2], r, r.existing && r.existing.personal_minus ? amt(r.existing.personal_minus) : "")}
+          <td><input class="text" data-f="notes" value="${r.existing?.notes || ""}" ${editable ? "" : "disabled"} aria-label="Notes, ${r.label}"></td>
           <td>${r.existing?.updated_by ? html`<span class="badge plain" title="Edited by ${r.existing.updated_by}">edited</span>` : ""}</td>
         </tr>`)}</tbody>
-      <tfoot><tr><td>Total</td><td class="r" data-t="business_amount"></td><td class="r" data-t="settled_amount"></td><td class="r" data-t="settle"></td><td class="r" data-t="personal_minus"></td><td colspan="2"></td></tr></tfoot>
+      <tfoot><tr><th scope="row">Total</th><td class="r" data-t="business_amount"></td><td class="r" data-t="settled_amount"></td><td class="r" data-t="settle"></td><td class="r" data-t="personal_minus"></td><td colspan="2"></td></tr></tfoot>
     </table></div>
-    ${editable ? html`<div class="row between" style="padding:14px 18px;border-top:1px solid var(--border)">
-      <span class="muted" id="dirty-info">No unsaved changes</span>
-      <div class="row"><button class="btn" id="revert" disabled>Discard</button><button class="btn primary" id="save" disabled>${icon("check")} Save sheet</button></div></div>` : ""}`;
+    <p class="scroll-hint">Swipe the table sideways to see all columns.</p>
+    <div id="sheet-errors"></div>
+    ${editable ? html`<div class="savebar">
+      <span class="muted" id="dirty-info" role="status">No unsaved changes</span>
+      <div class="row"><button type="button" class="btn" id="revert" disabled>Discard</button><button type="button" class="btn primary" id="save" disabled>${icon("check")} Save sheet</button></div></div>` : ""}`;
 
+  // Validate as the user types: bad amounts are marked on the cell, never shown as "NaN".
+  const validate = (tr) => {
+    let ok = true;
+    FIELDS.forEach((f) => {
+      const inp = tr.querySelector(`[data-f="${f.k}"]`);
+      const bad = !isAmount(inp.value) || (parseAmount(inp.value) ?? 0) < 0;
+      inp.toggleAttribute("aria-invalid", bad);
+      if (bad) { inp.setAttribute("aria-invalid", "true"); ok = false; }
+    });
+    tr.classList.toggle("error", !ok);
+    return ok;
+  };
   const refresh = () => {
     let dirty = 0;
     $$("tbody tr", grid).forEach((tr) => {
       const r = rows[tr.dataset.i];
       const val = (f) => tr.querySelector(`[data-f="${f}"]`).value.trim();
-      const b = Number(val("business_amount") || 0), s = Number(val("settled_amount") || 0);
+      const valid = validate(tr);
       const c = tr.querySelector("[data-calc]");
       const any = val("business_amount") !== "" || val("settled_amount") !== "";
-      c.innerHTML = any ? `<span class="${b - s > 0 ? "neg" : b - s < 0 ? "pos" : ""}">${money(Math.round((b - s) * 100))}</span>` : "";
+      if (!valid) c.innerHTML = `<span class="neg">check amounts</span>`;
+      else {
+        const d = cents(val("business_amount")) - cents(val("settled_amount"));
+        c.innerHTML = any ? `<span class="${d > 0 ? "neg" : d < 0 ? "pos" : ""}">${money(d)}</span>` : "";
+      }
       const orig = r.existing;
-      const changed = ["business_amount", "settled_amount", "personal_minus"].some((f) => {
-        const now = val(f) === "" ? (f === "personal_minus" && orig ? 0 : null) : Math.round(Number(val(f)) * 100);
+      const changed = !valid || ["business_amount", "settled_amount", "personal_minus"].some((f) => {
+        const now = val(f) === "" ? (f === "personal_minus" && orig ? 0 : null) : cents(val(f));
         return (orig ? orig[f] : null) !== now && !(now === null && !orig);
       }) || (val("notes") || null) !== (orig?.notes || null);
       tr.classList.toggle("dirty", changed);
@@ -124,35 +150,58 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
     $('[data-t="personal_minus"]', grid).textContent = money(t.personal_minus);
     if (editable) {
       $("#save").disabled = $("#revert").disabled = !dirty;
-      $("#dirty-info").textContent = dirty ? `${dirty} row${dirty > 1 ? "s" : ""} changed` : "No unsaved changes";
+      $("#dirty-info").textContent = dirty ? `${dirty} row${dirty > 1 ? "s" : ""} changed — not saved yet` : "No unsaved changes";
+      $(".savebar", grid).classList.toggle("has-changes", !!dirty);
     }
     grid.dataset.dirty = dirty;
   };
   grid.addEventListener("input", refresh);
   sheetKeys(grid);
+  moneyInputs(grid);
+  setDirtyCheck(() => Number(grid.dataset.dirty || 0));
   refresh();
   if (!editable) return;
 
+  const showErrors = (list) => {
+    $("#sheet-errors", grid).innerHTML = list.length ? html`<div class="alert err sheet-errors" role="alert" tabindex="-1">${icon("alert")}<div>
+      <b>${list.length} row${list.length > 1 ? "s need" : " needs"} fixing before saving:</b>
+      <ul style="margin:6px 0 0;padding-left:18px">${list.map((m) => html`<li>${m}</li>`)}</ul></div></div>`.toString() : "";
+  };
   $("#revert").onclick = onSaved;
   $("#save").onclick = (e) => busy(e.currentTarget, async () => {
     const out = [];
+    const problems = [];
     let deletions = 0;
     for (const tr of $$("tbody tr.dirty", grid)) {
       const r = rows[tr.dataset.i];
       const v = (f) => tr.querySelector(`[data-f="${f}"]`).value.trim();
+      if (!validate(tr)) { problems.push(`${r.label}: amounts must be numbers of 0 or more (for example 12,500 or 12500.50).`); continue; }
       if (v("business_amount") === "" && v("settled_amount") === "") {
         if (r.existing) { out.push({ date: r.date, employee_id: r.employee_id, _delete: true }); deletions++; }
         continue;
       }
-      if (v("business_amount") === "" || v("settled_amount") === "") throw new Error(`${r.label}: enter both business and settled amounts`);
-      out.push({ date: r.date, employee_id: r.employee_id, business_amount: v("business_amount"), settled_amount: v("settled_amount"),
-        personal_minus: v("personal_minus") || 0, notes: v("notes") });
+      if (v("business_amount") === "" || v("settled_amount") === "") {
+        tr.classList.add("error");
+        tr.querySelector(`[data-f="${v("business_amount") === "" ? "business_amount" : "settled_amount"}"]`).setAttribute("aria-invalid", "true");
+        problems.push(`${r.label}: enter both Business and Settled.`);
+        continue;
+      }
+      out.push({ date: r.date, employee_id: r.employee_id, business_amount: parseAmount(v("business_amount")), settled_amount: parseAmount(v("settled_amount")),
+        personal_minus: parseAmount(v("personal_minus")) || 0, notes: v("notes") });
     }
+    showErrors(problems);
+    if (problems.length) { $("tbody [aria-invalid=true]", grid)?.focus(); return; }
     if (!out.length) return;
     if (deletions && !(await confirmDialog({ title: "Delete entries?", message: `${deletions} cleared row${deletions > 1 ? "s" : ""} will be deleted. Deletions are recorded in the audit trail.`, confirmText: "Delete & save", danger: true }))) return;
-    const res = await post("/api/daily/bulk", { rows: out });
-    toast(`Saved — ${res.created} added, ${res.updated} updated${res.deleted ? `, ${res.deleted} deleted` : ""}`);
-    onSaved();
+    try {
+      const res = await post("/api/daily/bulk", { rows: out });
+      setDirtyCheck(null);
+      toast(`Saved — ${res.created} added, ${res.updated} updated${res.deleted ? `, ${res.deleted} deleted` : ""}`);
+      onSaved();
+    } catch (err) {
+      showErrors([err.message]);
+      $("#sheet-errors .alert", grid)?.focus();
+    }
   });
 }
 
