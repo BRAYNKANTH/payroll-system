@@ -9,13 +9,27 @@ const crypto = require("crypto");
 const db = require("./db");
 const svc = require("./service");
 
-const target = process.argv[2] || process.env.DATABASE_URL || path.join(__dirname, "data", "demo");
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const target = args[0] || process.env.DATABASE_URL || path.join(__dirname, "data", "demo");
 const remote = /^postgres/.test(target);
 
 (async () => {
+if (remote) {
+  // A hosted database holds real accounts, so name it and ask for an explicit yes before writing to it.
+  const host = new URL(target).hostname;
+  if (!process.argv.includes("--yes")) {
+    console.log(`This will add mock staff, sheets, payroll and demo users to the hosted database ${host}.\nRun it again with --yes to continue.`);
+    return;
+  }
+  console.log(`Seeding the hosted database ${host} ...`);
+}
 const d = await db.open(target);
 if ((await d.get("SELECT COUNT(*) AS n FROM staff")).n) {
   console.log("That database already has data — leaving it as is.");
+  return d.close();
+}
+if ((await d.get("SELECT COUNT(*) AS n FROM hubs WHERE code IN ('J1','J2','J3')")).n) {
+  console.log("That database already has a hub called J1, J2 or J3 — leaving it as is.");
   return d.close();
 }
 const auth = require("./auth");
@@ -33,8 +47,11 @@ const DEMO_USERS = [
 ];
 // A hosted database is reachable from the internet, so it never gets the well-known demo passwords.
 if (remote) for (const u of DEMO_USERS) u[4] = "Pw" + crypto.randomBytes(6).toString("base64url") + "7";
-await auth.setup(d, { username: DEMO_USERS[0][0], full_name: DEMO_USERS[0][1], password: DEMO_USERS[0][4] });
-const adminUser = { username: "admin" };
+// A hosted database already has its owner's admin account: keep it, and do not create another.
+const existingAdmin = await d.get("SELECT username FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
+if (!existingAdmin) await auth.setup(d, { username: DEMO_USERS[0][0], full_name: DEMO_USERS[0][1], password: DEMO_USERS[0][4] });
+const adminUser = { username: existingAdmin?.username || DEMO_USERS[0][0] };
+const created = [];
 
 // Pay setup per position (the owner has not confirmed the group manager figures; they are placeholders).
 const PAY = {
@@ -56,7 +73,9 @@ const HUBS = [
 ];
 for (const [code, name, location] of HUBS) await add("hubs", { code, name, location, phone: "021 722 3317" });
 for (const [username, full_name, role, hub, password] of DEMO_USERS.slice(1)) {
+  if (await d.get("SELECT 1 AS x FROM users WHERE lower(username) = lower(?)", username)) continue; // keep an existing account as it is
   await auth.createUser(d, adminUser, { username, full_name, role, hub, password });
+  created.push(username);
 }
 
 // id, name, hub, position, reports to, usual business per working day, share of days worked
@@ -153,8 +172,11 @@ await svc.updateEntry(d, "staff", "D07", { bank_account_no: "3000999888" }, "acc
 await svc.runPeriod(d, open, "accounts");
 
 console.log(`Seeded ${remote ? "the Postgres database from DATABASE_URL" : target}`);
-console.log((remote ? "Sign-ins (random passwords — save them now, they are not shown again): " : "Demo sign-ins: ") +
-  DEMO_USERS.map(([u, , r, h, p]) => `${u} / ${p} (${r}${h ? ", " + h : ""})`).join(", "));
+console.log(remote ? "Sign-ins (random passwords — save them now, they are not shown again):" : "Demo sign-ins:");
+for (const [u, , r, h, p] of DEMO_USERS.slice(existingAdmin ? 1 : 0)) {
+  console.log(`  ${u.padEnd(10)} ${!existingAdmin || created.includes(u) ? p : "(already existed, password unchanged)"}  ${r}${h ? ", " + h : ""}`);
+}
+if (existingAdmin) console.log(`  Your admin account "${existingAdmin.username}" was kept as it is.`);
 for (const r of (await svc.getPeriod(d, open)).rows) {
   console.log(`  ${open} ${r.employee_id.padEnd(5)} ${r.status.padEnd(14)} net ${(r.net_pay / 100).toFixed(2).padStart(12)}  ${r.flags.map((f) => f.code).join(", ")}`);
 }
