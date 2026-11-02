@@ -44,7 +44,7 @@ export default {
         <div><h1>Weekly sheet</h1><p>One row per manager per week. Weekly balance = business × profit % − rent − hub fee − security − personal draw.</p></div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
-      <div class="card" style="margin-bottom:16px">
+      <div class="card mb-4">
         <div class="card-head"><div class="seg" id="weeks">${weeks.map((w) => {
           const n = entries.filter((e) => e.week_start === w).length;
           return html`<button data-w="${w}" class="${w === week ? "on" : ""}">${dateLabel(w).replace(/^\w+ /, "")} – ${dateLabel(addDays(w, 6)).replace(/^\w+ /, "")}
@@ -74,14 +74,14 @@ export default {
           const e = byMgr[mg.employee_id];
           const p = e ? e.profit_percent : lastPct(mg.employee_id);
           return html`<tr data-i="${i}">
-            <th scope="row" class="name"><b>${mg.name}</b><div class="faint" style="font-size:12px;font-weight:400">${mg.employee_id} · ${mg.hub}</div></th>
+            <th scope="row" class="name"><b>${mg.name}</b><div class="faint text-sm fw-400">${mg.employee_id} · ${mg.hub}</div></th>
             <td><input data-f="business_total" aria-label="Business, ${mg.name}" inputmode="decimal" value="${e ? fromCents(e.business_total) : ""}" ${editable ? "" : "disabled"}></td>
             <td><input data-f="profit_percent" aria-label="Profit %, ${mg.name}" inputmode="decimal" value="${p != null ? +(p * 100).toFixed(4) : ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>
             ${MONEY.slice(1).map((f) => html`<td><input data-f="${f.k}" aria-label="${f.label}, ${mg.name}" inputmode="decimal" value="${e && e[f.k] ? fromCents(e[f.k]) : ""}" ${editable ? "" : "disabled"}></td>`)}
             <td class="calc" data-calc></td></tr>`;
         })}</tbody>
       </table></div>
-      ${editable ? html`<div class="row between" style="padding:14px 18px;border-top:1px solid var(--border)">
+      ${editable ? html`<div class="row between card-foot">
         <span class="muted" id="dirty-info"></span><button class="btn primary" id="save">${icon("check")} Save week</button></div>` : ""}`;
 
     const rowVals = (tr) => Object.fromEntries([...tr.querySelectorAll("[data-f]")].map((i) => [i.dataset.f, i.value.trim()]));

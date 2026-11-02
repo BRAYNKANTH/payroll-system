@@ -18,8 +18,8 @@ export default {
     const bankState = !s.bank_account_no ? ["amber", "Missing"] : s.bank_account_no !== s.bank_account_verified ? ["red", "Awaiting verification"] : ["green", "Verified"];
 
     el.innerHTML = html`
-      <div style="margin-bottom:14px"><a href="/employees" data-link class="muted">${icon("left")} All employees</a></div>
-      <div class="card" style="margin-bottom:16px">
+      <div class="mb-3"><a href="/employees" data-link class="muted">${icon("left")} All employees</a></div>
+      <div class="card mb-4">
         <div class="profile-head">
           <div class="avatar lg" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div>
           <div style="flex:1;min-width:200px">
@@ -27,9 +27,9 @@ export default {
             <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
           </div>
           <div class="row" style="gap:28px">
-            <div><div class="faint" style="font-size:12px">Latest net pay</div><div style="font-size:20px;font-weight:700" class="num ${last?.net_pay < 0 ? "neg" : ""}">${last ? `Rs ${money(last.net_pay)}` : "—"}</div><div class="faint" style="font-size:12px">${last ? monthName(last.period) : ""}</div></div>
-            <div><div class="faint" style="font-size:12px">Balance carried</div><div style="font-size:20px;font-weight:700" class="num ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
-            ${s.role === "guy" ? html`<div><div class="faint" style="font-size:12px">Security held</div><div style="font-size:20px;font-weight:700" class="num">Rs ${money(p.security_held)}</div></div>` : ""}
+            <div><div class="faint text-sm">Latest net pay</div><div class="num stat-lg ${last?.net_pay < 0 ? "neg" : ""}">${last ? `Rs ${money(last.net_pay)}` : "—"}</div><div class="faint text-sm">${last ? monthName(last.period) : ""}</div></div>
+            <div><div class="faint text-sm">Balance carried</div><div class="num stat-lg ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
+            ${s.role === "guy" ? html`<div><div class="faint text-sm">Security held</div><div class="num stat-lg">Rs ${money(p.security_held)}</div></div>` : ""}
           </div>
           ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<button class="btn" id="edit">${icon("edit")} Edit</button>` : ""}
         </div>
@@ -65,7 +65,7 @@ export default {
             ${s.bank_account_no !== s.bank_account_verified ? html`<dt>Verified account</dt><dd class="mono">${s.bank_account_verified || "none"}</dd>` : ""}</dl></div></div>
         </div></div>`,
       history: () => p.history.length ? html`
-        <div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Net pay over time</h3></div><div class="card-body" id="chart"></div></div>
+        <div class="card mb-4"><div class="card-head"><h3>Net pay over time</h3></div><div class="card-body" id="chart"></div></div>
         <div class="card"><div class="card-body flush" id="hist"></div></div>` : html`<div class="card">${emptyState("No pay history yet", "", "file")}</div>`,
       team: () => html`<div class="card"><div class="card-body flush">${dataTable({
         rows: p.team, empty: "No guys report to this manager", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),

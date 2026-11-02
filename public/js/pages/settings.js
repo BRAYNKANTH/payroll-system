@@ -51,7 +51,7 @@ export default {
 
         <div class="row" style="justify-content:flex-end"><button class="btn primary" id="save">${icon("check")} Save settings</button></div>
       </form>
-      <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Backup</h3><div class="sub">Download every record (staff, sheets, payroll, audit trail) as one file. Passwords are not included.</div></div>
+      <div class="card mt-4"><div class="card-head"><div><h3>Backup</h3><div class="sub">Download every record (staff, sheets, payroll, audit trail) as one file. Passwords are not included.</div></div>
         <button class="btn" id="backup">${icon("download")} Download backup</button></div><div class="card-body muted">Neon also keeps its own point-in-time history of the database. Download a copy here after each month is finalized and keep it somewhere safe.</div></div>`;
     $("#backup").onclick = (e) => busy(e.currentTarget, async () => {
       const res = await fetch("/api/backup", { credentials: "same-origin" });

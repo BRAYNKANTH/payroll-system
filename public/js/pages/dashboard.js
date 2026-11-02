@@ -30,7 +30,7 @@ export default {
         </div>
       </div>
 
-      ${k.pending ? html`<div class="alert warn" style="margin-bottom:16px">${icon("alert")}<div><b>${k.pending} payroll ${k.pending === 1 ? "entry needs" : "entries need"} review</b> before ${monthName(d.period)} can be finalized.
+      ${k.pending ? html`<div class="alert warn mb-4">${icon("alert")}<div><b>${k.pending} payroll ${k.pending === 1 ? "entry needs" : "entries need"} review</b> before ${monthName(d.period)} can be finalized.
         <a href="/approvals" data-link>Open approvals →</a></div></div>` : ""}
 
       <div class="grid kpis">
@@ -41,14 +41,14 @@ export default {
         ${kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
       </div>
 
-      <div class="grid two" style="margin-top:16px">
+      <div class="grid two mt-4">
         <div class="card"><div class="card-head"><div><h3>Six-month trend</h3><div class="sub">Guys' business vs payroll cost</div></div></div>
           <div class="card-body" id="trend"></div></div>
         <div class="card"><div class="card-head"><div><h3>Business by hub</h3><div class="sub">From managers' weekly sheets</div></div></div>
           <div class="card-body" id="hub-donut"></div></div>
       </div>
 
-      <div class="grid two" style="margin-top:16px">
+      <div class="grid two mt-4">
         <div class="card"><div class="card-head"><div><h3>Hubs at a glance</h3><div class="sub">${monthName(d.period)}</div></div>
           <a class="btn sm" href="/reports" data-link>Reports</a></div>
           <div class="card-body flush" id="hub-table"></div></div>
@@ -57,7 +57,7 @@ export default {
           <div class="card-body flush" id="exceptions"></div></div>
       </div>
 
-      <div class="grid halves" style="margin-top:16px">
+      <div class="grid halves mt-4">
         <div class="card"><div class="card-head"><div><h3>Top performers</h3><div class="sub">Business vs monthly target</div></div></div>
           <div class="card-body flush" id="top"></div></div>
         <div class="card"><div class="card-head"><div><h3>Daily sheet completeness</h3><div class="sub">Working days without an entry</div></div>
@@ -87,7 +87,7 @@ export default {
       empty: "No hubs yet",
       footer: d.by_hub.length > 1,
       cols: [
-        { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b><div class="faint" style="font-size:12px">${h.code} · ${h.staff} staff</div>`, total: () => "All hubs" },
+        { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b><div class="faint text-sm">${h.code} · ${h.staff} staff</div>`, total: () => "All hubs" },
         { key: "hub_business", label: "Business", align: "r", render: (h) => money(h.hub_business), total: (r) => money(r.reduce((t, h) => t + h.hub_business, 0)) },
         { key: "gross_pay", label: "Gross pay", align: "r", render: (h) => money(h.gross_pay), total: (r) => money(r.reduce((t, h) => t + h.gross_pay, 0)) },
         { key: "stock_shortfall", label: "Stock short", align: "r", render: (h) => h.stock_shortfall ? html`<span class="neg">${money(h.stock_shortfall)}</span>` : "—", total: (r) => money(r.reduce((t, h) => t + h.stock_shortfall, 0)) },

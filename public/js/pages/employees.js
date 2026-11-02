@@ -132,7 +132,7 @@ export default {
         <div><h1>Employees</h1><p>${staff.filter((s) => s.status === "active").length} active · ${LEVELS.map(([v, l]) => `${staff.filter((s) => s.staff_level === v && s.status === "active").length} ${l.toLowerCase()}`).join(" · ")}</p></div>
         <div class="actions">${can("manage_staff") || can("manage_team") ? html`<button class="btn primary" id="add" ${state.hubs.length ? "" : "disabled"}>${icon("plus")} Add employee</button>` : ""}</div>
       </div>
-      ${!state.hubs.length ? html`<div class="alert warn" style="margin-bottom:16px">${icon("alert")}<div>Create at least one hub before adding employees. <a href="/hubs" data-link>Go to hubs →</a></div></div>` : ""}
+      ${!state.hubs.length ? html`<div class="alert warn mb-4">${icon("alert")}<div>Create at least one hub before adding employees. <a href="/hubs" data-link>Go to hubs →</a></div></div>` : ""}
       <div class="card">
         <div class="card-head">
           <div class="row">

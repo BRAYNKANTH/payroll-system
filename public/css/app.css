@@ -38,6 +38,8 @@
   --shadow-lg: 0 8px 24px rgba(29, 27, 23, .16);
   --radius: 8px;
   --radius-sm: 5px;
+  /* Spacing scale: use these for gaps, padding and margins. */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
   --font: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
   --font-display: "Newsreader", Georgia, "Times New Roman", serif;
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
@@ -130,11 +132,16 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 
 /* ---------- Cards / grid ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
-.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px 0; flex-wrap: wrap; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: 14px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .card-head h3 { font-size: 15px; font-weight: 650; }
 .card-head .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.card-body { padding: 16px 18px 18px; }
-.card-body.flush { padding: 12px 0 0; }
+.card-body { padding: 20px; }
+.card-body.flush { padding: 0; }
+/* Tables inside a card line up with the card's own 20px padding. */
+.card-body.flush .table th:first-child, .card-body.flush .table td:first-child { padding-left: 20px; }
+.card-body.flush .table th:last-child, .card-body.flush .table td:last-child { padding-right: 20px; }
+.card-body.flush > .table-wrap:last-child, .card-body.flush > .table:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+.card-foot { padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface-2); border-radius: 0 0 var(--radius) var(--radius); }
 .grid { display: grid; gap: 16px; }
 .grid.kpis { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .grid.two { grid-template-columns: 2fr 1fr; }
@@ -562,3 +569,26 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 .auth-art li { border-bottom-color: rgba(255, 255, 255, .14); color: #eef5f1; }
 .auth-art li::before { color: #e8a46d; }
 .auth-art .note { color: #a3bdb2; }
+
+/* ---------- Layout and utilities (replace one-off inline styles) ---------- */
+.mb-3 { margin-bottom: var(--sp-3); }
+.mb-4 { margin-bottom: var(--sp-4); }
+.mt-4 { margin-top: var(--sp-4); }
+.text-sm { font-size: 12px; }
+.fw-400 { font-weight: 400; }
+.stat-lg { font-size: 20px; font-weight: 700; letter-spacing: -.2px; }
+.sub-head { margin: var(--sp-5) 0 var(--sp-2); font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-2); }
+.page-head { margin-bottom: var(--sp-5); }
+.grid { gap: var(--sp-4); }
+.stack { gap: var(--sp-4); }
+@media (min-width: 1280px) { .content { padding: 28px 32px; } }
+
+/* A negative figure on a summary card reads as a warning. */
+.kpi:has(.icon.red) .value { color: var(--danger); }
+/* Cards that open something respond to hover and keyboard focus. */
+.card[data-href], .card.clickable { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.card[data-href]:hover, .card.clickable:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg); }
+.card-head h3 { display: flex; align-items: center; gap: var(--sp-2); }
+.card-head .sub { margin-top: 2px; }
+/* A person's name is the row's anchor: keep it on one line where it can. */
+.card-body.flush .table td:first-child b { white-space: nowrap; }

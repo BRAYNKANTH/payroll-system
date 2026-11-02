@@ -17,7 +17,7 @@ export default {
       <div class="page-head">
         <div><h1>Approvals</h1><p>Only entries that break a payroll rule land here. Everything else is processed automatically.</p></div>
       </div>
-      ${!can("review") ? html`<div class="alert info" style="margin-bottom:16px">${icon("info")}<div>You can see the queue, but only accountants and admins can approve or reject.</div></div>` : ""}
+      ${!can("review") ? html`<div class="alert info mb-4">${icon("info")}<div>You can see the queue, but only accountants and admins can approve or reject.</div></div>` : ""}
       <div class="grid two">
         <div class="stack" id="queue"></div>
         <div class="card"><div class="card-head"><div><h3>Recent decisions</h3><div class="sub">From the audit trail</div></div></div>
@@ -52,9 +52,9 @@ export default {
     $("#recent").innerHTML = dataTable({
       rows: recent, sortable: false, empty: "No decisions yet",
       cols: [
-        { key: "row_key", label: "Entry", render: (a) => html`<b>${a.row_key.split("@")[0]}</b><div class="faint" style="font-size:12px">${a.row_key.split("@")[1]}</div>` },
+        { key: "row_key", label: "Entry", render: (a) => html`<b>${a.row_key.split("@")[0]}</b><div class="faint text-sm">${a.row_key.split("@")[1]}</div>` },
         { key: "action", label: "Decision", render: (a) => badge(a.action === "approve" ? "approved" : "rejected") },
-        { key: "changed_by", label: "By", render: (a) => html`${a.changed_by}<div class="faint" style="font-size:12px">${dateTime(a.changed_at)}</div>` },
+        { key: "changed_by", label: "By", render: (a) => html`${a.changed_by}<div class="faint text-sm">${dateTime(a.changed_at)}</div>` },
       ],
     }).toString();
   },

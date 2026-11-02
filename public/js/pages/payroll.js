@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { $, $$, html, icon, money, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal } from "../ui.js";
+import { $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal } from "../ui.js";
 import { breakdownDrawer } from "./breakdown.js";
 
 let filter = "all";
@@ -41,17 +41,17 @@ export default {
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:16px"><div class="steps">${steps.map((s, i) => html`
+      <div class="card mb-4"><div class="steps">${steps.map((s, i) => html`
         <div class="step ${s.s}"><div class="dot">${s.s === "done" ? icon("check") : i + 1}</div><div><div class="t">${s.t}</div><div class="d">${s.d}</div></div></div>`)}</div></div>
 
       ${calculated ? html`
-      <div class="grid kpis" style="margin-bottom:16px">
+      <div class="grid kpis mb-4">
         <div class="card kpi"><div class="label"><span class="icon">${icon("users")}</span>Employees</div><div class="value">${all.length}</div>
           <div class="foot">${count("auto_approved")} auto · ${count("approved")} approved · <span class="${pending ? "neg" : ""}">${pending} pending</span>${rejected ? ` · ${rejected} rejected` : ""}</div></div>
-        <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Gross earnings</div><div class="value"><small>Rs</small>${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot">Guys & supervisors</div></div>
-        <div class="card kpi"><div class="label"><span class="icon amber">${icon("coins")}</span>Deductions</div><div class="value"><small>Rs</small>${money(sum("total_deductions", all.filter((r) => r.role === "guy")))}</div><div class="foot">Settle-up, stock, personal, security</div></div>
-        <div class="card kpi"><div class="label"><span class="icon green">${icon("bank")}</span>To bank</div><div class="value"><small>Rs</small>${money(sum("disbursed_amount"))}</div><div class="foot">${all.filter((r) => r.disbursed_amount > 0).length} payments</div></div>
-        <div class="card kpi"><div class="label"><span class="icon blue">${icon("trend")}</span>Managers' closing</div><div class="value"><small>Rs</small>${money(sum("closing_balance", all.filter((r) => r.role === "manager")))}</div><div class="foot">Running account with the company</div></div>
+        <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Gross earnings</div><div class="value"><small>Rs</small>${compact(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</b> · Guys & supervisors</div></div>
+        <div class="card kpi"><div class="label"><span class="icon amber">${icon("coins")}</span>Deductions</div><div class="value"><small>Rs</small>${compact(sum("total_deductions", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("total_deductions", all.filter((r) => r.role === "guy")))}</b> · Settle-up, stock, personal, security</div></div>
+        <div class="card kpi"><div class="label"><span class="icon green">${icon("bank")}</span>To bank</div><div class="value"><small>Rs</small>${compact(sum("disbursed_amount"))}</div><div class="foot"><b class="num">Rs ${money(sum("disbursed_amount"))}</b> · ${all.filter((r) => r.disbursed_amount > 0).length} payments</div></div>
+        <div class="card kpi"><div class="label"><span class="icon blue">${icon("trend")}</span>Managers' closing</div><div class="value"><small>Rs</small>${compact(sum("closing_balance", all.filter((r) => r.role === "manager")))}</div><div class="foot"><b class="num">Rs ${money(sum("closing_balance", all.filter((r) => r.role === "manager")))}</b> · Running account with the company</div></div>
       </div>
 
       <div class="card">
@@ -119,7 +119,7 @@ export default {
       const payees = all.filter((r) => r.disbursed_amount > 0);
       const m = modal({
         title: "Bank disbursement file",
-        body: html`<div class="alert warn" style="margin-bottom:14px">${icon("alert")}<div><b>Check the file format with your bank before the first upload.</b>
+        body: html`<div class="alert warn mb-3">${icon("alert")}<div><b>Check the file format with your bank before the first upload.</b>
           The current layout is a generic CSV, not a confirmed SLIPS specification.</div></div>
           <p style="margin:0 0 10px"><b>${payees.length}</b> payments totalling <b>Rs ${money(sum("disbursed_amount", payees))}</b>.</p>
           <div class="table-wrap" style="max-height:280px"><table class="table compact"><thead><tr><th>Employee</th><th>Bank</th><th>Account</th><th class="r">Amount</th></tr></thead>

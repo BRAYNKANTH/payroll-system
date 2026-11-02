@@ -27,7 +27,7 @@ export default {
     const views = {
       async hubs() {
         const d = await get("/api/dashboard" + qs({ period: p, hub: scopeHub() }));
-        pane.innerHTML = html`<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Business and payroll by hub</h3></div><div class="card-body" id="c"></div></div>
+        pane.innerHTML = html`<div class="card mb-4"><div class="card-head"><h3>Business and payroll by hub</h3></div><div class="card-body" id="c"></div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows: d.by_hub, footer: true,
             cols: [
@@ -81,7 +81,7 @@ export default {
       },
       async balances() {
         const rows = await get("/api/reports/balances");
-        pane.innerHTML = html`<div class="alert info" style="margin-bottom:16px">${icon("info")}<div>Latest closing balance per employee. Negative guy balances are money owed that is recovered from future pay; manager balances are their running account with the company.</div></div>
+        pane.innerHTML = html`<div class="alert info mb-4">${icon("info")}<div>Latest closing balance per employee. Negative guy balances are money owed that is recovered from future pay; manager balances are their running account with the company.</div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows, footer: true, empty: "No balances yet",
             cols: [
@@ -98,7 +98,7 @@ export default {
       async periods() {
         const rows = await get("/api/periods");
         const asc = [...rows].reverse().slice(-12);
-        pane.innerHTML = html`${rows.length ? html`<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Payroll cost by month</h3></div><div class="card-body" id="c"></div></div>` : ""}
+        pane.innerHTML = html`${rows.length ? html`<div class="card mb-4"><div class="card-head"><h3>Payroll cost by month</h3></div><div class="card-body" id="c"></div></div>` : ""}
           <div class="card"><div class="card-body flush">${dataTable({
             rows, empty: "No months calculated yet",
             cols: [

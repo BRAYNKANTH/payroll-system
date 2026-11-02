@@ -144,7 +144,7 @@ function shell() {
             <span class="who"><b>${esc(u.full_name)}</b><span>${esc(u.role)}</span></span>
           </button>
           <div class="menu" id="user-menu" hidden>
-            <div style="padding:8px 10px"><b>${esc(u.full_name)}</b><div class="faint" style="font-size:12px">${esc(u.username)} · ${esc(u.role)}</div></div><hr>
+            <div style="padding:8px 10px"><b>${esc(u.full_name)}</b><div class="faint text-sm">${esc(u.username)} · ${esc(u.role)}</div></div><hr>
             <a href="/account" data-link id="menu-account">${icon("lock")} Change password</a>
             <button type="button" id="logout">${icon("logout")} Sign out</button>
           </div>

@@ -95,7 +95,7 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
         <th scope="col" class="r">${FIELDS[2].label}</th><th scope="col">Notes</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>
       <tbody>${rows.map((r, i) => html`
         <tr data-i="${i}" style="${r.muted ? "opacity:.6" : ""}">
-          <th scope="row" class="name"><b>${r.label}</b><div class="faint" style="font-size:12px;font-weight:400">${r.sub}</div></th>
+          <th scope="row" class="name"><b>${r.label}</b><div class="faint text-sm fw-400">${r.sub}</div></th>
           ${FIELDS.slice(0, 2).map((f) => cell(f, r, r.existing ? amt(r.existing[f.k]) : ""))}
           <td class="calc" data-calc aria-live="off"></td>
           ${cell(FIELDS[2], r, r.existing && r.existing.personal_minus ? amt(r.existing.personal_minus) : "")}
@@ -264,7 +264,7 @@ function importCsv(guys, done) {
     body: html`
       <p class="muted" style="margin-top:0">Upload a CSV with the columns <code>date, employee_id, business_amount, settled_amount, personal_minus, notes</code>.
       Dates are <code>YYYY-MM-DD</code>; amounts in rupees. Existing entries for the same date and employee are updated.</p>
-      <div class="row" style="margin-bottom:14px"><input type="file" accept=".csv,text/csv" id="csv-file" class="input" style="max-width:360px;padding-top:6px">
+      <div class="row mb-3"><input type="file" accept=".csv,text/csv" id="csv-file" class="input" style="max-width:360px;padding-top:6px">
         <button class="btn sm ghost" id="tmpl">${icon("download")} Download template</button></div>
       <div id="csv-preview"></div>`.toString(),
     foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="csv-go" disabled>Import</button>`,

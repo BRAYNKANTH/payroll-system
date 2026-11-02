@@ -21,7 +21,7 @@ export default {
         <div><h1>Users & roles</h1><p>Who can sign in, and what they are allowed to do.</p></div>
         <div class="actions"><button class="btn primary" id="add">${icon("plus")} Add user</button></div>
       </div>
-      <div class="grid kpis" style="margin-bottom:16px">${ROLES.map(([k, , d]) => html`
+      <div class="grid kpis mb-4">${ROLES.map(([k, , d]) => html`
         <div class="card kpi"><div class="label">${roleBadge(k)}</div>
           <div class="value">${users.filter((u) => u.role === k && u.status === "active").length}</div><div class="foot">${d}</div></div>`)}</div>
       <div class="card"><div class="card-body flush" id="list"></div></div>`;

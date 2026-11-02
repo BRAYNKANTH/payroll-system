@@ -30,7 +30,7 @@ export default {
       </div>
       ${locked ? lockedBanner(state.period) : ""}
       <div class="card"><div class="card-body flush" id="grid"></div>
-        ${editable ? html`<div class="row between" style="padding:14px 18px;border-top:1px solid var(--border)">
+        ${editable ? html`<div class="row between card-foot">
           <span class="muted" id="info"></span><button class="btn primary" id="save">${icon("check")} Save stock count</button></div>` : ""}</div>`;
 
     const grid = $("#grid");
@@ -47,7 +47,7 @@ export default {
         <thead><tr><th>Employee</th><th>Product</th><th class="r">Opening</th><th class="r">Issued</th><th class="r">Sold</th><th class="r">Counted</th>
           <th class="r">Unit price</th><th class="r">Short qty</th><th class="r">Short value</th><th></th></tr></thead>
         <tbody>${rows.map((r, i) => r._state === "deleted" ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
-          <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint" style="font-size:12px">${r.employee_id}</div>`
+          <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint text-sm">${r.employee_id}</div>`
             : html`<select class="input sm" data-f="employee_id" style="min-width:160px">${guyOptions(r.employee_id)}</select>`}</td>
           <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" value="${r.product || ""}" placeholder="Product name">`}</td>
           ${INTS.map((k) => html`<td><input data-f="${k}" inputmode="numeric" value="${r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}

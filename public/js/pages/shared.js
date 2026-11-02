@@ -21,7 +21,7 @@ export async function periodInfo(period, fresh = false) {
   return periodsCache.rows.find((p) => p.period === period) || { period, status: "open" };
 }
 export const periodLocked = async (period) => (await periodInfo(period, true)).status === "finalized";
-export const lockedBanner = (period) => html`<div class="alert info" style="margin-bottom:16px">${icon("lock")}<div><b>${monthName(period)} is finalized.</b> Entries are locked and shown read-only.</div></div>`;
+export const lockedBanner = (period) => html`<div class="alert info mb-4">${icon("lock")}<div><b>${monthName(period)} is finalized.</b> Entries are locked and shown read-only.</div></div>`;
 
 export const hubName = (hubs, code) => hubs.find((h) => h.code === code)?.name || code;
 
