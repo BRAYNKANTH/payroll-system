@@ -24,20 +24,20 @@
   --danger-soft: #f9e4e2;
   --info: #1d5f8a;
   --info-soft: #e2eef6;
-  --sidebar: #f1eee6;
-  --sidebar-2: #e6e1d5;
-  --sidebar-text: #2c2922;
-  --sidebar-muted: #625d52;
+  --sidebar: #163a31;
+  --sidebar-2: rgba(255, 255, 255, .09);
+  --sidebar-text: #dce9e2;
+  --sidebar-muted: #a3bdb2;
   --chart-1: #1b5e4b;
   --chart-2: #b4531a;
   --chart-3: #3b6ea5;
   --chart-4: #8a7a1f;
   --chart-5: #6b6558;
-  --shadow-sm: none;
-  --shadow: none;
+  --shadow-sm: 0 1px 2px rgba(29, 27, 23, .06);
+  --shadow: 0 1px 2px rgba(29, 27, 23, .06), 0 2px 8px rgba(29, 27, 23, .04);
   --shadow-lg: 0 8px 24px rgba(29, 27, 23, .16);
-  --radius: 6px;
-  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-sm: 5px;
   --font: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
   --font-display: "Newsreader", Georgia, "Times New Roman", serif;
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
@@ -48,8 +48,8 @@
   --bg: #16150f; --surface: #1e1c16; --surface-2: #26241c; --surface-3: #312e24; --border: #38352a; --border-strong: #857f6b;
   --text: #f1eee6; --text-2: #d3cebf; --text-3: #aca695; --primary: #6fbf9f; --primary-2: #8fd1b6; --primary-soft: #1d3329;
   --primary-text: #a8dcc5; --accent: #e08a52; --accent-soft: #3a2616; --success: #7bd096; --success-soft: #1a2f20; --warning: #e7b755; --warning-soft: #33280f;
-  --danger: #f08a82; --danger-soft: #3a1b19; --info: #7fb8e0; --info-soft: #16293a; --sidebar: #110f0b; --sidebar-2: #26241c;
-  --sidebar-text: #e6e1d3; --sidebar-muted: #aca695;
+  --danger: #f08a82; --danger-soft: #3a1b19; --info: #7fb8e0; --info-soft: #16293a; --sidebar: #0e1f1a; --sidebar-2: rgba(255, 255, 255, .08);
+  --sidebar-text: #e1ece6; --sidebar-muted: #a3bdb2; --shadow: 0 1px 2px rgba(0, 0, 0, .35);
   --chart-1: #6fbf9f; --chart-2: #e08a52; --chart-3: #7fa8d6; --chart-4: #cdb94b; --chart-5: #a8a290;
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, .55); color-scheme: dark;
 }
@@ -524,3 +524,41 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
   .seg button { min-height: 36px; padding: 6px 14px; }
   .th-sort { min-height: 32px; }
 }
+
+/* ---------- Polish: brand sidebar, richer cards, matching sign-in ---------- */
+.sidebar { border-right: 0; }
+.brand-name { color: #fff; }
+.brand-mark { background: var(--accent); }
+.nav a:hover { background: var(--sidebar-2); color: #fff; }
+.nav a.active { background: rgba(255, 255, 255, .13); color: #fff; }
+.nav a.active::before { background: #e8a46d; }
+.nav a:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.sidebar-foot { border-top: 1px solid rgba(255, 255, 255, .12); }
+
+.topbar { background: var(--surface); }
+.card { border-radius: var(--radius); }
+.table th { letter-spacing: .4px; }
+
+/* Summary cards: a colored top edge and a tinted icon chip tell the metrics apart at a glance. */
+.kpi { padding: 18px 20px; border-top: 3px solid var(--primary); }
+.kpi:has(.icon.blue) { border-top-color: var(--info); }
+.kpi:has(.icon.green) { border-top-color: var(--success); }
+.kpi:has(.icon.amber) { border-top-color: var(--warning); }
+.kpi:has(.icon.red) { border-top-color: var(--danger); }
+.kpi .icon { width: 30px; height: 30px; border-radius: var(--radius); background: var(--primary-soft); color: var(--primary); }
+.kpi .icon.blue { background: var(--info-soft); color: var(--info); }
+.kpi .icon.green { background: var(--success-soft); color: var(--success); }
+.kpi .icon.amber { background: var(--warning-soft); color: var(--warning); }
+.kpi .icon.red { background: var(--danger-soft); color: var(--danger); }
+.kpi .value { font-size: 30px; letter-spacing: -.3px; }
+.grid.kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+/* Sign-in: the left panel uses the same deep green as the app. */
+.auth-art { background: #163a31; border-right: 0; color: #e6f0ea; }
+.auth-art .brand-sub { color: #a3bdb2; }
+.auth-art .art-title, .auth-art h2.art-title { color: #fff; }
+.auth-art p { color: #cfe0d7; }
+.auth-art ol { border-top-color: rgba(255, 255, 255, .35); }
+.auth-art li { border-bottom-color: rgba(255, 255, 255, .14); color: #eef5f1; }
+.auth-art li::before { color: #e8a46d; }
+.auth-art .note { color: #a3bdb2; }

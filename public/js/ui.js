@@ -30,8 +30,8 @@ export function compact(c) {
   const sign = c < 0 ? "-" : "";
   if (v >= 1e7) return sign + (v / 1e6).toFixed(1) + "M";
   if (v >= 1e6) return sign + (v / 1e6).toFixed(2) + "M";
-  if (v >= 1e5) return sign + (v / 1e3).toFixed(0) + "K";
-  if (v >= 1e3) return sign + (v / 1e3).toFixed(1) + "K";
+  if (v >= 1e5) return Math.round(v / 1e3) >= 1000 ? sign + (v / 1e6).toFixed(2) + "M" : sign + Math.round(v / 1e3) + "K"; // 999,950 is 1.00M, not 1000K
+  if (v >= 1e3) return sign + (Math.round(v / 100) >= 1000 ? "100" : (v / 1e3).toFixed(1)) + "K";
   return sign + nf0.format(v);
 }
 export const pct = (f, d = 1) => (f == null || !isFinite(f) ? "—" : (f * 100).toFixed(d) + "%");
