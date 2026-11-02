@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { can, navigate } from "../app.js";
+import { can, navigate, state } from "../app.js";
 import { $, $$, html, icon, money, badge, dataTable, emptyState, initials, roleLabel, levelLabel, pct, dateTime, monthName, shortMonth } from "../ui.js";
 import { lineChart, PALETTE } from "../charts.js";
 import { employeeForm } from "./employees.js";
@@ -31,7 +31,7 @@ export default {
             <div><div class="faint" style="font-size:12px">Balance carried</div><div style="font-size:20px;font-weight:700" class="num ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
             ${s.role === "guy" ? html`<div><div class="faint" style="font-size:12px">Security held</div><div style="font-size:20px;font-weight:700" class="num">Rs ${money(p.security_held)}</div></div>` : ""}
           </div>
-          ${can("manage_staff") ? html`<button class="btn" id="edit">${icon("edit")} Edit</button>` : ""}
+          ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<button class="btn" id="edit">${icon("edit")} Edit</button>` : ""}
         </div>
       </div>
 

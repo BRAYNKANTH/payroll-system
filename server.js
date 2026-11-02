@@ -105,8 +105,8 @@ function createHandler(dbReady) {
         hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })],
     ["POST", /^\/api\/hubs$/, "manage_hubs", ({ user, body }) => svc.createEntry(database, "hubs", body, user.username)],
     ["PUT", /^\/api\/hubs\/([\w-]+)$/, "manage_hubs", ({ user, body, m }) => svc.updateEntry(database, "hubs", m[1], body, user.username)],
-    ["POST", /^\/api\/staff$/, "manage_staff", ({ user, body }) => svc.createEntry(database, "staff", body, user.username)],
-    ["PUT", /^\/api\/staff\/([\w.-]+)$/, "manage_staff", ({ user, body, m }) => svc.updateEntry(database, "staff", m[1], body, user.username)],
+    ["POST", /^\/api\/staff$/, ["manage_staff", "manage_team"], ({ user, body }) => svc.createEntry(database, "staff", body, user.username, user.hub)],
+    ["PUT", /^\/api\/staff\/([\w.-]+)$/, ["manage_staff", "manage_team"], ({ user, body, m }) => svc.updateEntry(database, "staff", m[1], body, user.username, user.hub)],
     ["GET", /^\/api\/staff\/([\w.-]+)\/profile$/, "read", async ({ m, user }) => {
       const p = await svc.employeeProfile(database, m[1]);
       if (user.hub && p.staff.hub !== user.hub) throw svc.httpError(403, "Outside your hub");

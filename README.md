@@ -41,8 +41,10 @@ full copy from *Settings → Backup* — do this after each month is finalized.
 The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` and run `npm start`
 (it listens on `PORT`).
 
-**Demo sign-ins** (demo database only): `admin / admin123`, `accounts / accounts123`, `clerk / clerk123`
-(Colombo 10 only), `viewer / viewer123`.
+**Demo sign-ins** (demo database only): `admin / admin123`, `accounts / accounts123`,
+`manager1`, `manager2`, `manager3` (all `manager123`, each limited to one Jaffna branch), `clerk / clerk123`
+(Jaffna 01 only), `viewer / viewer123`. The demo has three branches, each with a manager, a group manager,
+supervisors and distributors, four finalized months and the current month open.
 
 ## What's in it
 
@@ -60,7 +62,7 @@ The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` 
 | Hubs | Branches with live figures |
 | Reports | Hub summary, commission, stock shortfall, balances, month history (CSV export) |
 | Audit trail | Every change after first entry: who, when, old → new; filters and export |
-| Users & roles | Admin, accountant, clerk (optionally one hub), viewer |
+| Users & roles | Admin, accountant, hub manager (one hub; registers their own team), clerk (optionally one hub), viewer |
 | Settings | Company, rule thresholds, closed days, session length |
 
 ## Roles

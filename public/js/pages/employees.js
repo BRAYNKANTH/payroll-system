@@ -21,10 +21,10 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Employee ID</label><input class="input" name="employee_id" value="${e.employee_id || ""}" ${existing ? "disabled" : ""} required placeholder="e.g. G05"></div>
       <div class="field"><label>Full name</label><input class="input" name="name" value="${e.name || ""}" required></div>
       <div class="field"><label for="ef-level">Position</label><select class="input" id="ef-level" name="staff_level">
-        ${LEVELS.map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select></div>
+        ${LEVELS.filter(([v]) => !(scopeHub() && v === "manager")).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Reports to</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Who sits directly above this person in the chain</span></div>
-      <div class="field"><label>Hub</label><select class="input" name="hub">${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
+      <div class="field"><label>Hub</label><select class="input" name="hub" ${scopeHub() ? "disabled" : ""}>${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
       <div class="field"><label>Phone</label><input class="input" name="phone" value="${e.phone || ""}" inputmode="tel"></div>
       <div class="field"><label>NIC</label><input class="input" name="nic" value="${e.nic || ""}"></div>
       <div class="field"><label>Join date</label><input class="input" type="date" name="join_date" value="${e.join_date || ""}"></div>
@@ -104,7 +104,7 @@ export async function employeeForm(existing, onSaved) {
     const secRule = !guy || v.sec_kind === "none" ? "none" : `${v.sec_kind}:${v.sec_value || 0}${v.sec_cap ? `;cap:${v.sec_cap}` : ""}`;
     const tiered = guy && v.pay_scheme === "tiered";
     const body = {
-      name: v.name, staff_level: v.staff_level, upline_id: guy ? v.upline_id || "" : "", hub: v.hub, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
+      name: v.name, staff_level: v.staff_level, upline_id: guy ? v.upline_id || "" : "", hub: f.hub.value, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
       ...(guy ? {} : { manager_id: "" }), basic_pay: guy ? v.basic_pay || 0 : 0, target: guy ? v.target || 0 : 0,
       commission_rate: guy && v.commission_pct ? Number(v.commission_pct) / 100 : 0, security_deduction_rule: secRule,
       pay_scheme: tiered ? "tiered" : "over_target",
@@ -130,7 +130,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Employees</h1><p>${staff.filter((s) => s.status === "active").length} active · ${LEVELS.map(([v, l]) => `${staff.filter((s) => s.staff_level === v && s.status === "active").length} ${l.toLowerCase()}`).join(" · ")}</p></div>
-        <div class="actions">${can("manage_staff") ? html`<button class="btn primary" id="add" ${state.hubs.length ? "" : "disabled"}>${icon("plus")} Add employee</button>` : ""}</div>
+        <div class="actions">${can("manage_staff") || can("manage_team") ? html`<button class="btn primary" id="add" ${state.hubs.length ? "" : "disabled"}>${icon("plus")} Add employee</button>` : ""}</div>
       </div>
       ${!state.hubs.length ? html`<div class="alert warn" style="margin-bottom:16px">${icon("alert")}<div>Create at least one hub before adding employees. <a href="/hubs" data-link>Go to hubs →</a></div></div>` : ""}
       <div class="card">

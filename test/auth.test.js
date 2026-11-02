@@ -52,6 +52,30 @@ test("role permissions", () => {
   assert.ok(auth.can({ role: "clerk" }, "enter_data"));
   assert.ok(!auth.can({ role: "clerk" }, "run_payroll"));
   assert.ok(!auth.can({ role: "viewer" }, "enter_data"));
+  assert.ok(auth.can({ role: "manager" }, "enter_data") && auth.can({ role: "manager" }, "manage_team"));
+  assert.ok(!auth.can({ role: "manager" }, "manage_staff") && !auth.can({ role: "manager" }, "run_payroll"));
+  assert.doesNotThrow(() => auth.requirePerm({ role: "manager" }, ["manage_staff", "manage_team"]));
+  assert.throws(() => auth.requirePerm({ role: "clerk" }, ["manage_staff", "manage_team"]), /cannot do this/);
+});
+
+test("a hub manager must be limited to one hub", async () => {
+  const { d, admin } = await setup();
+  await assert.rejects(() => auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "manager", password: PW.clerk }), /one hub/);
+  const u = await auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "manager", hub: "COL", password: PW.clerk });
+  assert.equal(u.role, "manager");
+  await assert.rejects(() => auth.updateUser(d, admin, "mgr", { hub: "" }), /one hub/);
+});
+
+test("a hub manager registers staff only in their own hub and never a manager", async () => {
+  const { d } = await setup();
+  const mine = await svc.createEntry(d, "staff", { employee_id: "D9", name: "D9", hub: "COL", staff_level: "distributor", upline_id: "M1" }, "mgr", "COL");
+  assert.equal(mine.manager_id, "M1");
+  await assert.rejects(() => svc.createEntry(d, "staff", { employee_id: "D8", name: "D8", hub: "KDY", staff_level: "distributor" }, "mgr", "COL"), /hub COL/);
+  await assert.rejects(() => svc.createEntry(d, "staff", { employee_id: "M9", name: "M9", hub: "COL", staff_level: "manager" }, "mgr", "COL"), /managers/);
+  await assert.rejects(() => svc.updateEntry(d, "staff", "D9", { hub: "KDY" }, "mgr", "COL"), /hub COL/);
+  await assert.rejects(() => svc.updateEntry(d, "staff", "M1", { name: "Renamed" }, "mgr", "COL"), /managers/);
+  await assert.rejects(() => svc.updateEntry(d, "staff", "G2", { name: "Renamed" }, "mgr", "COL"), /hub COL/);
+  await assert.rejects(() => svc.createEntry(d, "hubs", { code: "NEW", name: "New" }, "mgr", "COL"), /master data/);
 });
 
 test("hub-restricted clerk can only enter data for their hub", async () => {

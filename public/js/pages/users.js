@@ -5,10 +5,11 @@ import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago } f
 const ROLES = [
   ["admin", "Admin", "Everything, including finalizing months, users and settings"],
   ["accountant", "Accountant", "Run payroll, approve exceptions, manage staff and hubs, export files"],
+  ["manager", "Hub manager", "Enter sheets and register the team of their own hub"],
   ["clerk", "Clerk", "Enter daily, weekly, stock and allowance sheets"],
   ["viewer", "Viewer", "Read-only access to dashboards, payroll and reports"],
 ];
-const roleBadge = (r) => badge(r === "admin" ? "admin" : r === "accountant" ? "blue" : r === "clerk" ? "green" : "", ROLES.find((x) => x[0] === r)?.[1] || r);
+const roleBadge = (r) => badge(r === "admin" ? "admin" : r === "accountant" ? "blue" : r === "clerk" || r === "manager" ? "green" : "", ROLES.find((x) => x[0] === r)?.[1] || r);
 
 export default {
   title: "Users & roles",
@@ -40,7 +41,7 @@ export default {
             ${self ? html`<span class="hint">You can't change your own role.</span>` : ""}</div>
           <div class="field"><label>Hub access</label><select class="input" name="hub"><option value="">All hubs</option>
             ${state.hubs.map((h) => html`<option value="${h.code}" ${u?.hub === h.code ? "selected" : ""}>${h.name} only</option>`)}</select>
-            <span class="hint">Limit a clerk to one hub's staff</span></div>
+            <span class="hint">Required for a hub manager. Limits a clerk to one hub's staff.</span></div>
           ${u ? html`<div class="field"><label>Status</label><select class="input" name="status" ${self ? "disabled" : ""}><option value="active">Active</option><option value="disabled" ${u.status === "disabled" ? "selected" : ""}>Disabled</option></select></div>` : ""}
           <div class="field full"><label>${u ? "Set a new password" : "Initial password"}</label><input class="input" type="password" name="password" autocomplete="new-password" placeholder="${u ? "Leave blank to keep the current one" : ""}">
             <span class="hint">At least 8 characters with letters and numbers.${u ? " Setting a new one signs the user out everywhere." : ""}</span></div>

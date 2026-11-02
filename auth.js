@@ -3,18 +3,21 @@ const crypto = require("crypto");
 const { withUser, getSettings, httpError } = require("./db");
 
 const NOW = "now_iso()";
-const ROLES = ["viewer", "clerk", "accountant", "admin"];
-// What each role may do. Higher roles include everything below them.
+const ROLES = ["viewer", "clerk", "manager", "accountant", "admin"];
+// What each role may do. Higher roles include everything below them, except that a hub manager
+// (manage_team) registers staff only inside their own hub.
 const PERMISSIONS = {
   viewer: ["read"],
   clerk: ["read", "enter_data"],
+  manager: ["read", "enter_data", "manage_team"],
   accountant: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs"],
   admin: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "finalize", "manage_users", "settings"],
 };
 const can = (user, perm) => !!user && PERMISSIONS[user.role]?.includes(perm);
+// perm may be a list: any one of them is enough.
 function requirePerm(user, perm) {
   if (!user) throw httpError(401, "Please sign in");
-  if (!can(user, perm)) throw httpError(403, `Your role (${user.role}) cannot do this`);
+  if (![].concat(perm).some((p) => can(user, p))) throw httpError(403, `Your role (${user.role}) cannot do this`);
 }
 
 function hashPassword(password) {
@@ -110,6 +113,7 @@ async function createUser(db, actor, body) {
   if (!String(body.full_name || "").trim()) throw httpError(400, "Full name is required");
   checkPasswordStrength(body.password);
   if (body.hub && !(await db.get("SELECT 1 AS x FROM hubs WHERE code = ?", body.hub))) throw httpError(400, "Unknown hub");
+  if (body.role === "manager" && !body.hub) throw httpError(400, "A hub manager must be limited to one hub");
   if (await findUser(db, body.username)) throw httpError(409, "Username already exists");
   await withUser(db, actor.username, (t) =>
     t.run(`INSERT INTO users (username, full_name, role, hub, password_hash, created_by) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -128,6 +132,7 @@ async function updateUser(db, actor, username, body) {
   }
   if (body.status !== undefined) { if (!["active", "disabled"].includes(body.status)) throw httpError(400, "Invalid status"); sets.status = body.status; }
   if (body.password) { checkPasswordStrength(body.password); sets.password_hash = hashPassword(body.password); }
+  if ((sets.role ?? u.role) === "manager" && !(sets.hub !== undefined ? sets.hub : u.hub)) throw httpError(400, "A hub manager must be limited to one hub");
   if (u.username.toLowerCase() === actor.username.toLowerCase() && ((sets.role && sets.role !== "admin") || sets.status === "disabled")) {
     throw httpError(400, "You cannot remove your own admin access");
   }

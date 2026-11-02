@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS hubs (
 CREATE TABLE IF NOT EXISTS users (
   username      text PRIMARY KEY,
   full_name     text NOT NULL,
-  role          text NOT NULL CHECK (role IN ('admin','accountant','clerk','viewer')),
+  role          text NOT NULL CHECK (role IN ('admin','accountant','manager','clerk','viewer')),
   hub           text REFERENCES hubs(code),
   password_hash text NOT NULL,
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled')),
@@ -115,6 +115,10 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS pay_scheme text NOT NULL DEFAULT 'ove
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS base_commission_rate double precision NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_per_day bigint NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAULT 0;
+
+-- Existing databases were created before the hub-manager role: widen the role check (the name is Postgres's default).
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','accountant','manager','clerk','viewer'));
 
 -- Chain of command: distributor/guy -> supervisor -> group manager -> manager. upline_id is who this person reports to.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS staff_level text NOT NULL DEFAULT 'distributor' CHECK (staff_level IN ('distributor','supervisor','group_manager','manager'));

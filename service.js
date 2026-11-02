@@ -183,7 +183,13 @@ async function listEntries(db, kind, { period, employee_id, hub, from, to } = {}
 // A hub-scoped user (e.g. a branch clerk) may only touch entries for staff of their own hub.
 async function assertScope(db, kind, row, scopeHub) {
   if (!scopeHub) return;
-  if (kind === "staff" || kind === "hubs") throw httpError(403, "Hub-restricted users cannot change master data");
+  if (kind === "hubs") throw httpError(403, "Hub-restricted users cannot change master data");
+  if (kind === "staff") {
+    // A hub manager registers their own team: same hub, never another manager.
+    if (row.hub !== scopeHub) throw httpError(403, `You can only manage staff of hub ${scopeHub}`);
+    if (row.role === "manager" || row.staff_level === "manager") throw httpError(403, "Hub users cannot add or change managers");
+    return;
+  }
   const hub = (await db.get("SELECT hub FROM staff WHERE employee_id = ?", row[empCol(kind)]))?.hub;
   if (hub !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
 }
