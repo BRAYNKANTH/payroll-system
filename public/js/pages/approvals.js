@@ -41,13 +41,14 @@ export default {
             </div>`)}</div></div>`;
       }).join("");
 
-    el.addEventListener("click", (e) => {
+    // onclick, not addEventListener: render() runs again after every decision and would stack a second handler.
+    el.onclick = (e) => {
       const box = e.target.closest("[data-open]");
       if (!box) return;
       const [p, id] = box.dataset.open.split("|");
       const row = queue.find((r) => r.period === p && r.employee_id === id);
       breakdownDrawer(row, { finalized: false, onChange: () => this.render(ctx) });
-    });
+    };
 
     $("#recent").innerHTML = dataTable({
       rows: recent, sortable: false, empty: "No decisions yet",

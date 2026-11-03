@@ -56,13 +56,14 @@ export default {
       });
     };
     $("#add")?.addEventListener("click", () => open(null));
-    el.addEventListener("click", async (e) => {
+    // onclick, not addEventListener: render() runs again after every change and would stack a second handler.
+    el.onclick = async (e) => {
       const ed = e.target.closest("[data-edit]");
       if (ed) return open(rows.find((r) => String(r.id) === ed.dataset.edit));
       const dl = e.target.closest("[data-del]");
       if (dl && (await confirmDialog({ title: "Delete allowance?", message: "This is recorded in the audit trail.", confirmText: "Delete", danger: true }))) {
         await busy(dl, async () => { await del(`/api/allowances/${dl.dataset.del}`); toast("Deleted"); this.render(ctx); });
       }
-    });
+    };
   },
 };

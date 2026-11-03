@@ -48,10 +48,10 @@ export default {
           <th class="r">Unit price</th><th class="r">Short qty</th><th class="r">Short value</th><th></th></tr></thead>
         <tbody>${rows.map((r, i) => r._state === "deleted" ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint text-sm">${r.employee_id}</div>`
-            : html`<select class="input sm" data-f="employee_id" style="min-width:160px">${guyOptions(r.employee_id)}</select>`}</td>
-          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" value="${r.product || ""}" placeholder="Product name">`}</td>
-          ${INTS.map((k) => html`<td><input data-f="${k}" inputmode="numeric" value="${r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
-          <td><input data-f="unit_price" inputmode="decimal" value="${r.unit_price != null ? fromCents(r.unit_price) : ""}" ${editable ? "" : "disabled"}></td>
+            : html`<select class="input sm" data-f="employee_id" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
+          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
+          ${INTS.map((k) => html`<td><input data-f="${k}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
+          <td><input data-f="unit_price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-q></td><td class="calc" data-v></td>
           <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove line">${icon("trash")}</button>` : ""}</td>
         </tr>`)}</tbody>
@@ -59,6 +59,8 @@ export default {
       refresh();
     };
 
+    // Redrawing rebuilds the table from `rows`, so keep what has been typed so far in a per-row draft.
+    const snap = () => $$("tbody tr", grid).forEach((tr) => { const r = rows[tr.dataset.i]; if (r) r._draft = read(tr); });
     const read = (tr) => Object.fromEntries([...tr.querySelectorAll("[data-f]")].map((i) => [i.dataset.f, i.value.trim()]));
     const refresh = () => {
       let total = 0, dirty = 0;
@@ -89,6 +91,7 @@ export default {
     grid.addEventListener("click", async (e) => {
       const b = e.target.closest("[data-del]");
       if (!b) return;
+      snap();
       const r = rows[b.dataset.del];
       if (r.id && !(await confirmDialog({ title: "Remove stock line?", message: `${r.product} for ${names[r.employee_id] || r.employee_id} will be deleted when you save.`, confirmText: "Remove", danger: true }))) return;
       r._state = r.id ? "deleted" : "gone";
@@ -99,11 +102,13 @@ export default {
     draw();
 
     $("#add")?.addEventListener("click", () => {
+      snap();
       rows.push({ _state: "new", employee_id: guys.find((g) => g.status === "active")?.employee_id, product: "", opening_stock: 0, issued: 0, sold: 0, counted_stock: null, unit_price: null });
       draw();
       $$("tbody tr:last-child [data-f=product]", grid)[0]?.focus();
     });
     $("#carry")?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
+      snap();
       const prev = await get("/api/stock" + qs({ period: prevPeriod(state.period), hub: scopeHub() }));
       const have = new Set(rows.map((r) => `${r.employee_id}|${r.product}`));
       const add = prev.filter((p) => !have.has(`${p.employee_id}|${p.product}`) && guys.some((g) => g.employee_id === p.employee_id && g.status === "active"));

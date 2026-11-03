@@ -58,6 +58,6 @@ export default {
       });
     };
     $("#add")?.addEventListener("click", () => open(null));
-    el.addEventListener("click", (e) => { const b = e.target.closest("[data-edit]"); if (b) open(hubs.find((h) => h.code === b.dataset.edit)); });
+    el.onclick = (e) => { const b = e.target.closest("[data-edit]"); if (b) open(hubs.find((h) => h.code === b.dataset.edit)); };
   },
 };
