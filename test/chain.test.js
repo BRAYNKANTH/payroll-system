@@ -45,6 +45,21 @@ test("legacy role-only records still work and default their level", async () => 
   assert.equal(moved.manager_id, "M1");
 });
 
+test("a go-live balance is the opening balance of the first month only", async () => {
+  const d = await setup();
+  await svc.createEntry(d, "staff", { employee_id: "M1", name: "M1", hub: "H1", staff_level: "manager", opening_balance: -5000 }, "admin");
+  await svc.createEntry(d, "staff", { employee_id: "D1", name: "D1", hub: "H1", staff_level: "distributor", upline_id: "M1", target: 100000, opening_balance: -2000, bank_account_no: "11112222" }, "admin");
+  await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "D1", business_amount: 50000, settled_amount: 46000 }, "clerk");
+  await svc.runPeriod(d, "2026-09", "acct");
+  const sep = (await svc.getPeriod(d, "2026-09")).rows;
+  assert.equal(sep.find((r) => r.employee_id === "D1").opening_balance, -200000);
+  assert.equal(sep.find((r) => r.employee_id === "M1").opening_balance, -500000);
+  await svc.createEntry(d, "daily", { date: "2026-10-01", employee_id: "D1", business_amount: 50000, settled_amount: 46000 }, "clerk");
+  await svc.runPeriod(d, "2026-10", "acct");
+  const oct = (await svc.getPeriod(d, "2026-10")).rows.find((r) => r.employee_id === "D1");
+  assert.equal(oct.opening_balance, sep.find((r) => r.employee_id === "D1").closing_balance, "later months use the previous closing, not the go-live balance");
+});
+
 test("position pay defaults are validated and stored", async () => {
   const d = await setup();
   const good = { supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 24, security_deduction_rule: "pct_business:1" } };

@@ -183,7 +183,7 @@ function createHandler(dbReady) {
 const createServer = (database) => http.createServer(createHandler(database));
 
 if (require.main === module) {
-  const PORT = Number(process.env.PAYROLL_PORT || process.env.PORT || 8090);
+  const PORT = Number(process.argv[3] || process.env.PAYROLL_PORT || process.env.PORT || 8090);
   const HOST = process.env.PAYROLL_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
   const target = process.argv[2] || process.env.DATABASE_URL || undefined;
   db.open(target).then(async (database) => {

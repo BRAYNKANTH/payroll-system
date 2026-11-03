@@ -45,6 +45,10 @@ export async function employeeForm(existing, onSaved) {
       <div class="field" data-guy data-sec><label id="sec-val-lbl">Amount</label><input class="input" name="sec_value" inputmode="decimal" value="${rule.value}"></div>
       <div class="field" data-guy data-sec><label>Stop after total of (Rs)</label><input class="input" name="sec_cap" inputmode="decimal" value="${rule.cap}" placeholder="No cap"><span class="hint">Lifetime cap on security held</span></div>
 
+      <div class="form-section">Starting balance</div>
+      <div class="field full"><label for="ef-open">Balance brought forward (Rs)</label><input class="input" id="ef-open" name="opening_balance" inputmode="decimal" value="${fromCents(e.opening_balance)}" placeholder="0">
+        <span class="hint">From the old spreadsheet at the start date (a manager's last master balance, or money a guy still owes as a negative number). It is used only until the first month is calculated.</span></div>
+
       <div class="form-section">Bank details</div>
       <div class="field"><label>Bank name</label><input class="input" name="bank_name" value="${e.bank_name || ""}" placeholder="e.g. Bank of Ceylon"></div>
       <div class="field"><label>Bank code</label><input class="input" name="bank_code" value="${e.bank_code || ""}" placeholder="e.g. 7010"></div>
@@ -110,6 +114,7 @@ export async function employeeForm(existing, onSaved) {
       pay_scheme: tiered ? "tiered" : "over_target",
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
       food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
+      opening_balance: v.opening_balance || 0,
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };
     const saved = existing ? await put(`/api/staff/${encodeURIComponent(existing.employee_id)}`, body) : await post("/api/staff", { ...body, employee_id: v.employee_id });

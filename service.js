@@ -39,6 +39,7 @@ const ENTITIES = {
       nic: { type: "text" },
       join_date: { type: "date" },
       staff_level: { type: "enum", values: ["distributor", "supervisor", "group_manager", "manager"] },
+      opening_balance: { type: "money" }, // balance brought forward when payroll starts; negative = money owed
       upline_id: { type: "text" },
       manager_id: { type: "text" },
       basic_pay: { type: "money" },
@@ -423,7 +424,7 @@ async function runPeriod(db, period, user) {
             daily: daily.get(s.employee_id) || [],
             stock: stock.get(s.employee_id) || [],
             allowances: allow.get(s.employee_id) || [],
-            openingBalance: prev ? prev.closing_balance : 0,
+            openingBalance: prev ? prev.closing_balance : Number(s.opening_balance) || 0, // go-live balance until a first month exists
             securityHeldToDate: heldBy.get(s.employee_id) || 0,
           }),
         });
@@ -438,7 +439,7 @@ async function runPeriod(db, period, user) {
         staff: m, prev,
         result: engine.computeManager({
           staff: m, weekly: weekly.get(m.employee_id) || [], guyNetPays,
-          openingBalance: prev ? prev.closing_balance : 0,
+          openingBalance: prev ? prev.closing_balance : Number(m.opening_balance) || 0,
           companyReturnRate: Number(settings.company_return_rate),
         }),
       });
