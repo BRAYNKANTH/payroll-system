@@ -3,10 +3,11 @@ const crypto = require("crypto");
 const { withUser, getSettings, httpError } = require("./db");
 
 const NOW = "now_iso()";
-const ROLES = ["viewer", "clerk", "manager", "accountant", "admin"];
+const ROLES = ["viewer", "clerk", "manager", "accountant", "admin", "staff"];
 // What each role may do. Higher roles include everything below them, except that a hub manager
 // (manage_team) registers staff only inside their own hub.
 const PERMISSIONS = {
+  staff: ["self"], // the staff portal: own figures only, nothing in the office pages
   viewer: ["read"],
   clerk: ["read", "enter_data"],
   manager: ["read", "enter_data", "manage_team"],
@@ -41,7 +42,7 @@ function validateUsername(u) {
 }
 const sha256 = (s) => crypto.createHash("sha256").update(s).digest("hex");
 const publicUser = (u) => u && ({
-  username: u.username, full_name: u.full_name, role: u.role, hub: u.hub, status: u.status,
+  username: u.username, full_name: u.full_name, role: u.role, hub: u.hub, employee_id: u.employee_id || null, status: u.status,
   last_login_at: u.last_login_at, created_at: u.created_at, permissions: PERMISSIONS[u.role],
 });
 const findUser = (db, username) => db.get("SELECT * FROM users WHERE lower(username) = lower(?)", String(username || ""));
@@ -115,9 +116,21 @@ async function createUser(db, actor, body) {
   if (body.hub && !(await db.get("SELECT 1 AS x FROM hubs WHERE code = ?", body.hub))) throw httpError(400, "Unknown hub");
   if (body.role === "manager" && !body.hub) throw httpError(400, "A hub manager must be limited to one hub");
   if (await findUser(db, body.username)) throw httpError(409, "Username already exists");
+  let hub = body.hub || null;
+  let employeeId = null;
+  if (body.role === "staff") {
+    // The portal login is tied to one sales person and takes that person's hub.
+    const s = await db.get("SELECT employee_id, hub, role, status FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
+    if (!s) throw httpError(400, "Choose the employee this login is for");
+    if (s.role !== "guy") throw httpError(400, "The staff portal is for distributors, supervisors and group managers");
+    if (s.status !== "active") throw httpError(400, "That employee is inactive");
+    if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
+    employeeId = s.employee_id;
+    hub = s.hub;
+  }
   await withUser(db, actor.username, (t) =>
-    t.run(`INSERT INTO users (username, full_name, role, hub, password_hash, created_by) VALUES (?, ?, ?, ?, ?, ?)`,
-      body.username.trim(), body.full_name.trim(), body.role, body.hub || null, hashPassword(body.password), actor.username));
+    t.run(`INSERT INTO users (username, full_name, role, hub, employee_id, password_hash, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      body.username.trim(), body.full_name.trim(), body.role, hub, employeeId, hashPassword(body.password), actor.username));
   return publicUser(await findUser(db, body.username));
 }
 async function updateUser(db, actor, username, body) {
@@ -125,8 +138,12 @@ async function updateUser(db, actor, username, body) {
   if (!u) throw httpError(404, "User not found");
   const sets = {};
   if (body.full_name !== undefined) sets.full_name = String(body.full_name).trim();
-  if (body.role !== undefined) { if (!ROLES.includes(body.role)) throw httpError(400, "Invalid role"); sets.role = body.role; }
-  if (body.hub !== undefined) {
+  if (body.role !== undefined) {
+    if (!ROLES.includes(body.role)) throw httpError(400, "Invalid role");
+    if ((body.role === "staff") !== (u.role === "staff")) throw httpError(400, "A staff-portal login cannot be changed into an office role (or the other way). Create a new user instead.");
+    sets.role = body.role;
+  }
+  if (body.hub !== undefined && u.role !== "staff") {
     if (body.hub && !(await db.get("SELECT 1 AS x FROM hubs WHERE code = ?", body.hub))) throw httpError(400, "Unknown hub");
     sets.hub = body.hub || null;
   }

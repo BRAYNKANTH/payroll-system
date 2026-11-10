@@ -10,6 +10,7 @@ const db = require("./db");
 const svc = require("./service");
 const auth = require("./auth");
 const reports = require("./reports");
+const portal = require("./portal");
 
 const PUBLIC = path.join(__dirname, "public");
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -67,7 +68,7 @@ function createHandler(dbReady) {
   let database;
   const routes = [
     ["GET", /^\/api\/health$/, null, async () => ({ ok: true, db: !!(await database.get("SELECT 1 AS ok")).ok, schema: db.SCHEMA_VERSION })],
-    ["GET", /^\/api\/auth\/state$/, null, async ({ user }) => ({ needs_setup: !(await auth.hasUsers(database)), user })],
+    ["GET", /^\/api\/auth\/state$/, null, async ({ user }) => ({ needs_setup: !(await auth.hasUsers(database)), user, company_name: (await db.getSettings(database)).company_name })],
     ["POST", /^\/api\/auth\/setup$/, null, async ({ body, req, res }) => {
       const s = await auth.setup(database, body);
       res.setHeader("Set-Cookie", sessionCookie(req, s.token, s.maxAge));
@@ -84,6 +85,16 @@ function createHandler(dbReady) {
       return { ok: true };
     }],
     ["POST", /^\/api\/auth\/password$/, "auth", ({ user, body }) => auth.changeOwnPassword(database, user, body)],
+
+    // Staff portal: a signed-in distributor, supervisor or group manager sees only their own figures.
+    ["GET", /^\/api\/me\/portal$/, "self", ({ user, q }) => portal.summary(database, user, q.get("period") || new Date().toISOString().slice(0, 7))],
+    ["GET", /^\/api\/me\/payslip\/(\d{4}-\d{2})$/, "self", async ({ user, m }) => ({ html: await portal.payslip(database, user, m[1]) })],
+    ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],
+    ["POST", /^\/api\/me\/documents$/, "self", ({ user, body }) => portal.addDocument(database, user, body)],
+    ["GET", /^\/api\/me\/documents\/(\d+)$/, "self", async ({ user, m }) => {
+      const d = await portal.getDocument(database, user, m[1]);
+      return { file: d.buffer, type: d.mime, filename: d.file_name };
+    }],
 
     ["GET", /^\/api\/users$/, "manage_users", () => auth.listUsers(database)],
     ["POST", /^\/api\/users$/, "manage_users", ({ user, body }) => auth.createUser(database, user, body)],

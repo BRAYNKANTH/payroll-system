@@ -103,6 +103,12 @@ for (const [i, [id, name, hub, position, upline]] of TEAM.entries()) {
     phone: `077 ${String(100 + i).padStart(3, "0")} ${2000 + i * 7}`, join_date: "2024-03-01",
   });
 }
+// Staff-portal logins: a distributor, a supervisor and a group manager can sign in and see their own figures.
+const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["meena", "Meena Rajan", "GM01"]]
+  .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
+for (const [username, full_name, employee_id, password] of PORTAL_USERS) {
+  await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id, password });
+}
 const sellers = TEAM.filter((t) => t[3] !== "manager");
 
 // Deterministic pseudo-random so the demo is reproducible
@@ -176,6 +182,7 @@ console.log(remote ? "Sign-ins (random passwords — save them now, they are not
 for (const [u, , r, h, p] of DEMO_USERS.slice(existingAdmin ? 1 : 0)) {
   console.log(`  ${u.padEnd(10)} ${!existingAdmin || created.includes(u) ? p : "(already existed, password unchanged)"}  ${r}${h ? ", " + h : ""}`);
 }
+for (const [u, , e, p] of PORTAL_USERS) console.log(`  ${u.padEnd(10)} ${p}  staff portal (${e})`);
 if (existingAdmin) console.log(`  Your admin account "${existingAdmin.username}" was kept as it is.`);
 for (const r of (await svc.getPeriod(d, open)).rows) {
   console.log(`  ${open} ${r.employee_id.padEnd(5)} ${r.status.padEnd(14)} net ${(r.net_pay / 100).toFixed(2).padStart(12)}  ${r.flags.map((f) => f.code).join(", ")}`);

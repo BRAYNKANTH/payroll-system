@@ -43,7 +43,7 @@ The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` 
 
 **Demo sign-ins** (demo database only): `admin / admin123`, `accounts / accounts123`,
 `manager1`, `manager2`, `manager3` (all `manager123`, each limited to one Jaffna branch), `clerk / clerk123`
-(Jaffna 01 only), `viewer / viewer123`. The demo has three branches, each with a manager, a group manager,
+(Jaffna 01 only), `viewer / viewer123`, and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `meena` (group manager GM01), all `staff123`. The demo has three branches, each with a manager, a group manager,
 supervisors and distributors, four finalized months and the current month open.
 
 ## What's in it
@@ -71,6 +71,7 @@ supervisors and distributors, four finalized months and the current month open.
 | Role | Can |
 |---|---|
 | Viewer | See everything, change nothing |
+| Staff portal | A distributor, supervisor or group manager signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
 | Clerk | Enter daily / weekly / stock / allowance sheets (limited to one hub if set) |
 | Accountant | + manage staff and hubs, calculate payroll, approve / reject, export files |
 | Admin | + finalize months, manage users, change settings |

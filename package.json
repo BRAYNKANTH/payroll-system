@@ -10,7 +10,7 @@
     "trial": "node --no-warnings server.js data/trial 8091",
     "seed:neon": "node --env-file=.env --no-warnings seed.js",
     "start:neon": "node --env-file=.env --no-warnings server.js",
-    "test": "node --test --no-warnings test/engine.test.js test/service.test.js test/auth.test.js test/chain.test.js test/rules.test.js"
+    "test": "node --test --no-warnings test/engine.test.js test/service.test.js test/auth.test.js test/chain.test.js test/rules.test.js test/portal.test.js"
   },
   "engines": {
     "node": ">=22"

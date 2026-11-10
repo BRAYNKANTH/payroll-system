@@ -37,6 +37,8 @@ const NAV = [
   { group: "Insights" },
   { path: "/reports", label: "Reports", icon: "chart", page: "reports" },
   { path: "/audit", label: "Audit trail", icon: "history", page: "audit" },
+  { group: "My account", perm: "self" },
+  { path: "/me", label: "My page", icon: "users", page: "portal", perm: "self" },
   { group: "Administration", perm: "manage_users" },
   { path: "/users", label: "Users & roles", icon: "key", page: "users", perm: "manage_users" },
   { path: "/settings", label: "Settings", icon: "settings", page: "settings", perm: "settings" },
@@ -45,6 +47,9 @@ const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
   { re: /^\/account$/, page: "account", nav: null },
 ];
+// A staff-portal login (a distributor, supervisor or group manager) gets one page about themselves and nothing else.
+const isStaff = () => state.user?.role === "staff";
+const roleText = (r) => (r === "staff" ? "Staff portal" : r);
 const groupOf = (path) => {
   let g = "";
   for (const n of NAV) { if (n.group) g = n.group; else if (n.path === path) return g; }
@@ -120,11 +125,11 @@ function shell() {
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
       <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
       <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
-      <nav class="nav" id="nav" aria-label="Sections">${NAV.filter((n) => !n.perm || can(n.perm)).map((n) => n.group
+      <nav class="nav" id="nav" aria-label="Sections">${NAV.filter((n) => (isStaff() ? n.perm === "self" : !n.perm || can(n.perm))).map((n) => n.group
         ? `<div class="nav-group" aria-hidden="true">${esc(n.group)}</div>`
         : `<a href="${n.path}" data-link data-nav="${n.path}" title="${esc(n.label)}">${icon(n.icon)}<span>${esc(n.label)}</span>${n.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
       </nav>
-      <div class="sidebar-foot">Signed in as <b>${esc(u.username)}</b><br>${esc(u.role)}${u.hub ? ` · hub ${esc(u.hub)}` : ""}</div>
+      <div class="sidebar-foot">Signed in as <b>${esc(u.username)}</b><br>${esc(roleText(u.role))}${u.hub ? ` · hub ${esc(u.hub)}` : ""}</div>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <div class="main">
@@ -133,7 +138,7 @@ function shell() {
         <div class="crumbs" id="crumbs"></div>
         <div class="spacer"></div>
         <div class="filters" id="filters">
-          ${u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
+          ${isStaff() ? "" : u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
           <select class="input sm" id="hub-filter" style="width:auto;min-width:140px" aria-label="Hub filter">
             <option value="">All hubs</option>${hubOpts}</select>`}
           ${periodPicker()}
@@ -142,10 +147,10 @@ function shell() {
         <div class="user-wrap" style="position:relative">
           <button type="button" class="user-chip" id="user-chip" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu for ${esc(u.full_name)}">
             <span class="avatar" aria-hidden="true">${esc(initials(u.full_name))}</span>
-            <span class="who"><b>${esc(u.full_name)}</b><span>${esc(u.role)}</span></span>
+            <span class="who"><b>${esc(u.full_name)}</b><span>${esc(roleText(u.role))}</span></span>
           </button>
           <div class="menu" id="user-menu" hidden>
-            <div style="padding:8px 10px"><b>${esc(u.full_name)}</b><div class="faint text-sm">${esc(u.username)} · ${esc(u.role)}</div></div><hr>
+            <div style="padding:8px 10px"><b>${esc(u.full_name)}</b><div class="faint text-sm">${esc(u.username)} · ${esc(roleText(u.role))}</div></div><hr>
             <a href="/account" data-link id="menu-account">${icon("lock")} Change password</a>
             <button type="button" id="logout">${icon("logout")} Sign out</button>
           </div>
@@ -293,6 +298,7 @@ function nameTables(root) {
 export async function render({ moveFocus = false } = {}) {
   const seq = ++renderSeq;
   dirtyCheck = null;
+  if (isStaff() && !["/me", "/account"].includes(location.pathname)) history.replaceState({}, "", "/me");
   const { page, nav, params, perm } = resolve(location.pathname);
   $$("#nav a").forEach((a) => {
     const on = a.dataset.nav === nav;
@@ -311,7 +317,7 @@ export async function render({ moveFocus = false } = {}) {
     view.removeAttribute("aria-busy");
     document.title = `${blocked[0]} · ${state.settings.company_name || "Payroll"}`;
     $("#crumbs").innerHTML = `<b>${esc(blocked[0])}</b>`;
-    view.innerHTML = `<div class="page-head"><div><h1>${esc(blocked[0])}</h1><p>${esc(blocked[1])}</p></div></div><a class="btn" href="/" data-link>Back to the dashboard</a>`;
+    view.innerHTML = `<div class="page-head"><div><h1>${esc(blocked[0])}</h1><p>${esc(blocked[1])}</p></div></div><a class="btn" href="${isStaff() ? "/me" : "/"}" data-link>${isStaff() ? "Back to my page" : "Back to the dashboard"}</a>`;
     if (moveFocus) { const h = view.querySelector("h1"); h.tabIndex = -1; h.focus({ preventScroll: true }); }
     return;
   }
@@ -372,12 +378,13 @@ export async function boot() {
     return login.render({ needsSetup: s.needs_setup, onDone: boot });
   }
   state.user = s.user;
-  [state.hubs, state.settings] = await Promise.all([get("/api/hubs"), get("/api/settings")]);
+  if (isStaff()) { state.hubs = []; state.settings = { company_name: s.company_name }; }
+  else [state.hubs, state.settings] = await Promise.all([get("/api/hubs"), get("/api/settings")]);
   if (state.user.hub) state.hub = state.user.hub;
   else if (state.hub && !state.hubs.some((h) => h.code === state.hub)) state.hub = "";
   shell();
   await render();
-  refreshPending();
+  if (!isStaff()) refreshPending();
 }
 
 boot().catch((e) => {

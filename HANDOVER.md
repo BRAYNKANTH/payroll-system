@@ -50,7 +50,7 @@ Money is integer cents. See `README.md` for the full feature list and hosting no
 | `test/` | `node:test` suites |
 
 Commands: `npm install`, `npm run demo` (local demo at http://127.0.0.1:8090), `npm test` (32 tests, about 40 s).
-Demo sign-ins on a local demo database only: `admin/admin123`, `accounts/accounts123`, `manager1`/`manager2`/`manager3` (all `manager123`, one branch each), `clerk/clerk123`, `viewer/viewer123`.
+Demo sign-ins on a local demo database only: `admin/admin123`, `accounts/accounts123`, `manager1`/`manager2`/`manager3` (all `manager123`, one branch each), staff portal `pavan`/`kavin`/`meena` (all `staff123`), `clerk/clerk123`, `viewer/viewer123`.
 
 ### Done in the last session (commit `8ea4c21`, pushed)
 
