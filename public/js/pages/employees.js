@@ -1,6 +1,6 @@
 import { get, post, put, qs } from "../api.js";
 import { state, can, scopeHub, navigate } from "../app.js";
-import { $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel } from "../ui.js";
+import { $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
 let filters = { q: "", role: "", status: "active" };
 
@@ -21,7 +21,7 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Employee ID</label><input class="input" name="employee_id" value="${e.employee_id || ""}" ${existing ? "disabled" : ""} required placeholder="e.g. G05"></div>
       <div class="field"><label>Full name</label><input class="input" name="name" value="${e.name || ""}" required></div>
       <div class="field"><label for="ef-level">Position</label><select class="input" id="ef-level" name="staff_level">
-        ${LEVELS.filter(([v]) => !(scopeHub() && v === "manager")).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select></div>
+        ${LEVELS.filter(([v]) => !(scopeHub() && isManagerLevel(v))).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Reports to</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Who sits directly above this person in the chain</span></div>
       <div class="field"><label>Hub</label><select class="input" name="hub" ${scopeHub() ? "disabled" : ""}>${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
@@ -30,11 +30,11 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Join date</label><input class="input" type="date" name="join_date" value="${e.join_date || ""}"></div>
       <div class="field"><label>Status</label><select class="input" name="status"><option value="active" ${e.status === "active" ? "selected" : ""}>Active</option><option value="inactive" ${e.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
 
-      <div class="form-section" data-guy>Pay setup</div>
+      <div class="form-section">Pay setup</div>
       <div class="field" data-guy><label>Pay scheme</label><select class="input" name="pay_scheme">
         <option value="over_target" ${e.pay_scheme !== "tiered" ? "selected" : ""}>Basic + commission over target</option>
         <option value="tiered" ${e.pay_scheme === "tiered" ? "selected" : ""}>Tiered (commission under target, fixed basic over it)</option></select></div>
-      <div class="field" data-guy><label id="basic-lbl">Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"></div>
+      <div class="field"><label id="basic-lbl">Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"><span class="hint" id="basic-hint" hidden>A separate fixed salary, paid to the bank each month on top of the weekly account. Leave at 0 for none.</span></div>
       <div class="field" data-guy><label>Monthly target (Rs)</label><input class="input" name="target" inputmode="decimal" value="${fromCents(e.target)}"></div>
       <div class="field" data-guy data-tiered><label>Commission on all business when target not reached (%)</label><input class="input" name="base_commission_pct" inputmode="decimal" value="${e.base_commission_rate ? +(e.base_commission_rate * 100).toFixed(4) : ""}"></div>
       <div class="field" data-guy><label>Commission on business over target (%)</label><input class="input" name="commission_pct" inputmode="decimal" value="${e.commission_rate ? +(e.commission_rate * 100).toFixed(4) : ""}"></div>
@@ -63,7 +63,7 @@ export async function employeeForm(existing, onSaved) {
   const currentUpline = e.upline_id || e.manager_id || "";
   const fillUpline = (keep) => {
     const rank = levelRank(f.staff_level.value);
-    const top = f.staff_level.value === "manager";
+    const top = rank === LEVELS.length - 1;
     const sel = f.upline_id;
     const want = keep ?? sel.value;
     const cands = staff.filter((s) => s.status === "active" && s.employee_id !== e.employee_id && levelRank(s.staff_level || (s.role === "manager" ? "manager" : "distributor")) > rank);
@@ -73,20 +73,19 @@ export async function employeeForm(existing, onSaved) {
     sel.disabled = top;
   };
   const sync = () => {
-    const guy = f.staff_level.value !== "manager";
+    const guy = !isManagerLevel(f.staff_level.value);
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
+    $("#basic-hint", f).hidden = guy;
     const tiered = f.pay_scheme.value === "tiered";
     $$("[data-tiered]", f).forEach((x) => (x.hidden = !guy || !tiered));
-    $("#basic-lbl", f).textContent = tiered ? "Fixed basic when target is exceeded (Rs / month)" : "Basic pay (Rs / month)";
+    $("#basic-lbl", f).textContent = !guy ? "Basic salary (Rs / month)" : tiered ? "Fixed basic when target is exceeded (Rs / month)" : "Basic pay (Rs / month)";
     const k = f.sec_kind.value;
     $$("[data-sec]", f).forEach((x) => (x.hidden = !guy || k === "none"));
     $("#sec-val-lbl", f).textContent = k === "fixed" ? "Amount (Rs / month)" : "Percentage (%)";
   };
   // New staff start from the position's pay defaults (Settings); every field stays editable for this person.
   const applyDefaults = () => {
-    let all = {};
-    try { all = JSON.parse(state.settings.position_defaults || "{}"); } catch { /* none set */ }
-    const d = all[f.staff_level.value];
+    const d = positionDefaults(state.settings)[f.staff_level.value];
     if (!d) return;
     const rule = parseRule(d.security_deduction_rule);
     const set = (n, v) => { f[n].value = v || ""; };
@@ -104,12 +103,12 @@ export async function employeeForm(existing, onSaved) {
 
   $("#ef-save", d.panel).onclick = (ev) => busy(ev.currentTarget, async () => {
     const v = Object.fromEntries(new FormData(f));
-    const guy = v.staff_level !== "manager";
+    const guy = !isManagerLevel(v.staff_level);
     const secRule = !guy || v.sec_kind === "none" ? "none" : `${v.sec_kind}:${v.sec_value || 0}${v.sec_cap ? `;cap:${v.sec_cap}` : ""}`;
     const tiered = guy && v.pay_scheme === "tiered";
     const body = {
-      name: v.name, staff_level: v.staff_level, upline_id: guy ? v.upline_id || "" : "", hub: f.hub.value, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
-      ...(guy ? {} : { manager_id: "" }), basic_pay: guy ? v.basic_pay || 0 : 0, target: guy ? v.target || 0 : 0,
+      name: v.name, staff_level: v.staff_level, upline_id: v.upline_id || "", hub: f.hub.value, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
+      ...(guy ? {} : { manager_id: "" }), basic_pay: v.basic_pay || 0, target: guy ? v.target || 0 : 0,
       commission_rate: guy && v.commission_pct ? Number(v.commission_pct) / 100 : 0, security_deduction_rule: secRule,
       pay_scheme: tiered ? "tiered" : "over_target",
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
@@ -161,7 +160,7 @@ export default {
           { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
           { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
           { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
-          { key: "basic_pay", label: "Basic", align: "r", render: (s) => s.role === "guy" ? money(s.basic_pay) : html`<span class="faint">—</span>` },
+          { key: "basic_pay", label: "Basic", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` },
           { key: "target", label: "Target", align: "r", render: (s) => s.role === "guy" ? money(s.target) : html`<span class="faint">—</span>` },
           { key: "commission_rate", label: "Comm.", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` },
           { key: "bank_account_no", label: "Bank", render: (s) => !s.bank_account_no ? html`<span class="badge amber plain">missing</span>`

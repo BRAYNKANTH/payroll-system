@@ -25,6 +25,7 @@ const NAV = [
   { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily" },
   { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly" },
   { path: "/stock", label: "Stock count", icon: "box", page: "stock" },
+  { path: "/branch-stock", label: "Branch stock", icon: "store", page: "hubstock" },
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances" },
   { group: "Payroll" },
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll" },

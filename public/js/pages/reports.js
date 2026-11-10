@@ -4,7 +4,7 @@ import { $, $$, html, icon, money, pct, badge, dataTable, downloadCsv, monthName
 import { barChart, lineChart, PALETTE } from "../charts.js";
 
 let tab = "hubs";
-const TABS = [["hubs", "Hub summary"], ["commission", "Commission"], ["stock", "Stock shortfall"], ["balances", "Balances"], ["periods", "Month history"]];
+const TABS = [["hubs", "Hub summary"], ["commission", "Commission"], ["stock", "Stock shortfall"], ["hubstock", "Branch stock"], ["balances", "Balances"], ["periods", "Month history"]];
 
 export default {
   title: "Reports",
@@ -78,6 +78,25 @@ export default {
         })}</div></div>`.toString() : html`<div class="card">${emptyState("No stock counts this month", "", "box")}</div>`.toString();
         exporter = () => downloadCsv(`stock-${p}.csv`, ["employee_id", "name", "hub", "product", "opening", "issued", "sold", "counted", "shortfall_qty", "unit_price", "shortfall_value"],
           rows.map((r) => [r.employee_id, r.name, r.hub, r.product, r.opening_stock, r.issued, r.sold, r.counted_stock, r.shortfall_qty, fromCents(r.unit_price), fromCents(r.shortfall_value)]));
+      },
+      async hubstock() {
+        const rows = await get("/api/hubstock" + qs({ period: p, hub: scopeHub() }));
+        const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
+        const sum = (x, k) => x.reduce((t, r) => t + r[k], 0);
+        pane.innerHTML = rows.length ? html`<div class="card"><div class="card-body flush">${dataTable({
+          rows, footer: true,
+          cols: [
+            { key: "hub", label: "Branch", render: (r) => html`<b>${hubName(r.hub)}</b> <span class="faint">${r.hub}</span>`, total: () => "Total" },
+            { key: "product", label: "Product" },
+            ...[["opening_stock", "Opening"], ["received", "Received"], ["issued", "Given out"], ["counted_stock", "Counted"]].map(([k, l]) => ({ key: k, label: l, align: "r" })),
+            { key: "shortfall_qty", label: "Difference", align: "r", render: (r) => html`<span class="${r.shortfall_qty > 0 ? "neg" : r.shortfall_qty < 0 ? "pos" : ""}">${r.shortfall_qty > 0 ? `${r.shortfall_qty} short` : r.shortfall_qty < 0 ? `${-r.shortfall_qty} over` : "0"}</span>` },
+            { key: "unit_price", label: "Unit price", align: "r", render: (r) => money(r.unit_price) },
+            { key: "shortfall_value", label: "Short value", align: "r", render: (r) => html`<span class="${r.shortfall_value ? "neg" : ""}">${money(r.shortfall_value)}</span>`, total: (x) => money(sum(x, "shortfall_value")) },
+            { key: "stock_value", label: "Stock value", align: "r", render: (r) => html`<b>${money(r.stock_value)}</b>`, total: (x) => money(sum(x, "stock_value")) },
+          ],
+        })}</div></div>`.toString() : html`<div class="card">${emptyState("No branch stock entered this month", "Enter it on the Branch stock page.", "box")}</div>`.toString();
+        exporter = () => downloadCsv(`branch-stock-${p}.csv`, ["hub", "product", "opening", "received", "given_out", "counted", "difference", "unit_price", "short_value", "stock_value"],
+          rows.map((r) => [r.hub, r.product, r.opening_stock, r.received, r.issued, r.counted_stock, r.shortfall_qty, fromCents(r.unit_price), fromCents(r.shortfall_value), fromCents(r.stock_value)]));
       },
       async balances() {
         const rows = await get("/api/reports/balances");

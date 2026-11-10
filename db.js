@@ -15,6 +15,13 @@ const DEFAULT_SETTINGS = {
   company_account_no: "",
   company_name: "My Company",
   position_defaults: "{}",             // JSON: pay setup pre-filled when adding someone at each position (see service.updateSettings)
+  // Managers' weekly sheet: commission is the high rate once the week's business reaches the threshold, else the low rate.
+  manager_commission_threshold: "10000000", // cents -> Rs 100,000
+  manager_commission_high: "0.20",
+  manager_commission_low: "0.15",
+  manager_rent_default: "400000",      // cents -> Rs 4,000 a week, pre-filled on the weekly sheet
+  manager_hub_fee_default: "50000",    // cents -> Rs 500 a week
+  manager_security_rate: "0.01",       // security pre-filled as this share of the week's business
 };
 
 // Timestamps are stored as ISO-8601 UTC text so they compare and serialise exactly like before.
@@ -127,6 +134,9 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS opening_balance bigint NOT NULL DEFAU
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS staff_level text NOT NULL DEFAULT 'distributor' CHECK (staff_level IN ('distributor','supervisor','group_manager','manager'));
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS upline_id text REFERENCES staff(employee_id);
 UPDATE staff SET staff_level = 'manager' WHERE role = 'manager' AND staff_level = 'distributor';
+-- Promoting manager and coacher sit above the manager and draw a fixed monthly salary (staff.basic_pay), as a manager can.
+ALTER TABLE staff DROP CONSTRAINT IF EXISTS staff_staff_level_check;
+ALTER TABLE staff ADD CONSTRAINT staff_staff_level_check CHECK (staff_level IN ('distributor','supervisor','group_manager','manager','promoting_manager','coacher'));
 
 CREATE TABLE IF NOT EXISTS daily_log (
   id              bigserial PRIMARY KEY,
@@ -180,6 +190,41 @@ CREATE TABLE IF NOT EXISTS stock_recon (
   updated_at      text,
   UNIQUE (period, employee_id, product)
 );
+
+-- Branch stock for the month: what the hub opened with, received, gave out and counted at the end.
+CREATE TABLE IF NOT EXISTS hub_stock (
+  id              bigserial PRIMARY KEY,
+  period          text NOT NULL ${PERIOD_CHECK("period")},
+  hub             text NOT NULL REFERENCES hubs(code),
+  product         text NOT NULL,
+  opening_stock   bigint NOT NULL,
+  received        bigint NOT NULL DEFAULT 0,
+  issued          bigint NOT NULL DEFAULT 0,
+  counted_stock   bigint NOT NULL,
+  unit_price      bigint NOT NULL,
+  shortfall_qty   bigint GENERATED ALWAYS AS (opening_stock + received - issued - counted_stock) STORED,
+  shortfall_value bigint GENERATED ALWAYS AS (GREATEST(0, opening_stock + received - issued - counted_stock) * unit_price) STORED,
+  stock_value     bigint GENERATED ALWAYS AS (counted_stock * unit_price) STORED,
+  created_by      text NOT NULL,
+  created_at      text NOT NULL DEFAULT ${NOW},
+  updated_by      text,
+  updated_at      text,
+  UNIQUE (period, hub, product)
+);
+
+-- Scans kept with an employee's record (NIC, bank book front page, O/L results). data is base64.
+CREATE TABLE IF NOT EXISTS staff_documents (
+  id          bigserial PRIMARY KEY,
+  employee_id text NOT NULL REFERENCES staff(employee_id),
+  doc_type    text NOT NULL CHECK (doc_type IN ('nic','bank_book','ol_results','other')),
+  file_name   text NOT NULL,
+  mime        text NOT NULL,
+  size_bytes  integer NOT NULL,
+  data        text NOT NULL,
+  uploaded_by text NOT NULL,
+  uploaded_at text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS staff_documents_emp ON staff_documents (employee_id);
 
 CREATE TABLE IF NOT EXISTS allowances (
   id          bigserial PRIMARY KEY,
@@ -284,6 +329,7 @@ const AUDITED = {
   daily_log:   { key: "id", period: "date" },
   weekly_log:  { key: "id", period: "week_start" },
   stock_recon: { key: "id", period: "period" },
+  hub_stock:   { key: "id", period: "period" },
   allowances:  { key: "id", period: "period" },
 };
 

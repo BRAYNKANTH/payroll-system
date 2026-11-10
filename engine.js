@@ -115,7 +115,14 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
   };
 }
 
+// Commission rate for a manager's week: the high rate once business reaches the threshold, otherwise the low rate.
+function managerCommissionRate(businessCents, settings) {
+  return businessCents >= Number(settings.manager_commission_threshold) ? Number(settings.manager_commission_high) : Number(settings.manager_commission_low);
+}
+
 // Managers — monthly, built from that month's weekly rows.
+// staff.basic_pay is a separate fixed salary (manager, promoting manager, coacher): it is paid out to the bank
+// and does not move the running balance.
 // guyNetPays: net_pay of each guy whose manager_id is this manager, for the same period.
 function computeManager({ staff, weekly, guyNetPays, openingBalance, companyReturnRate }) {
   const weeks = weekly.map((w) => {
@@ -130,7 +137,8 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
   const totalBusiness = sum(weeks, "business_total");
   const companyReturn = pct(totalBusiness, companyReturnRate);
   const guysSalaryTotal = sum(guyNetPays, "net_pay");
-  const gross = sum(weeks, "profit_share");
+  const salary = Number(staff.basic_pay) || 0;
+  const gross = sum(weeks, "profit_share") + salary;
   const deductions = [
     { key: "rent", label: "Rent", amount: sum(weeks, "rent") },
     { key: "hub_fee", label: "Hub fee", amount: sum(weeks, "hub_fee") },
@@ -141,7 +149,7 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
   ];
   const totalDeductions = sum(deductions, "amount");
   // closing = opening + Σweekly_balance − company_return − guys_salary_total
-  const netPay = sum(weeks, "weekly_balance") - companyReturn - guysSalaryTotal;
+  const netPay = sum(weeks, "weekly_balance") - companyReturn - guysSalaryTotal + salary;
 
   return {
     role: "manager",
@@ -149,14 +157,16 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
     gross_earnings: gross,
     total_deductions: totalDeductions,
     net_pay: netPay,
-    disbursed_amount: 0, // manager balances are a running account with the company, not a bank payout
-    closing_balance: openingBalance + netPay,
+    disbursed_amount: salary, // only the fixed salary is a bank payout; the rest is a running account with the company
+    closing_balance: openingBalance + netPay - salary,
     detail: {
       weeks_logged: weeks.length,
       total_business: totalBusiness,
       weeks,
       guys: guyNetPays,
-      earnings: [{ label: "Profit share (Σ business × profit %)", amount: gross }],
+      basic_salary: salary,
+      earnings: [{ label: "Profit share (Σ business × profit %)", amount: gross - salary },
+        ...(salary ? [{ label: "Basic salary (paid to bank)", amount: salary }] : [])],
       deductions,
     },
   };
@@ -214,4 +224,4 @@ function fmt(cents) {
 function fmtRate(r) { return `${+(r * 100).toFixed(4)}%`; }
 function mask(acct) { return acct.length <= 4 ? acct : "…" + acct.slice(-4); }
 
-module.exports = { parseSecurityRule, securityDeduction, computeGuy, computeManager, evaluateFlags, fmt, fmtRate };
+module.exports = { parseSecurityRule, securityDeduction, computeGuy, computeManager, managerCommissionRate, evaluateFlags, fmt, fmtRate };

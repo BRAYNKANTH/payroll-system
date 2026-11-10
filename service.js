@@ -38,7 +38,7 @@ const ENTITIES = {
       phone: { type: "text" },
       nic: { type: "text" },
       join_date: { type: "date" },
-      staff_level: { type: "enum", values: ["distributor", "supervisor", "group_manager", "manager"] },
+      staff_level: { type: "enum", values: ["distributor", "supervisor", "group_manager", "manager", "promoting_manager", "coacher"] },
       opening_balance: { type: "money" }, // balance brought forward when payroll starts; negative = money owed
       upline_id: { type: "text" },
       manager_id: { type: "text" },
@@ -75,7 +75,7 @@ const ENTITIES = {
       week_end: { type: "date", required: true },
       manager_id: { type: "text", required: true },
       business_total: { type: "money", required: true },
-      profit_percent: { type: "rate", required: true },
+      profit_percent: { type: "rate" }, // left blank on a new row → the commission rule in Settings decides
       rent: { type: "money" },
       hub_fee: { type: "money" },
       security_cost: { type: "money" },
@@ -91,6 +91,19 @@ const ENTITIES = {
       opening_stock: { type: "int", required: true },
       issued: { type: "int" },
       sold: { type: "int" },
+      counted_stock: { type: "int", required: true },
+      unit_price: { type: "money", required: true },
+    },
+  },
+  hubstock: {
+    table: "hub_stock", key: "id", periodCol: "period", byHub: true,
+    fields: {
+      period: { type: "period", required: true },
+      hub: { type: "text", required: true },
+      product: { type: "text", required: true },
+      opening_stock: { type: "int", required: true },
+      received: { type: "int" },
+      issued: { type: "int" },
       counted_stock: { type: "int", required: true },
       unit_price: { type: "money", required: true },
     },
@@ -169,14 +182,14 @@ async function listEntries(db, kind, { period, employee_id, hub, from, to } = {}
   if (period && e.periodCol) { assertPeriod(period); where.push(`${e.periodCol} = ?`); args.push(period); }
   if (from && e.fields.date) { where.push("date >= ?"); args.push(from); }
   if (to && e.fields.date) { where.push("date <= ?"); args.push(to); }
-  if (employee_id && kind !== "staff" && kind !== "hubs") { where.push(`${empCol(kind)} = ?`); args.push(employee_id); }
+  if (employee_id && kind !== "staff" && kind !== "hubs" && !e.byHub) { where.push(`${empCol(kind)} = ?`); args.push(employee_id); }
   if (hub) {
-    if (kind === "staff") where.push("hub = ?");
+    if (kind === "staff" || e.byHub) where.push("hub = ?");
     else if (kind === "hubs") where.push("code = ?");
     else where.push(`${empCol(kind)} IN (SELECT employee_id FROM staff WHERE hub = ?)`);
     args.push(hub);
   }
-  const order = kind === "hubs" ? "code" : kind === "staff" ? "role DESC, hub, employee_id" : e.fields.date ? "date, employee_id"
+  const order = kind === "hubs" ? "code" : e.byHub ? "hub, product" : kind === "staff" ? "role DESC, hub, employee_id" : e.fields.date ? "date, employee_id"
     : e.fields.week_start ? "week_start, manager_id" : "employee_id, id";
   return db.all(`SELECT * FROM ${e.table} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${order}`, ...args);
 }
@@ -185,10 +198,14 @@ async function listEntries(db, kind, { period, employee_id, hub, from, to } = {}
 async function assertScope(db, kind, row, scopeHub) {
   if (!scopeHub) return;
   if (kind === "hubs") throw httpError(403, "Hub-restricted users cannot change master data");
+  if (ENTITIES[kind].byHub) {
+    if (row.hub !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
+    return;
+  }
   if (kind === "staff") {
     // A hub manager registers their own team: same hub, never another manager.
     if (row.hub !== scopeHub) throw httpError(403, `You can only manage staff of hub ${scopeHub}`);
-    if (row.role === "manager" || row.staff_level === "manager") throw httpError(403, "Hub users cannot add or change managers");
+    if (row.role === "manager" || MANAGER_LEVELS.has(row.staff_level)) throw httpError(403, "Hub users cannot add or change managers");
     return;
   }
   const hub = (await db.get("SELECT hub FROM staff WHERE employee_id = ?", row[empCol(kind)]))?.hub;
@@ -212,17 +229,20 @@ async function validateRefs(db, kind, row) {
 }
 
 // Chain of command. Payroll only knows two roles (guy, manager); staff_level adds the rungs between them.
-const LEVEL_RANK = { distributor: 0, supervisor: 1, group_manager: 2, manager: 3 };
-const LEVEL_NAME = { distributor: "Distributor", supervisor: "Supervisor", group_manager: "Group manager", manager: "Manager" };
+// Manager, promoting manager and coacher are all payroll "managers": a weekly account plus an optional fixed salary.
+const LEVEL_RANK = { distributor: 0, supervisor: 1, group_manager: 2, manager: 3, promoting_manager: 4, coacher: 5 };
+const LEVEL_NAME = { distributor: "Distributor", supervisor: "Supervisor", group_manager: "Group manager", manager: "Manager",
+  promoting_manager: "Promoting manager", coacher: "Coacher" };
+const MANAGER_LEVELS = new Set(["manager", "promoting_manager", "coacher"]);
+const roleOf = (level) => (MANAGER_LEVELS.has(level) ? "manager" : "guy");
 
 // Keeps role, staff_level, upline_id and manager_id consistent. `row` holds the changes, `existing` the stored record.
 async function applyChain(db, row, existing = {}, id) {
   const m = { ...existing, ...row };
   if (!m.role && !m.staff_level) throw httpError(400, "staff_level (position) is required");
-  if (row.staff_level) row.role = m.role = row.staff_level === "manager" ? "manager" : "guy";
+  if (row.staff_level) row.role = m.role = roleOf(row.staff_level);
   else if (row.role && row.role !== existing.role) row.staff_level = m.staff_level = row.role === "manager" ? "manager" : "distributor";
   else if (!m.staff_level) row.staff_level = m.staff_level = m.role === "manager" ? "manager" : "distributor";
-  if (m.role === "manager" && m.upline_id) throw httpError(400, "A manager is at the top of the chain and reports to no one");
   if (m.upline_id) {
     if (m.upline_id === id) throw httpError(400, "An employee cannot report to themselves");
     const up = await db.get("SELECT staff_level FROM staff WHERE employee_id = ?", m.upline_id);
@@ -256,9 +276,18 @@ function sqlError(err) {
 
 const insertSql = (table, cols) => `INSERT INTO ${table} (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`;
 
+// A new weekly row with no profit % gets the commission rule: high rate at or above the threshold, else the low rate.
+const blank = (v) => v === undefined || v === null || v === "";
+function weeklyDefaults(raw, settings) {
+  const business = Number(raw.business_total);
+  if (!blank(raw.profit_percent) || blank(raw.business_total) || !Number.isFinite(business)) return raw;
+  return { ...raw, profit_percent: engine.managerCommissionRate(Math.round(business * 100), settings) };
+}
+
 async function createEntry(db, kind, body, user, scopeHub) {
   const e = ENTITIES[kind];
   if (!e) throw httpError(404, `Unknown entity ${kind}`);
+  if (kind === "weekly") body = weeklyDefaults(body, await getSettings(db));
   const row = clean(e, body, { creating: true });
   if (kind === "staff") await applyChain(db, row, {}, row.employee_id);
   await validateRefs(db, kind, row);
@@ -309,7 +338,8 @@ async function deleteEntry(db, kind, key, user, scopeHub) {
 
 // ---------------------------------------------------------------- bulk grid entry
 
-const NATURAL_KEYS = { daily: ["date", "employee_id"], weekly: ["week_start", "manager_id"], stock: ["period", "employee_id", "product"] };
+const NATURAL_KEYS = { daily: ["date", "employee_id"], weekly: ["week_start", "manager_id"], stock: ["period", "employee_id", "product"],
+  hubstock: ["period", "hub", "product"] };
 
 // Save a whole grid (e.g. one hub's daily sheet) in a single all-or-nothing transaction.
 // Rows are matched on their natural key: existing rows are updated (audited), new ones inserted,
@@ -324,6 +354,8 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
   // Validate everything up front, with staff looked up once.
   const staff = new Map((await db.all("SELECT employee_id, role, hub FROM staff")).map((s) => [s.employee_id, s]));
   const wantRole = kind === "weekly" ? "manager" : "guy";
+  const settings = kind === "weekly" ? await getSettings(db) : null;
+  const rowHub = (r) => (e.byHub ? r.hub : staff.get(r[empCol(kind)])?.hub);
   const prepared = [];
   const errors = [];
   rows.forEach((raw, i) => {
@@ -332,10 +364,10 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
         prepared.push({ del: true, key: keys.map((k) => coerce(k, { ...e.fields[k], required: true }, raw[k])) });
         return;
       }
-      const row = clean(e, raw, { creating: true });
+      const row = clean(e, settings ? weeklyDefaults(raw, settings) : raw, { creating: true });
       const s = staff.get(row[empCol(kind)]);
-      if (!s || s.role !== wantRole) throw httpError(400, `${row[empCol(kind)]} is not a ${wantRole === "guy" ? "guy/supervisor" : "manager"}`);
-      if (scopeHub && s.hub !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
+      if (!e.byHub && (!s || s.role !== wantRole)) throw httpError(400, `${row[empCol(kind)]} is not a ${wantRole === "guy" ? "guy/supervisor" : "manager"}`);
+      if (scopeHub && rowHub(row) !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
       prepared.push({ row, key: keys.map((k) => row[k]) });
     } catch (err) {
       errors.push(`Row ${i + 1}${raw[keys[1]] ? ` (${raw[keys[1]]})` : ""}: ${err.message}`);
@@ -351,7 +383,7 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
         const existing = await t.get(findSql, ...p.key);
         if (p.del) {
           if (!existing) continue;
-          if (scopeHub && staff.get(existing[empCol(kind)])?.hub !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
+          if (scopeHub && rowHub(existing) !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
           await t.run(`DELETE FROM ${e.table} WHERE id = ?`, existing.id);
           counts.deleted++;
         } else if (existing) {
@@ -572,6 +604,12 @@ async function updateSettings(db, body, user) {
     session_hours: (v) => { const n = Number(v); if (!(n >= 1 && n <= 168)) throw httpError(400, "session_hours must be 1–168"); return String(Math.round(n)); },
     company_account_no: (v) => String(v).trim(),
     company_name: (v) => String(v).trim(),
+    manager_commission_threshold: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_commission_threshold must be ≥ 0"); return String(Math.round(n * 100)); },
+    manager_commission_high: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_commission_high must be 0–1"); return String(n); },
+    manager_commission_low: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_commission_low must be 0–1"); return String(n); },
+    manager_rent_default: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_rent_default must be ≥ 0"); return String(Math.round(n * 100)); },
+    manager_hub_fee_default: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_hub_fee_default must be ≥ 0"); return String(Math.round(n * 100)); },
+    manager_security_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_security_rate must be 0–1"); return String(n); },
     // Pay setup pre-filled for new staff at each position. People can still be given their own target and rates.
     position_defaults: (v) => {
       let o;
@@ -579,7 +617,7 @@ async function updateSettings(db, body, user) {
       if (!o || typeof o !== "object" || Array.isArray(o)) throw httpError(400, "position_defaults must be an object");
       const out = {};
       for (const [level, d] of Object.entries(o)) {
-        if (!(level in LEVEL_RANK) || level === "manager") throw httpError(400, `No pay defaults for position ${level}`);
+        if (!(level in LEVEL_RANK)) throw httpError(400, `No pay defaults for position ${level}`);
         const num = (k, max = Infinity) => { const n = Number(d[k] ?? 0); if (!(n >= 0 && n <= max)) throw httpError(400, `${level}: ${k} is invalid`); return n; };
         const scheme = d.pay_scheme === "tiered" ? "tiered" : "over_target";
         const rule = String(d.security_deduction_rule || "none");
@@ -759,6 +797,63 @@ async function stockReport(db, period) {
     ORDER BY k.shortfall_value DESC, s.hub, k.employee_id`, period);
 }
 
+// ---------------------------------------------------------------- employee documents
+
+const DOC_TYPES = ["nic", "bank_book", "ol_results", "other"];
+const DOC_MIME = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const DOC_MAX_BYTES = 3_000_000; // keeps the upload under the host's request limit once base64-encoded
+
+async function docStaff(db, employeeId, scopeHub) {
+  const s = await db.get("SELECT employee_id, hub, role FROM staff WHERE employee_id = ?", employeeId);
+  if (!s) throw httpError(404, "Employee not found");
+  if (scopeHub && s.hub !== scopeHub) throw httpError(403, "Outside your hub");
+  return s;
+}
+
+async function listDocuments(db, employeeId, scopeHub) {
+  await docStaff(db, employeeId, scopeHub);
+  return db.all(`SELECT id, employee_id, doc_type, file_name, mime, size_bytes, uploaded_by, uploaded_at FROM staff_documents
+    WHERE employee_id = ? ORDER BY doc_type, id`, employeeId);
+}
+
+async function addDocument(db, employeeId, body, user, scopeHub) {
+  await docStaff(db, employeeId, scopeHub);
+  const name = String(body.file_name || "").trim().replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120);
+  if (!DOC_TYPES.includes(body.doc_type)) throw httpError(400, `doc_type must be one of ${DOC_TYPES.join(", ")}`);
+  if (!name) throw httpError(400, "file_name is required");
+  if (!DOC_MIME.includes(body.mime)) throw httpError(400, "Only JPG, PNG, WebP or PDF files can be uploaded");
+  const data = String(body.data || "").replace(/^data:[^,]*,/, "");
+  if (!data || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) throw httpError(400, "The file could not be read");
+  const size = Buffer.from(data, "base64").length;
+  if (size > DOC_MAX_BYTES) throw httpError(413, "The file is larger than 3 MB — scan or photograph it at a lower quality");
+  return withUser(db, user, async (t) => {
+    const row = await t.get(`INSERT INTO staff_documents (employee_id, doc_type, file_name, mime, size_bytes, data, uploaded_by) VALUES (?,?,?,?,?,?,?)
+      RETURNING id, employee_id, doc_type, file_name, mime, size_bytes, uploaded_by, uploaded_at`, employeeId, body.doc_type, name, body.mime, size, data, user);
+    await t.run(`INSERT INTO audit_log (table_name, row_key, action, changed_by, new_value) VALUES ('staff_documents', ?, 'upload', ?, ?)`,
+      employeeId, user, JSON.stringify({ id: row.id, doc_type: row.doc_type, file_name: row.file_name, size_bytes: size }));
+    return row;
+  });
+}
+
+async function getDocument(db, id, scopeHub) {
+  const d = await db.get("SELECT * FROM staff_documents WHERE id = ?", Number(id));
+  if (!d) throw httpError(404, "Document not found");
+  await docStaff(db, d.employee_id, scopeHub);
+  return { ...d, buffer: Buffer.from(d.data, "base64") };
+}
+
+async function deleteDocument(db, id, user, scopeHub) {
+  const d = await db.get("SELECT id, employee_id, doc_type, file_name FROM staff_documents WHERE id = ?", Number(id));
+  if (!d) throw httpError(404, "Document not found");
+  await docStaff(db, d.employee_id, scopeHub);
+  return withUser(db, user, async (t) => {
+    await t.run("DELETE FROM staff_documents WHERE id = ?", d.id);
+    await t.run(`INSERT INTO audit_log (table_name, row_key, action, changed_by, old_value) VALUES ('staff_documents', ?, 'delete', ?, ?)`,
+      d.employee_id, user, JSON.stringify(d));
+    return { deleted: true };
+  });
+}
+
 async function commissionReport(db, period) {
   return (await getPeriod(db, period)).rows.filter((r) => r.role === "guy").map((r) => ({
     employee_id: r.employee_id, name: r.name, hub: r.hub, business: r.detail.total_business, target: r.detail.target,
@@ -786,5 +881,6 @@ async function listPeriods(db) {
 module.exports = {
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
   runPeriod, getPeriod, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
+  listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, MANAGER_LEVELS,
   dashboard, employeeProfile, balancesReport, stockReport, commissionReport, reviewQueue, listPeriods, shiftPeriod,
 };

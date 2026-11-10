@@ -18,7 +18,7 @@ const BASE_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "
 const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'";
 const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:; base-uri 'none'";
-const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "allowances", "periods", "pay_period_summary", "audit_log"];
+const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "periods", "pay_period_summary", "audit_log"];
 
 function send(res, status, body, type = "application/json; charset=utf-8", extra = {}) {
   res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", ...BASE_HEADERS, ...extra });
@@ -100,7 +100,7 @@ function createHandler(dbReady) {
       return { download: JSON.stringify(out), filename: `payroll-backup-${out.exported_at.slice(0, 10)}.json`, type: "application/json; charset=utf-8" };
     }],
 
-    ["GET", /^\/api\/(hubs|staff|daily|weekly|stock|allowances)$/, "read", ({ user, m, q }) =>
+    ["GET", /^\/api\/(hubs|staff|daily|weekly|stock|hubstock|allowances)$/, "read", ({ user, m, q }) =>
       svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
         hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })],
     ["POST", /^\/api\/hubs$/, "manage_hubs", ({ user, body }) => svc.createEntry(database, "hubs", body, user.username)],
@@ -112,10 +112,17 @@ function createHandler(dbReady) {
       if (user.hub && p.staff.hub !== user.hub) throw svc.httpError(403, "Outside your hub");
       return p;
     }],
-    ["POST", /^\/api\/(daily|weekly|stock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, user.hub)],
-    ["POST", /^\/api\/(daily|weekly|stock|allowances)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
-    ["PUT", /^\/api\/(daily|weekly|stock|allowances)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
-    ["DELETE", /^\/api\/(daily|weekly|stock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
+    ["GET", /^\/api\/staff\/([\w.-]+)\/documents$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.listDocuments(database, m[1], user.hub)],
+    ["POST", /^\/api\/staff\/([\w.-]+)\/documents$/, ["manage_staff", "manage_team"], ({ m, user, body }) => svc.addDocument(database, m[1], body, user.username, user.hub)],
+    ["GET", /^\/api\/documents\/(\d+)$/, ["manage_staff", "manage_team"], async ({ m, user }) => {
+      const d = await svc.getDocument(database, m[1], user.hub);
+      return { file: d.buffer, type: d.mime, filename: d.file_name };
+    }],
+    ["DELETE", /^\/api\/documents\/(\d+)$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.deleteDocument(database, m[1], user.username, user.hub)],
+    ["POST", /^\/api\/(daily|weekly|stock|hubstock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, user.hub)],
+    ["POST", /^\/api\/(daily|weekly|stock|hubstock|allowances)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
+    ["PUT", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
+    ["DELETE", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
 
     ["GET", /^\/api\/dashboard$/, "read", ({ user, q }) => svc.dashboard(database, q.get("period"), user.hub || q.get("hub") || undefined)],
     ["GET", /^\/api\/audit$/, "read", ({ q }) => svc.auditSearch(database, {
@@ -167,6 +174,11 @@ function createHandler(dbReady) {
       if (out && out.html) return send(res, 200, out.html, "text/html; charset=utf-8", { "Content-Security-Policy": REPORT_CSP });
       if (out && out.csv !== undefined) {
         return send(res, 200, "﻿" + out.csv, "text/csv; charset=utf-8", { "Content-Disposition": `attachment; filename="${out.filename}"` });
+      }
+      if (out && out.file !== undefined) {
+        // An uploaded scan: shown in the browser, but never allowed to run scripts or load anything.
+        return send(res, 200, out.file, out.type, { "Content-Disposition": `inline; filename="${encodeURIComponent(out.filename)}"`,
+          "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; object-src 'self'; sandbox" });
       }
       if (out && out.download !== undefined) {
         return send(res, 200, out.download, out.type, { "Content-Disposition": `attachment; filename="${out.filename}"` });

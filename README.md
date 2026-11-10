@@ -54,13 +54,14 @@ supervisors and distributors, four finalized months and the current month open.
 | Daily sheet | Spreadsheet grid, by day (all guys) or by employee (whole month); CSV import/export |
 | Weekly sheet | One row per manager per week, live weekly balance, month overview |
 | Stock count | Per guy per product, live shortfall, carry over last month's count as opening stock |
+| Branch stock | Per branch per product: opening, received, given out, counted; difference and stock value; open a month from last month's count |
 | Allowances | Extra earnings per month |
 | Payroll run | Step-by-step: data check → calculate → review → finalize → pay; full breakdown per person |
 | Approvals | Queue of flagged entries only; approve / reject with notes |
 | Payslips | Per person or all, printable |
 | Employees | Directory, add/edit, profile with pay history chart, team, change log |
 | Hubs | Branches with live figures |
-| Reports | Hub summary, commission, stock shortfall, balances, month history (CSV export) |
+| Reports | Hub summary, commission, stock shortfall, branch stock, balances, month history (CSV export) |
 | Audit trail | Every change after first entry: who, when, old → new; filters and export |
 | Users & roles | Admin, accountant, hub manager (one hub; registers their own team), clerk (optionally one hub), viewer |
 | Settings | Company, rule thresholds, closed days, session length |
