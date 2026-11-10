@@ -116,12 +116,20 @@ function periodPicker() {
   </div>`;
 }
 
+// The five things people open most, as a bar at the bottom of a phone. "More" opens the full menu.
+function bottomNav() {
+  const items = [["/", "Home", "dashboard"], can("enter_data") ? ["/daily", "Daily", "sheet"] : ["/reports", "Reports", "chart"], ["/payroll", "Payroll", "play"], ["/employees", "People", "users"]];
+  return `<nav class="bottom-nav" id="bnav" aria-label="Main">${items.map(([path, label, ic]) =>
+    `<a href="${path}" data-link data-nav="${path}">${icon(ic)}<span>${label}</span></a>`).join("")}
+    <button type="button" id="bnav-more" aria-controls="sidebar" aria-haspopup="true">${icon("menu")}<span>More</span><span class="dot" id="more-dot" hidden></span></button></nav>`;
+}
+
 function shell() {
   const u = state.user;
   const hubOpts = state.hubs.map((h) => `<option value="${esc(h.code)}" ${state.hub === h.code ? "selected" : ""}>${esc(h.name)}</option>`).join("");
   document.body.innerHTML = `
   <a class="skip-link" href="#view">Skip to main content</a>
-  <div class="shell">
+  <div class="shell ${isStaff() ? "" : "has-bnav"}">
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
       <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
       <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
@@ -159,7 +167,8 @@ function shell() {
       <div class="filterbar" id="filterbar"></div>
       <main class="content" id="view" tabindex="-1"></main>
     </div>
-  </div>`;
+  </div>
+  ${isStaff() ? "" : bottomNav()}`;
 
   // Mobile: the hub/month filters move below the header so the sticky bar stays one row tall.
   const placeFilters = () => {
@@ -171,6 +180,7 @@ function shell() {
 
   $("#menu-btn").onclick = () => (isMobile() ? setSidebar(true) : setRail(!rail));
   $("#sidebar-close").onclick = () => setSidebar(false);
+  $("#bnav-more")?.addEventListener("click", () => setSidebar(true));
   $("#sidebar-backdrop").onclick = () => setSidebar(false);
   $("#sidebar").addEventListener("keydown", (e) => { if (e.key === "Escape" && isMobile()) { e.stopPropagation(); setSidebar(false); } });
   syncSidebar();
@@ -206,13 +216,14 @@ function syncSidebar() {
   sb.inert = mobile && !sidebarOpen;                 // closed off-canvas menu: not focusable
   $("#sidebar-backdrop").classList.toggle("show", mobile && sidebarOpen);
   $("#menu-btn").setAttribute("aria-expanded", String(mobile ? sidebarOpen : !rail));
+  $("#bnav-more")?.setAttribute("aria-expanded", String(mobile && sidebarOpen));
   $$(".shell > .main").forEach((m) => (m.inert = mobile && sidebarOpen)); // page behind the open menu
 }
 function setSidebar(open) {
   sidebarOpen = open;
   syncSidebar();
   if (open) setTimeout(() => $("#nav a.active, #nav a")?.focus(), 50);
-  else if (isMobile()) $("#menu-btn")?.focus();
+  else if (isMobile()) ($("#bnav-more") || $("#menu-btn"))?.focus();
 }
 
 function shift(p, d) {
@@ -284,6 +295,8 @@ export async function refreshPending() {
     state.pending = q.length;
     const el = $("#pending-count");
     if (el) { el.textContent = q.length; el.hidden = !q.length; el.setAttribute("aria-label", `${q.length} waiting`); }
+    const dot = $("#more-dot");
+    if (dot) { dot.hidden = !(q.length && can("review")); dot.setAttribute("aria-label", `${q.length} entries need review`); }
   } catch { /* ignore */ }
 }
 
@@ -345,7 +358,7 @@ export async function render({ moveFocus = false } = {}) {
   dirtyCheck = null;
   if (isStaff() && !["/me", "/account"].includes(location.pathname)) history.replaceState({}, "", "/me");
   const { page, nav, params, perm } = resolve(location.pathname);
-  $$("#nav a").forEach((a) => {
+  $$("#nav a, #bnav a").forEach((a) => {
     const on = a.dataset.nav === nav;
     a.classList.toggle("active", on);
     if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
