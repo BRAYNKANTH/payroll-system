@@ -276,6 +276,20 @@ CREATE TABLE IF NOT EXISTS pay_period_summary (
   PRIMARY KEY (employee_id, period)
 );
 
+-- Security held so far is summed on every payroll run, so it is kept as a plain column instead of being dug out of the JSON each time.
+-- Finalized rows are locked, so the one-time fill-in switches the user triggers off while it runs; they are re-created below.
+ALTER TABLE pay_period_summary ADD COLUMN IF NOT EXISTS security_held bigint;
+ALTER TABLE pay_period_summary DISABLE TRIGGER USER;
+UPDATE pay_period_summary SET security_held = COALESCE((detail::jsonb->>'security_deducted')::numeric, 0) WHERE security_held IS NULL;
+ALTER TABLE pay_period_summary ENABLE TRIGGER USER;
+
+-- Indexes for the lookups the pages make most.
+CREATE INDEX IF NOT EXISTS daily_emp_date ON daily_log (employee_id, date);
+CREATE INDEX IF NOT EXISTS staff_hub ON staff (hub);
+CREATE INDEX IF NOT EXISTS staff_upline ON staff (upline_id);
+CREATE INDEX IF NOT EXISTS pps_period ON pay_period_summary (period);
+CREATE INDEX IF NOT EXISTS weekly_mgr_week ON weekly_log (manager_id, week_start);
+
 -- ---- audit trail: every UPDATE / DELETE is logged with the app user (set per transaction) and old/new values.
 -- A password hash is reduced to a short fingerprint so the log shows that it changed without storing it.
 CREATE OR REPLACE FUNCTION audit_snapshot(r jsonb, excl text[]) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $$

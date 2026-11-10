@@ -1,7 +1,7 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
 import { $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal, levelLabel } from "../ui.js";
-import { breakdownDrawer } from "./breakdown.js";
+import { openBreakdown } from "./breakdown.js";
 
 let filter = "all";
 let search = "";
@@ -12,7 +12,7 @@ export default {
   async render(ctx) {
     const { el } = ctx;
     const p = state.period;
-    const [data, dash] = await Promise.all([get(`/api/payroll/${p}`), get("/api/dashboard" + qs({ period: p, hub: scopeHub() }))]);
+    const [data, dash] = await Promise.all([get(`/api/payroll/${p}?slim=1`), get("/api/dashboard" + qs({ period: p, hub: scopeHub() }))]);
     const all = data.rows.filter((r) => !scopeHub() || r.hub === scopeHub());
     const finalized = data.status === "finalized";
     const count = (s) => all.filter((r) => r.status === s).length;
@@ -79,7 +79,7 @@ export default {
         (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q)));
       $("#table").innerHTML = dataTable({
         rows, footer: true, empty: "No matching employees",
-        onRow: (r) => breakdownDrawer(r, { finalized, onChange: () => this.render(ctx) }),
+        onRow: (r) => openBreakdown(r, p, { finalized, onChange: () => this.render(ctx) }),
         cols: [
           { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>`, total: (rs) => `${rs.length} employees` },
           { key: "role", label: "Position", render: (r) => badge(r.role, levelLabel(r.staff_level)) },

@@ -39,6 +39,9 @@ export default {
     const guyOptions = (sel) => guys.filter((g) => g.status === "active" || g.employee_id === sel)
       .map((g) => html`<option value="${g.employee_id}" ${g.employee_id === sel ? "selected" : ""}>${g.name}</option>`);
 
+    // A month can have hundreds of lines; draw the first ones, plus any being edited, and the rest on request.
+    let shown = 120;
+    const visible = (r, i) => i < shown || r._state === "new" || !!r._draft;
     const draw = () => {
       if (!rows.length) {
         grid.innerHTML = emptyState("No stock lines for this month", editable ? "Add a line or carry over last month's products." : "", "box").toString();
@@ -47,7 +50,7 @@ export default {
       grid.innerHTML = html`<div class="table-wrap"><table class="table sheet">
         <thead><tr><th>Employee</th><th>Product</th><th class="r">Opening</th><th class="r">Issued</th><th class="r">Sold</th><th class="r">Counted</th>
           <th class="r">Unit price</th><th class="r">Short qty</th><th class="r">Short value</th><th></th></tr></thead>
-        <tbody>${rows.map((r, i) => r._state === "deleted" ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
+        <tbody>${rows.map((r, i) => r._state === "deleted" || !visible(r, i) ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint text-sm">${r.employee_id}</div>`
             : html`<select class="input sm" data-f="employee_id" aria-label="Employee" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
           <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
@@ -56,7 +59,10 @@ export default {
           <td class="calc" data-q></td><td class="calc" data-v></td>
           <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove line">${icon("trash")}</button>` : ""}</td>
         </tr>`)}</tbody>
-        <tfoot><tr><td colspan="8">Total shortfall</td><td class="r" id="tot"></td><td></td></tr></tfoot></table></div>`.toString();
+        <tfoot><tr><td colspan="8">Total shortfall</td><td class="r" id="tot"></td><td></td></tr></tfoot></table></div>
+        ${rows.some((r, i) => r._state !== "deleted" && !visible(r, i)) ? html`<div class="more-rows"><span class="muted" role="status">Showing ${rows.filter(visible).length} of ${rows.length} lines</span>
+          <button type="button" class="btn" id="more-lines">Show ${Math.min(150, rows.length - shown)} more</button></div>` : ""}`.toString();
+      $("#more-lines")?.addEventListener("click", () => { snap(); shown += 150; draw(); });
       refresh();
     };
 
@@ -66,6 +72,12 @@ export default {
     const refresh = () => {
       let total = 0, dirty = 0;
       const perEmp = {};
+      const drawn = new Set($$("tbody tr", grid).map((tr) => Number(tr.dataset.i)));
+      rows.forEach((r, i) => { // lines not drawn are unchanged, so their saved values still count toward the totals
+        if (drawn.has(i) || r._state === "deleted" || r._state === "gone") return;
+        total += r.shortfall_value || 0;
+        perEmp[r.employee_id] = (perEmp[r.employee_id] || 0) + (r.shortfall_value || 0);
+      });
       $$("tbody tr", grid).forEach((tr) => {
         const r = rows[tr.dataset.i];
         const v = read(tr);

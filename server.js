@@ -153,8 +153,8 @@ function createHandler(dbReady) {
     ["GET", /^\/api\/reports\/stock$/, "read", async ({ user, q }) => (await svc.stockReport(database, q.get("period"))).filter((r) => !user.hub || r.hub === user.hub)],
     ["GET", /^\/api\/reports\/commission$/, "read", async ({ user, q }) => (await svc.commissionReport(database, q.get("period"))).filter((r) => !user.hub || r.hub === user.hub)],
 
-    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})$/, "read", async ({ m, user }) => {
-      const p = await svc.getPeriod(database, m[1]);
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})$/, "read", async ({ m, user, q }) => {
+      const p = await svc.getPeriod(database, m[1], { detail: q.get("slim") !== "1" }); // ?slim=1 leaves out each person's full working
       return user.hub ? { ...p, rows: p.rows.filter((r) => r.hub === user.hub) } : p;
     }],
     ["POST", /^\/api\/payroll\/(\d{4}-\d{2})\/run$/, "run_payroll", ({ m, user }) => svc.runPeriod(database, m[1], user.username)],
@@ -171,6 +171,8 @@ function createHandler(dbReady) {
       await database.run(`INSERT INTO audit_log (table_name, row_key, action, changed_by) VALUES ('periods', ?, 'bank_file_download', ?)`, m[1], user.username);
       return { csv: f.body, filename: f.filename };
     }],
+    // One person's full working. Listed last so it never shadows /register, /payslips or /bank-file.
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, "read", ({ m, user }) => svc.getPeriodRow(database, m[1], m[2], user.hub)],
   ];
 
   return async function handler(req, res) {

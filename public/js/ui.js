@@ -296,7 +296,7 @@ export function confirmDialog({ title, message, confirmText = "Confirm", danger 
 // cols: [{ key, label, align: 'r'|'c', render(row) -> html/raw, sort(row) -> value | false, total(rows) -> html }]
 // onRow: makes rows clickable for mouse users AND adds a real button per row (rowLabel names it) so the
 // same action works from the keyboard and for screen readers.
-export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "" }) {
+export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100 }) {
   const id = "t" + Math.random().toString(36).slice(2, 8);
   if (!rows.length) return raw(`<div class="empty"><div class="ico">${icon("sheet")}</div><h4>${esc(empty)}</h4></div>`);
   const sortableCol = (c) => sortable && c.sort !== false && c.label;
@@ -304,14 +304,31 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
     ? `<th class="${c.align || ""}" scope="col" aria-sort="none" data-col="${i}"><button type="button" class="th-sort">${esc(c.label)}<span class="sort-ind" aria-hidden="true"></span></button></th>`
     : `<th class="${c.align || ""}" scope="col">${c.label ? esc(c.label) : `<span class="sr-only">${onRow ? "" : "Actions"}</span>`}</th>`).join("")
     + (onRow ? `<th scope="col"><span class="sr-only">Actions</span></th>` : "");
-  const body = rows.map((r, ri) => `<tr data-i="${ri}" class="${onRow ? "clickable" : ""}" ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.align || ""}">${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}${onRow ? `<td class="r row-act"><button type="button" class="btn sm ghost" data-row-open aria-label="${esc(rowLabel(r))}">${esc(rowAction)} ${icon("right")}</button></td>` : ""}</tr>`).join("");
+  const rowHtml = (r, ri) => `<tr data-i="${ri}" class="${onRow ? "clickable" : ""}" ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.align || ""}">${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}${onRow ? `<td class="r row-act"><button type="button" class="btn sm ghost" data-row-open aria-label="${esc(rowLabel(r))}">${esc(rowAction)} ${icon("right")}</button></td>` : ""}</tr>`;
+  // A long list draws its first rows at once and the rest on request, so the page appears quickly and stays light.
+  let shown = Math.min(rows.length, pageSize);
+  const body = rows.slice(0, shown).map(rowHtml).join("");
+  const moreBar = () => (rows.length > shown ? `<div class="more-rows"><span class="muted" role="status">Showing ${shown} of ${rows.length}</span><button type="button" class="btn" data-more>Show ${Math.min(pageSize, rows.length - shown)} more</button></div>` : "");
   const foot = footer ? `<tfoot><tr>${cols.map((c, i) => `<td class="${c.align || ""}">${c.total ? c.total(rows) : i === 0 ? "Total" : ""}</td>`).join("")}${onRow ? "<td></td>" : ""}</tr></tfoot>` : "";
   queueMicrotask(() => {
     const t = document.getElementById(id);
     if (!t) return;
-    if (onRow) t.querySelectorAll("tbody tr").forEach((tr) => tr.addEventListener("click", (e) => {
-      if (e.target.closest("[data-row-open]") || !e.target.closest("button,a,input,select")) onRow(rows[tr.dataset.i]);
-    }));
+    const tb = t.querySelector("tbody");
+    const wrap = t.closest(".table-wrap");
+    const drawMore = (n) => {
+      const next = Math.min(rows.length, shown + n);
+      tb.insertAdjacentHTML("beforeend", rows.slice(shown, next).map((r, i) => rowHtml(r, shown + i)).join(""));
+      shown = next;
+      if (wrap.nextElementSibling?.matches(".more-rows")) wrap.nextElementSibling.remove();
+      if (rows.length > shown) wrap.insertAdjacentHTML("afterend", moreBar());
+      bindMore();
+    };
+    const bindMore = () => { const bar = wrap.nextElementSibling; if (bar?.matches(".more-rows")) bar.querySelector("[data-more]").onclick = () => drawMore(pageSize); };
+    bindMore();
+    if (onRow) tb.addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-i]");
+      if (tr && (e.target.closest("[data-row-open]") || !e.target.closest("button,a,input,select"))) onRow(rows[tr.dataset.i]);
+    });
     if (sortable) {
       t.querySelectorAll("th[data-col] .th-sort").forEach((btn) => btn.addEventListener("click", () => {
         const th = btn.parentElement;
@@ -320,7 +337,7 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
         t.querySelectorAll("th[aria-sort]").forEach((x) => x.setAttribute("aria-sort", "none"));
         th.setAttribute("aria-sort", dir === 1 ? "ascending" : "descending");
         const val = c.sort || ((r) => r[c.key]);
-        const tb = t.querySelector("tbody");
+        if (shown < rows.length) drawMore(rows.length); // sorting has to see every row, not just the ones on screen
         [...tb.rows].sort((a, b) => {
           const x = val(rows[a.dataset.i]), y = val(rows[b.dataset.i]);
           return (x > y ? 1 : x < y ? -1 : 0) * dir;
@@ -329,7 +346,7 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
       }));
     }
   });
-  return raw(`<div class="table-wrap" tabindex="0" role="region" aria-label="${esc(caption || "Table")}"><table class="table ${cls}" id="${id}">${caption ? `<caption class="sr-only">${esc(caption)}</caption>` : ""}<thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div>`);
+  return raw(`<div class="table-wrap" tabindex="0" role="region" aria-label="${esc(caption || "Table")}"><table class="table ${cls}" id="${id}">${caption ? `<caption class="sr-only">${esc(caption)}</caption>` : ""}<thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div>${moreBar()}`);
 }
 
 export const emptyState = (title, text = "", ico = "sheet", action = "") =>

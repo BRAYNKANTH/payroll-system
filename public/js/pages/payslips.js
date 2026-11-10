@@ -10,7 +10,7 @@ export default {
   periodic: true,
   async render({ el }) {
     const p = state.period;
-    const data = await get(`/api/payroll/${p}`);
+    const data = await get(`/api/payroll/${p}?slim=1`);
     const rows = data.rows.filter((r) => !scopeHub() || r.hub === scopeHub());
 
     el.innerHTML = html`

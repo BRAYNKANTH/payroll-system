@@ -6,6 +6,7 @@ const svc = require("./service");
 const reports = require("./reports");
 
 const TEAM_LEVELS = new Set(["supervisor", "group_manager"]);
+const monthBounds = (period) => [period + "-01", svc.shiftPeriod(period, 1) + "-01"];
 
 async function me(db, user) {
   if (!user?.employee_id) throw httpError(403, "This login is not linked to an employee");
@@ -26,9 +27,9 @@ async function team(db, id, period) {
     SELECT d.employee_id, d.name, d.staff_level, d.target, d.status, d.depth, u.name AS reports_to,
       COALESCE(SUM(l.business_amount), 0) AS business, COUNT(l.id) AS days
     FROM d LEFT JOIN staff u ON u.employee_id = d.upline_id
-    LEFT JOIN daily_log l ON l.employee_id = d.employee_id AND left(l.date, 7) = ?
+    LEFT JOIN daily_log l ON l.employee_id = d.employee_id AND l.date >= ? AND l.date < ?
     GROUP BY d.employee_id, d.name, d.staff_level, d.target, d.status, d.depth, u.name
-    ORDER BY d.depth, d.employee_id`, id, period);
+    ORDER BY d.depth, d.employee_id`, id, ...monthBounds(period));
   return rows.filter((r) => r.status === "active" || r.business > 0);
 }
 
@@ -36,7 +37,7 @@ async function summary(db, user, period) {
   svc.assertPeriod(period);
   const s = await me(db, user);
   const finalized = await svc.isFinalized(db, period);
-  const daily = await db.all("SELECT date, business_amount, settled_amount, settle_up_minus, personal_minus, notes FROM daily_log WHERE employee_id = ? AND left(date, 7) = ? ORDER BY date", s.employee_id, period);
+  const daily = await db.all("SELECT date, business_amount, settled_amount, settle_up_minus, personal_minus, notes FROM daily_log WHERE employee_id = ? AND date >= ? AND date < ? ORDER BY date", s.employee_id, ...monthBounds(period));
   const stock = await db.all("SELECT * FROM stock_recon WHERE employee_id = ? AND period = ? ORDER BY product", s.employee_id, period);
   const allowances = await db.all("SELECT description, amount FROM allowances WHERE employee_id = ? AND period = ? ORDER BY id", s.employee_id, period);
   const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k] || 0), 0);
@@ -51,7 +52,7 @@ async function summary(db, user, period) {
       closing: r.closing_balance, ...(({ earnings, deductions }) => ({ earnings, deduction_lines: deductions }))(JSON.parse(r.detail)) };
   } else if (daily.length || stock.length || allowances.length) {
     const prev = await db.get("SELECT closing_balance FROM pay_period_summary WHERE employee_id = ? AND period < ? ORDER BY period DESC LIMIT 1", s.employee_id, period);
-    const held = await db.get(`SELECT COALESCE(SUM((detail::jsonb->>'security_deducted')::numeric), 0) AS held FROM pay_period_summary WHERE employee_id = ? AND period < ?`, s.employee_id, period);
+    const held = await db.get(`SELECT COALESCE(SUM(security_held), 0) AS held FROM pay_period_summary WHERE employee_id = ? AND period < ?`, s.employee_id, period);
     const r = engine.computeGuy({ staff: s, daily, stock, allowances, openingBalance: prev ? prev.closing_balance : Number(s.opening_balance) || 0, securityHeldToDate: Number(held.held) || 0 });
     estimate = { gross: r.gross_earnings, deductions: r.total_deductions, net: r.net_pay, opening: r.opening_balance, closing: r.closing_balance,
       earnings: r.detail.earnings, deduction_lines: r.detail.deductions };
@@ -59,7 +60,7 @@ async function summary(db, user, period) {
 
   const history = await db.all(`SELECT p.period, p.gross_earnings, p.total_deductions, p.net_pay, p.disbursed_amount, p.closing_balance
     FROM pay_period_summary p JOIN periods x USING (period) WHERE p.employee_id = ? AND x.status = 'finalized' ORDER BY p.period DESC LIMIT 36`, s.employee_id);
-  const security = await db.get(`SELECT COALESCE(SUM((p.detail::jsonb->>'security_deducted')::numeric), 0) AS held FROM pay_period_summary p
+  const security = await db.get(`SELECT COALESCE(SUM(p.security_held), 0) AS held FROM pay_period_summary p
     JOIN periods x USING (period) WHERE p.employee_id = ? AND x.status = 'finalized'`, s.employee_id);
 
   return {

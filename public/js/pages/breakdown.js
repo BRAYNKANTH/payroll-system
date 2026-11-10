@@ -1,5 +1,5 @@
 // Detailed breakdown drawer for one payroll summary row, with approve / reject actions.
-import { post } from "../api.js";
+import { get, post } from "../api.js";
 import { can, refreshPending } from "../app.js";
 import { $, html, icon, money, badge, drawer, toast, busy, confirmDialog, dateTime, roleLabel, levelLabel, initials, pct, modal } from "../ui.js";
 
@@ -17,6 +17,12 @@ export function openPayslip(period, id) {
     body: `<iframe class="frame" src="/api/payroll/${period}/payslips/${encodeURIComponent(id)}" title="Payslip"></iframe>`,
     foot: `<a class="btn" href="/api/payroll/${period}/payslips/${encodeURIComponent(id)}" target="_blank" rel="noopener">Open in new tab</a><button class="btn primary" id="pp">Print</button>`,
   }).panel.querySelector("#pp").onclick = (e) => e.target.closest(".modal").querySelector("iframe").contentWindow.print();
+}
+
+// The payroll list leaves out each person's full working to stay small; fetch it when a row is opened.
+export async function openBreakdown(r, period, opts) {
+  const full = r.detail ? r : { ...r, ...(await get(`/api/payroll/${period}/${encodeURIComponent(r.employee_id)}`)) };
+  breakdownDrawer(full, opts);
 }
 
 export function breakdownDrawer(r, { finalized, onChange }) {

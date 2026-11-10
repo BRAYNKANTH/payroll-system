@@ -58,7 +58,7 @@ const ENTITIES = {
     },
   },
   daily: {
-    table: "daily_log", key: "id", periodCol: "left(date, 7)",
+    table: "daily_log", key: "id", periodCol: "left(date, 7)", dateCol: "date",
     fields: {
       date: { type: "date", required: true },
       employee_id: { type: "text", required: true },
@@ -69,7 +69,7 @@ const ENTITIES = {
     },
   },
   weekly: {
-    table: "weekly_log", key: "id", periodCol: "left(week_start, 7)",
+    table: "weekly_log", key: "id", periodCol: "left(week_start, 7)", dateCol: "week_start",
     fields: {
       week_start: { type: "date", required: true },
       week_end: { type: "date", required: true },
@@ -172,6 +172,9 @@ function clean(entity, body, { creating }) {
   return out;
 }
 
+// [first day, first day of the next month] as text, for "this month" filters on date columns.
+const monthBounds = (period) => [period + "-01", shiftPeriod(period, 1) + "-01"];
+
 const empCol = (kind) => (kind === "weekly" ? "manager_id" : "employee_id");
 
 async function listEntries(db, kind, { period, employee_id, hub, from, to } = {}) {
@@ -179,7 +182,11 @@ async function listEntries(db, kind, { period, employee_id, hub, from, to } = {}
   if (!e) throw httpError(404, `Unknown entity ${kind}`);
   const where = [];
   const args = [];
-  if (period && e.periodCol) { assertPeriod(period); where.push(`${e.periodCol} = ?`); args.push(period); }
+  if (period && e.periodCol) {
+    assertPeriod(period);
+    if (e.dateCol) { where.push(`${e.dateCol} >= ? AND ${e.dateCol} < ?`); args.push(...monthBounds(period)); } // a range can use the index
+    else { where.push(`${e.periodCol} = ?`); args.push(period); }
+  }
   if (from && e.fields.date) { where.push("date >= ?"); args.push(from); }
   if (to && e.fields.date) { where.push("date <= ?"); args.push(to); }
   if (employee_id && kind !== "staff" && kind !== "hubs" && !e.byHub) { where.push(`${empCol(kind)} = ?`); args.push(employee_id); }
@@ -375,29 +382,57 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
   });
   if (errors.length) throw httpError(400, errors.slice(0, 8).join(" · ") + (errors.length > 8 ? ` · and ${errors.length - 8} more` : ""));
 
-  const findSql = `SELECT * FROM ${e.table} WHERE ${keys.map((k) => `${k} = ?`).join(" AND ")}`;
   const counts = { created: 0, updated: 0, unchanged: 0, deleted: 0 };
   try {
     await withUser(db, user, async (t) => {
+      // One read of everything these rows touch (the key columns are all text), instead of one read per row.
+      const distinct = (i) => [...new Set(prepared.map((p) => p.key[i]))];
+      const found = await t.all(`SELECT * FROM ${e.table} WHERE ${keys.map((k) => `${k} = ANY(?::text[])`).join(" AND ")}`, ...keys.map((_, i) => distinct(i)));
+      const idOf = (r) => keys.map((k) => r[k]).join("\u0001");
+      const existingBy = new Map(found.map((r) => [idOf(r), r]));
+      // Work out what each row needs, in memory. If the same key appears twice the last one wins.
+      const plan = new Map();
       for (const p of prepared) {
-        const existing = await t.get(findSql, ...p.key);
+        const k = p.key.join("\u0001");
+        const existing = existingBy.get(k);
         if (p.del) {
-          if (!existing) continue;
+          if (!existing) { plan.delete(k); continue; }
           if (scopeHub && rowHub(existing) !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
-          await t.run(`DELETE FROM ${e.table} WHERE id = ?`, existing.id);
-          counts.deleted++;
+          plan.set(k, { del: existing.id });
         } else if (existing) {
           const cols = Object.keys(p.row).filter((c) => !keys.includes(c) && p.row[c] !== existing[c]);
-          if (!cols.length) { counts.unchanged++; continue; }
-          await t.run(`UPDATE ${e.table} SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_by = ?, updated_at = ${NOW} WHERE id = ?`,
-            ...cols.map((c) => p.row[c]), user, existing.id);
-          counts.updated++;
+          plan.set(k, cols.length ? { update: existing.id, cols, row: p.row } : { same: true });
         } else {
-          const row = { ...p.row, created_by: user };
-          const cols = Object.keys(row);
-          await t.run(insertSql(e.table, cols), ...cols.map((c) => row[c]));
-          counts.created++;
+          plan.set(k, { insert: { ...p.row, created_by: user } });
         }
+      }
+      const items = [...plan.values()];
+      const CHUNK = 200;
+      const chunks = (a) => Array.from({ length: Math.ceil(a.length / CHUNK) }, (_, i) => a.slice(i * CHUNK, (i + 1) * CHUNK));
+      const group = (list, sig) => list.reduce((m, x) => (m.get(sig(x)) || m.set(sig(x), []).get(sig(x))).push(x) && m, new Map());
+      const cast = (c) => ({ money: "bigint", int: "bigint", rate: "double precision" }[e.fields[c]?.type] || "text");
+
+      counts.unchanged += items.filter((x) => x.same).length;
+      const dels = items.filter((x) => x.del).map((x) => x.del);
+      for (const ids of chunks(dels)) await t.run(`DELETE FROM ${e.table} WHERE id = ANY(?::bigint[])`, ids);
+      counts.deleted += dels.length;
+      // Changed rows are written together, one statement per set of changed columns (usually one).
+      for (const [sig, list] of group(items.filter((x) => x.update), (x) => x.cols.join(","))) {
+        const cols = sig.split(",");
+        for (const part of chunks(list)) {
+          await t.run(`UPDATE ${e.table} AS t SET ${cols.map((c) => `${c} = v.${c}`).join(", ")}, updated_by = ?, updated_at = ${NOW}
+            FROM (VALUES ${part.map(() => `(?::bigint, ${cols.map((c) => `?::${cast(c)}`).join(", ")})`).join(", ")}) AS v(id, ${cols.join(", ")}) WHERE t.id = v.id`,
+            user, ...part.flatMap((x) => [x.update, ...cols.map((c) => x.row[c])]));
+        }
+        counts.updated += list.length;
+      }
+      for (const [sig, list] of group(items.filter((x) => x.insert), (x) => Object.keys(x.insert).join(","))) {
+        const cols = sig.split(",");
+        for (const part of chunks(list)) {
+          await t.run(`INSERT INTO ${e.table} (${cols.join(",")}) VALUES ${part.map(() => `(${cols.map(() => "?").join(",")})`).join(", ")}`,
+            ...part.flatMap((x) => cols.map((c) => x.insert[c])));
+        }
+        counts.created += list.length;
       }
     });
   } catch (err) { throw sqlError(err); }
@@ -424,17 +459,18 @@ async function runPeriod(db, period, user) {
     const settings = await getSettings(t);
 
     // Load the whole period in a handful of queries (cheap over a network connection to Neon).
-    const dailyAll = await t.all("SELECT * FROM daily_log WHERE left(date, 7) = ? ORDER BY date", period);
+    const [from, to] = monthBounds(period);
+    const dailyAll = await t.all("SELECT * FROM daily_log WHERE date >= ? AND date < ? ORDER BY date", from, to);
     const stockAll = await t.all("SELECT * FROM stock_recon WHERE period = ? ORDER BY product", period);
     const allowAll = await t.all("SELECT * FROM allowances WHERE period = ? ORDER BY id", period);
-    const weeklyAll = await t.all("SELECT * FROM weekly_log WHERE left(week_start, 7) = ? ORDER BY week_start", period);
+    const weeklyAll = await t.all("SELECT * FROM weekly_log WHERE week_start >= ? AND week_start < ? ORDER BY week_start", from, to);
     const daily = groupBy(dailyAll, "employee_id"), stock = groupBy(stockAll, "employee_id");
     const allow = groupBy(allowAll, "employee_id"), weekly = groupBy(weeklyAll, "manager_id");
     // Latest earlier summary per employee (opening balance + previous net pay) and security held so far.
-    const prevRows = await t.all(`SELECT DISTINCT ON (employee_id) * FROM pay_period_summary
+    const prevRows = await t.all(`SELECT DISTINCT ON (employee_id) employee_id, period, closing_balance, net_pay FROM pay_period_summary
       WHERE period < ? ORDER BY employee_id, period DESC`, period);
     const prevBy = new Map(prevRows.map((r) => [r.employee_id, r]));
-    const heldRows = await t.all(`SELECT employee_id, COALESCE(SUM((detail::jsonb->>'security_deducted')::numeric), 0) AS held
+    const heldRows = await t.all(`SELECT employee_id, COALESCE(SUM(security_held), 0) AS held
       FROM pay_period_summary WHERE period < ? GROUP BY employee_id`, period);
     const heldBy = new Map(heldRows.map((r) => [r.employee_id, Number(r.held)]));
 
@@ -481,6 +517,7 @@ async function runPeriod(db, period, user) {
     const existingBy = new Map((await t.all(`SELECT employee_id, status, result_hash, flags, reviewed_by, reviewed_at, review_note
       FROM pay_period_summary WHERE period = ?`, period)).map((r) => [r.employee_id, r]));
     const counts = { auto_approved: 0, pending_review: 0, approved: 0, rejected: 0 };
+    const saves = [];
     for (const [id, { staff: s, prev, result }] of results) {
       const flags = engine.evaluateFlags(result, { staff: s, previous: prev, settings });
       const hash = hashResult(result, s);
@@ -492,22 +529,27 @@ async function runPeriod(db, period, user) {
         && flags.every((f) => reviewedCodes.has(f.code));
       const status = keep ? existing.status : flags.length ? "pending_review" : "auto_approved";
       counts[status]++;
+      saves.push([id, period, result.role, result.opening_balance, result.gross_earnings, result.total_deductions,
+        result.net_pay, result.disbursed_amount, result.closing_balance, JSON.stringify(result.detail), JSON.stringify(flags),
+        hash, status, s.bank_name, s.bank_code, s.branch_code, s.bank_account_no,
+        keep ? existing.reviewed_by : null, keep ? existing.reviewed_at : null, keep ? existing.review_note : null,
+        Number(result.detail.security_deducted) || 0]);
+    }
+    // Everyone's result goes in with a few statements (200 people each), not one statement per person.
+    for (let i = 0; i < saves.length; i += 200) {
+      const part = saves.slice(i, i + 200);
       await t.run(`
         INSERT INTO pay_period_summary (employee_id, period, role, opening_balance, gross_earnings, total_deductions, net_pay,
           disbursed_amount, closing_balance, detail, flags, result_hash, status, bank_name, bank_code, branch_code, bank_account_no,
-          computed_at, reviewed_by, reviewed_at, review_note)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ${NOW},?,?,?)
+          computed_at, reviewed_by, reviewed_at, review_note, security_held)
+        VALUES ${part.map(() => `(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ${NOW},?,?,?,?)`).join(", ")}
         ON CONFLICT (employee_id, period) DO UPDATE SET
           role=excluded.role, opening_balance=excluded.opening_balance, gross_earnings=excluded.gross_earnings,
           total_deductions=excluded.total_deductions, net_pay=excluded.net_pay, disbursed_amount=excluded.disbursed_amount,
           closing_balance=excluded.closing_balance, detail=excluded.detail, flags=excluded.flags, result_hash=excluded.result_hash,
           status=excluded.status, bank_name=excluded.bank_name, bank_code=excluded.bank_code, branch_code=excluded.branch_code,
           bank_account_no=excluded.bank_account_no, computed_at=excluded.computed_at, reviewed_by=excluded.reviewed_by,
-          reviewed_at=excluded.reviewed_at, review_note=excluded.review_note`,
-        id, period, result.role, result.opening_balance, result.gross_earnings, result.total_deductions,
-        result.net_pay, result.disbursed_amount, result.closing_balance, JSON.stringify(result.detail), JSON.stringify(flags),
-        hash, status, s.bank_name, s.bank_code, s.branch_code, s.bank_account_no,
-        keep ? existing.reviewed_by : null, keep ? existing.reviewed_at : null, keep ? existing.review_note : null);
+          reviewed_at=excluded.reviewed_at, review_note=excluded.review_note, security_held=excluded.security_held`, ...part.flat());
     }
     const ids = [...results.keys()];
     await t.run(`DELETE FROM pay_period_summary WHERE period = ? AND NOT (employee_id = ANY(?::text[]))`, period, ids);
@@ -517,14 +559,26 @@ async function runPeriod(db, period, user) {
   }, { lockKey: "period:" + period });
 }
 
-async function getPeriod(db, period) {
+// detail: false leaves out each person's full working (the big part), for lists that only show the figures.
+async function getPeriod(db, period, { detail = true } = {}) {
   assertPeriod(period);
   const info = (await db.get("SELECT * FROM periods WHERE period = ?", period)) || { period, status: "open" };
+  const cols = detail ? "p.*" : `p.employee_id, p.period, p.role, p.opening_balance, p.gross_earnings, p.total_deductions, p.net_pay, p.disbursed_amount,
+    p.closing_balance, p.flags, p.status, p.bank_name, p.bank_code, p.branch_code, p.bank_account_no, p.computed_at, p.reviewed_by, p.reviewed_at, p.review_note`;
   const rows = (await db.all(`
-    SELECT p.*, s.name, s.hub, s.manager_id, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
+    SELECT ${cols}, s.name, s.hub, s.manager_id, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
     WHERE p.period = ? ORDER BY p.role DESC, s.hub, p.employee_id`, period))
-    .map((r) => ({ ...r, detail: JSON.parse(r.detail), flags: JSON.parse(r.flags) }));
+    .map((r) => ({ ...r, ...(detail ? { detail: JSON.parse(r.detail) } : {}), flags: JSON.parse(r.flags) }));
   return { ...info, rows };
+}
+
+// One person's row with the full working, for the breakdown drawer.
+async function getPeriodRow(db, period, employeeId, scopeHub) {
+  assertPeriod(period);
+  const r = await db.get(`SELECT p.*, s.name, s.hub, s.manager_id, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
+    WHERE p.period = ? AND p.employee_id = ?`, period, employeeId);
+  if (!r || (scopeHub && r.hub !== scopeHub)) throw httpError(404, "No payroll row for that person");
+  return { ...r, detail: JSON.parse(r.detail), flags: JSON.parse(r.flags) };
 }
 
 async function review(db, period, employeeId, user, decision, note) {
@@ -679,13 +733,13 @@ async function dashboard(db, period, hub) {
   const byId = new Map(staff.map((s) => [s.employee_id, s]));
 
   const daily = (await db.all(`SELECT employee_id, COUNT(*) AS days, SUM(business_amount) AS business, SUM(settle_up_minus) AS settle_up,
-      SUM(personal_minus) AS personal, string_agg(date, ',') AS dates FROM daily_log WHERE left(date, 7) = ? GROUP BY employee_id`, period))
+      SUM(personal_minus) AS personal, string_agg(date, ',') AS dates FROM daily_log WHERE date >= ? AND date < ? GROUP BY employee_id`, ...monthBounds(period)))
     .filter((r) => ids.has(r.employee_id));
   const weekly = (await db.all(`SELECT manager_id, COUNT(*) AS weeks, SUM(business_total) AS business FROM weekly_log
-      WHERE left(week_start, 7) = ? GROUP BY manager_id`, period)).filter((r) => ids.has(r.manager_id));
+      WHERE week_start >= ? AND week_start < ? GROUP BY manager_id`, ...monthBounds(period))).filter((r) => ids.has(r.manager_id));
   const stock = (await db.all(`SELECT employee_id, SUM(shortfall_value) AS shortfall FROM stock_recon WHERE period = ? GROUP BY employee_id`, period))
     .filter((r) => ids.has(r.employee_id));
-  const summaries = (await getPeriod(db, period)).rows.filter((r) => ids.has(r.employee_id));
+  const summaries = (await getPeriod(db, period, { detail: false })).rows.filter((r) => ids.has(r.employee_id));
   const dailyBy = new Map(daily.map((r) => [r.employee_id, r]));
   const sum = (arr, k) => arr.reduce((t, r) => t + (Number(r[k]) || 0), 0);
   const guys = summaries.filter((r) => r.role === "guy");
@@ -720,7 +774,7 @@ async function dashboard(db, period, hub) {
   const trendRows = (await db.all(`SELECT p.period, p.role, p.net_pay, p.disbursed_amount, p.gross_earnings, s.hub
     FROM pay_period_summary p JOIN staff s USING (employee_id) WHERE p.period BETWEEN ? AND ?`, first, period)).filter((r) => !hub || r.hub === hub);
   const bizRows = (await db.all(`SELECT left(date, 7) AS period, employee_id, SUM(business_amount) AS b FROM daily_log
-    WHERE left(date, 7) BETWEEN ? AND ? GROUP BY 1, 2`, first, period)).filter((r) => ids.has(r.employee_id));
+    WHERE date >= ? AND date < ? GROUP BY 1, 2`, first + "-01", monthBounds(period)[1])).filter((r) => ids.has(r.employee_id));
   const trend = [];
   for (let i = 5; i >= 0; i--) {
     const p = shiftPeriod(period, -i);
@@ -880,7 +934,7 @@ async function listPeriods(db) {
 
 module.exports = {
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
-  runPeriod, getPeriod, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
+  runPeriod, getPeriod, getPeriodRow, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
   listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
   dashboard, employeeProfile, balancesReport, stockReport, commissionReport, reviewQueue, listPeriods, shiftPeriod,
 };
