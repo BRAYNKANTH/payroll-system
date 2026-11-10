@@ -177,6 +177,7 @@ const layers = [];
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])';
 let uid = 0;
 function setBackgroundInert(on) {
+  document.documentElement.classList.toggle("modal-open", on); // the page behind a form must not scroll
   document.querySelectorAll("body > *:not(.overlay):not(.drawer):not(.modal):not(.toasts):not(.sr-only):not(.chart-tip)").forEach((el) => (el.inert = on));
   // Only the top layer stays interactive.
   layers.forEach((l, i) => { l.panel.inert = on && i < layers.length - 1; l.ov.inert = on && i < layers.length - 1; });
@@ -223,7 +224,11 @@ function overlayShell(cls, title, inner, { onClose } = {}) {
   ov.addEventListener("click", close);
   panel.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));
   linkLabels(panel);
-  setTimeout(() => (panel.querySelector("input:not([disabled]),select:not([disabled]),textarea,button.primary") || panel.querySelector(FOCUSABLE))?.focus(), 30);
+  setTimeout(() => {
+    // On a touch screen, focusing a field would open the keyboard over the form; focus the dialog itself instead.
+    if (matchMedia("(pointer: coarse)").matches) { panel.tabIndex = -1; panel.focus({ preventScroll: true }); return; }
+    (panel.querySelector("input:not([disabled]),select:not([disabled]),textarea,button.primary") || panel.querySelector(FOCUSABLE))?.focus();
+  }, 30);
   return { panel, close };
 }
 

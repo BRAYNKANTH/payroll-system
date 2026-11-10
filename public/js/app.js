@@ -244,6 +244,8 @@ function isDark() {
 function applyTheme() {
   const t = store.get("pr.theme");
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#faf8f4";
   const b = $("#theme-btn");
   if (b) { b.innerHTML = icon(isDark() ? "sun" : "moon"); b.setAttribute("aria-label", isDark() ? "Switch to light theme" : "Switch to dark theme"); }
 }
@@ -283,6 +285,49 @@ export async function refreshPending() {
     const el = $("#pending-count");
     if (el) { el.textContent = q.length; el.hidden = !q.length; el.setAttribute("aria-label", `${q.length} waiting`); }
   } catch { /* ignore */ }
+}
+
+// Every tab bar becomes a real tablist: roles, selected state, one tab stop, arrow keys (Enter or Space opens the focused tab).
+let tabSeq = 0;
+function enhanceTabs(root) {
+  root.querySelectorAll(".tabs").forEach((bar) => {
+    if (bar.dataset.aria) return;
+    bar.dataset.aria = "1";
+    bar.setAttribute("role", "tablist");
+    const panel = root.querySelector("#pane");
+    const tabs = () => [...bar.querySelectorAll("button")];
+    const sync = () => tabs().forEach((b) => {
+      const on = b.classList.contains("on");
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+      if (on && panel) panel.setAttribute("aria-labelledby", b.id);
+    });
+    tabs().forEach((b) => { b.setAttribute("role", "tab"); b.id ||= `tab-${++tabSeq}`; if (panel) b.setAttribute("aria-controls", "pane"); });
+    if (panel) { panel.setAttribute("role", "tabpanel"); panel.tabIndex = 0; }
+    sync();
+    new MutationObserver(sync).observe(bar, { subtree: true, attributes: true, attributeFilter: ["class"] });
+    bar.addEventListener("keydown", (e) => {
+      const list = tabs(), i = list.indexOf(document.activeElement);
+      const to = { ArrowRight: (i + 1) % list.length, ArrowLeft: (i - 1 + list.length) % list.length, Home: 0, End: list.length - 1 }[e.key];
+      if (to === undefined || i < 0) return;
+      e.preventDefault();
+      list[to].focus();
+    });
+  });
+}
+// A tab bar wider than the screen fades at the edge that has more, so people know to swipe.
+function fadeScrollers(root) {
+  root.querySelectorAll(".tabs:not(.portal-tabs)").forEach((bar) => {
+    const update = () => {
+      bar.classList.toggle("fade-r", bar.scrollWidth - bar.clientWidth - bar.scrollLeft > 4);
+      bar.classList.toggle("fade-l", bar.scrollLeft > 4);
+    };
+    bar.addEventListener("scroll", update, { passive: true });
+    new ResizeObserver(update).observe(bar);
+    const on = bar.querySelector("button.on");
+    if (on) bar.scrollLeft = Math.max(0, on.offsetLeft - 24);
+    update();
+  });
 }
 
 let renderSeq = 0;
@@ -331,6 +376,8 @@ export async function render({ moveFocus = false } = {}) {
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");
     nameTables(view);
+    enhanceTabs(view);
+    fadeScrollers(view);
     if (moveFocus) {
       // Move focus to the new page's heading so screen readers announce it and Tab starts at the content.
       const h1 = view.querySelector("h1");
@@ -375,7 +422,7 @@ export async function boot() {
   const s = await get("/api/auth/state");
   if (!s.user) {
     const login = (await import("./pages/login.js")).default;
-    return login.render({ needsSetup: s.needs_setup, onDone: boot });
+    return login.render({ needsSetup: s.needs_setup, onDone: boot, company: s.company_name });
   }
   state.user = s.user;
   if (isStaff()) { state.hubs = []; state.settings = { company_name: s.company_name }; }

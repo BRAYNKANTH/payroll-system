@@ -12,7 +12,11 @@ export function sheetKeys(root) {
     const target = next?.querySelector(`input[data-f="${input.dataset.f}"]`);
     if (target) { e.preventDefault(); target.focus(); target.select(); }
   });
-  root.addEventListener("focusin", (e) => { if (e.target.matches("input[data-f]")) e.target.select(); });
+  root.addEventListener("focusin", (e) => {
+    if (!e.target.matches("input[data-f]")) return;
+    e.target.setAttribute("enterkeyhint", "next"); // Enter moves down the column, so the key should say Next
+    e.target.select();
+  });
 }
 
 let periodsCache = { at: 0, rows: [] };

@@ -602,3 +602,97 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 .card-head .sub { margin-top: 2px; }
 /* A person's name is the row's anchor: keep it on one line where it can. */
 .card-body.flush .table td:first-child b { white-space: nowrap; }
+
+/* ---------- Phone polish: readable text, safe areas, steadier forms ---------- */
+html.modal-open, html.modal-open body { overflow: hidden; }
+.drawer-body, .modal-body { overscroll-behavior: contain; }
+.lbl-sm { }
+.hide-sm { }
+.portal-tabs .tab-ic, .portal-tabs .sm { display: none; }
+.portal-tabs .cnt { margin-left: 4px; font-weight: 500; opacity: .8; }
+.tabs.fade-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.tabs.fade-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); }
+.tabs.fade-l.fade-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
+details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 18px; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h2 { font-size: 15px; font-weight: 650; }
+details.fold > summary::after { content: ""; width: 9px; height: 9px; border-right: 2px solid var(--text-2); border-bottom: 2px solid var(--text-2); transform: rotate(45deg); transition: transform .15s; margin-right: 4px; }
+details.fold[open] > summary::after { transform: rotate(-135deg); }
+details.fold > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.auth-brand { display: none; }
+.pw-wrap { position: relative; }
+.pw-wrap .input { padding-right: 48px; }
+.pw-toggle { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; background: none; color: var(--text-2); border-radius: var(--radius); cursor: pointer; display: grid; place-items: center; }
+.pw-toggle:hover { color: var(--text); background: var(--surface-3); }
+.pw-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+
+@media (max-width: 860px) {
+  /* Readable text. Nothing the person has to read is smaller than 13px, body copy is 15px. */
+  body { font-size: 15px; }
+  select.input, select.input.sm, textarea.input { font-size: 16px; min-height: 44px; }
+  table.table, .breakdown, .kv, .alert, .sheet th.name, .list-item .grow b, .step .t, .menu a, .menu button { font-size: 15px; }
+  .table thead th, .th-sort { font-size: 12.5px; }
+  .card-head .sub, .kpi .foot, .kpi .label, .field .hint, .field-error, .list-item .grow span, .step .d, .table .who span, .text-sm, .legend,
+  .btn-hint, .scroll-hint, .topbar .crumb, .sidebar-foot, .user-chip .who span, .brand-sub, .badge, .chip, .form-section, .field label, .field .lbl,
+  .sub-head, .kpi .value small, .nav .count { font-size: 13px; }
+  .nav-group { font-size: 12px; }
+  /* Captions that pages size inline (11px to 12.5px) also come up to 13px on a phone */
+  [style*="font-size:11px"]:not(.avatar), [style*="font-size:11.5px"]:not(.avatar), [style*="font-size:12px"]:not(.avatar), [style*="font-size:12.5px"]:not(.avatar) { font-size: 13px !important; }
+  .nav a { font-size: 15px; }
+  .btn { font-size: 14.5px; }
+  .card-head h2, .card-head h3, details.fold > summary h2 { font-size: 16px; }
+  .tabs button { font-size: 14.5px; }
+
+  /* Safe areas: notch, rounded corners and the home bar */
+  .topbar { padding-top: max(10px, env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .content { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .savebar { padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .toasts { bottom: max(12px, env(safe-area-inset-bottom)); }
+  .sidebar { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Two cards per row: a phone shows the whole summary in one screen instead of four */
+  .grid.kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .grid.kpis .kpi { padding: 12px; min-width: 0; }
+  .grid.kpis .kpi .value { font-size: 26px; }
+
+  /* Daily sheet: shorter header so the first row is near the top, three columns on screen */
+  .hide-sm { display: none; }
+  .lbl-sm { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .btn:has(> .lbl-sm) { min-width: 44px; padding: 0 12px; }
+  .page-head { margin-bottom: 12px; gap: 10px; }
+  .page-head .actions { flex-wrap: nowrap; }
+  .card-head { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .card-head .row { gap: 6px; }
+  .card-head .row h2 { font-size: 15px; margin-left: 2px; }
+  .sheet td { padding: 4px 2px; }
+  .sheet th.name { padding: 6px 8px; white-space: nowrap; width: 132px; max-width: 132px; overflow: hidden; text-overflow: ellipsis; }
+  .sheet th.name b { font-size: 14.5px; }
+  .sheet input { min-width: 88px; padding: 0 4px; }
+  .sheet .calc { padding-right: 10px; }
+  .savebar { gap: 8px; }
+  .savebar #dirty-info { font-size: 13px; line-height: 1.25; max-width: 38%; }
+  .savebar .btn { min-height: 44px; padding: 0 14px; }
+
+  /* Sign-in: brand on top, since the side panel is hidden on a phone */
+  .auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .auth-brand .brand-name { color: var(--text); font-size: 18px; }
+  .auth-brand .brand-sub { color: var(--text-3); }
+  .auth-brand .brand-mark { width: 44px; height: 44px; font-size: 22px; }
+  .auth-form { padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
+  /* Staff portal: a bottom tab bar, the way phone apps work */
+  .portal-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; overflow: visible; gap: 0; background: var(--surface);
+    border-top: 1px solid var(--border); border-bottom: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-shadow: 0 -6px 18px -10px rgba(15, 23, 42, .25); }
+  .portal-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; padding: 6px 2px; margin: 0;
+    border-bottom: 0; border-top: 3px solid transparent; font-size: 12.5px; white-space: nowrap; }
+  .portal-tabs button.on { border-top-color: var(--primary); }
+  .portal-tabs .tab-ic { display: block; line-height: 0; }
+  .portal-tabs .tab-ic svg { width: 22px; height: 22px; }
+  .portal-tabs .lg, .portal-tabs .cnt { display: none; }
+  .portal-tabs .sm { display: inline; }
+  .has-bottom-tabs { padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
+  body:has(.portal-tabs) .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  details.fold > summary { padding: 0 14px; min-height: 52px; }
+}

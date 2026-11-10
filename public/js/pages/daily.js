@@ -37,11 +37,11 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Daily sheet</h1><p>Business and settlements for distributors, supervisors and group managers. Settle-up minus is calculated automatically.</p></div>
+        <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for distributors, supervisors and group managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions">
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button></div>
-          ${editable ? html`<button class="btn" id="import">${icon("upload")} Import CSV</button>` : ""}
-          <button class="btn" id="export">${icon("download")} Export</button>
+          ${editable ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}
+          <button class="btn" id="export">${icon("download")} <span class="lbl-sm">Export</span></button>
         </div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}

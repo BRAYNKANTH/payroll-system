@@ -42,6 +42,7 @@ export default {
   title: "My page",
   async render(ctx) {
     const { el } = ctx;
+    el.classList.add("has-bottom-tabs");
     const d = await get("/api/me/portal?period=" + state.period);
     const me = d.me, m = d.month;
     const hasTeam = !!d.team;
@@ -53,8 +54,9 @@ export default {
         <div><h1>Hello, ${me.name.split(" ")[0]}</h1>
           <p>${badge("green", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""} · ${monthName(d.period)} ${badge(d.finalized ? "finalized" : "open")}</p></div>
       </div>
-      <div class="tabs" id="tabs">${[["month", "This month"], ["payslips", `Payslips (${d.history.length})`], ...(hasTeam ? [["team", `My team (${d.team.length})`]] : []), ["documents", "My documents"], ["details", "My details"]]
-        .map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
+      <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""], ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
+        ...(hasTeam ? [["team", "My team", "Team", "users", d.team.length]] : []), ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
+        .map(([k, long, short, ic, n]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}"><span class="tab-ic">${icon(ic)}</span><span class="tab-lb"><span class="lg">${long}</span><span class="sm">${short}</span></span>${n !== "" ? html`<span class="cnt">(${n})</span>` : ""}</button>`)}</div>
       <div id="pane"></div>`;
 
     const panes = {
@@ -91,7 +93,7 @@ export default {
           <div class="card-body flush" id="days"></div></div>
         ${m.stock.length ? html`<div class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></div>` : ""}
         ${m.allowances.length ? html`<div class="card mb-4"><div class="card-head"><h2>Allowances this month</h2></div><div class="card-body flush" id="allow"></div></div>` : ""}
-        <div class="card"><div class="card-head"><h2>How your pay is worked out</h2></div><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></div>`,
+        <details class="card fold"><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>`,
 
       payslips: () => d.history.length ? html`<div class="card"><div class="card-body flush" id="hist"></div></div>
         <p class="muted" style="margin-top:12px">Security held back so far: <b class="num">Rs ${money(d.security_held)}</b>.</p>`

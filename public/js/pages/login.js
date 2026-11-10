@@ -3,7 +3,7 @@ import { $, esc, icon } from "../ui.js";
 
 export default {
   title: "Sign in",
-  render({ needsSetup, onDone }) {
+  render({ needsSetup, onDone, company }) {
     document.title = needsSetup ? "Set up · Payroll" : "Sign in · Payroll";
     document.body.innerHTML = `
     <div class="auth-wrap">
@@ -24,12 +24,15 @@ export default {
       </section>
       <main class="auth-form">
         <div class="auth-card">
+          <div class="auth-brand" aria-hidden="true"><div class="brand-mark">₨</div><div><div class="brand-name">${esc(company || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
           <h1 class="auth-title">${needsSetup ? "Create the admin account" : "Welcome back"}</h1>
           <p class="muted" style="margin:0">${needsSetup ? "This is the first run. The account you create here will have full access." : "Sign in to continue to your payroll workspace."}</p>
           <form id="auth-form" novalidate>
             ${needsSetup ? `<div class="field"><label for="full_name">Full name</label><input class="input" id="full_name" name="full_name" autocomplete="name" required></div>` : ""}
-            <div class="field"><label for="username">Username</label><input class="input" id="username" name="username" autocomplete="username" required autofocus></div>
-            <div class="field"><label for="password">Password</label><input class="input" id="password" name="password" type="password" autocomplete="${needsSetup ? "new-password" : "current-password"}" required>
+            <div class="field"><label for="username">Username</label><input class="input" id="username" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></div>
+            <div class="field"><label for="password">Password</label>
+              <div class="pw-wrap"><input class="input" id="password" name="password" type="password" autocomplete="${needsSetup ? "new-password" : "current-password"}" enterkeyhint="go" required>
+                <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password" aria-pressed="false" aria-controls="password">${icon("eye")}</button></div>
               ${needsSetup ? `<span class="hint">At least 8 characters, with letters and numbers.</span>` : ""}</div>
             <div id="auth-err" class="alert err" role="alert" hidden>${icon("alert")}<div></div></div>
             <button class="btn primary" type="submit">${needsSetup ? "Create account & continue" : "Sign in"}</button>
@@ -38,6 +41,15 @@ export default {
       </main>
     </div>`;
     const form = $("#auth-form");
+    if (company) document.title = `${needsSetup ? "Set up" : "Sign in"} · ${company}`;
+    if (!matchMedia("(pointer: coarse)").matches) form.querySelector("input")?.focus(); // a phone keyboard should not cover the form on arrival
+    $("#pw-toggle").onclick = (e) => {
+      const pw = $("#password"), show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      e.currentTarget.setAttribute("aria-pressed", String(show));
+      e.currentTarget.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    };
+    form.addEventListener("input", () => { form.querySelectorAll("[aria-invalid]").forEach((i) => { i.removeAttribute("aria-invalid"); i.removeAttribute("aria-describedby"); }); });
     form.onsubmit = async (e) => {
       e.preventDefault();
       const btn = form.querySelector("button");
@@ -50,7 +62,10 @@ export default {
       } catch (err) {
         $("#auth-err div").innerHTML = esc(err.message);
         $("#auth-err").hidden = false;
-        form.querySelector("#password").select();
+        const pw = form.querySelector("#password");
+        pw.setAttribute("aria-invalid", "true");
+        pw.setAttribute("aria-describedby", "auth-err");
+        pw.select();
         btn.classList.remove("loading");
       }
     };

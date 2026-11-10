@@ -35,7 +35,7 @@ export default {
 
       <div class="grid kpis">
         ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
-        ${kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} guys · ${k.active_managers} managers` : "Run payroll to calculate")}
+        ${kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "guy" : "guys"} · ${k.active_managers} ${k.active_managers === 1 ? "manager" : "managers"}` : "Run payroll to calculate")}
         ${kpi("To bank", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Net pay Rs ${compact(k.net_pay)}` : "&nbsp;")}
         ${kpi("Settle-up + stock short", compact(k.settle_up + k.stock_shortfall), "coins", "amber", `Stock Rs ${compact(k.stock_shortfall)}`)}
         ${kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
