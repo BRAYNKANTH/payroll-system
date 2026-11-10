@@ -1,21 +1,22 @@
 /* Payroll — design system */
 :root {
-  /* One primary (deep green), one accent (terracotta), warm neutrals. */
-  --bg: #faf8f4;
+  /* Light blue surfaces, one blue primary, a gold accent. Navy anchors the sidebar. */
+  --bg: #f5f8fd;
   --surface: #ffffff;
-  --surface-2: #f4f1ea;
-  --surface-3: #ebe7dd;
-  --border: #ddd7ca;
-  --border-strong: #8a826f;
-  --text: #1d1b17;
-  --text-2: #46423a;
-  --text-3: #625d52;
-  --primary: #1b5e4b;
-  --primary-2: #134a3a;
-  --primary-soft: #e3eee8;
-  --primary-text: #134a3a;
-  --accent: #a64a14;
-  --accent-soft: #f8e9dd;
+  --surface-2: #edf3fb;
+  --surface-3: #dfe9f6;
+  --border: #d3dfef;
+  --border-strong: #6b82a3;
+  --text: #0e2240;
+  --text-2: #33466a;
+  --text-3: #4f6082;
+  --primary: #1d5ba6;
+  --primary-2: #174b8a;
+  --primary-soft: #e1ecfa;
+  --primary-text: #174b8a;
+  --accent: #8f6508;
+  --accent-soft: #f8efd6;
+  --gold: #d4a53c;
   --success: #1f6b3a;
   --success-soft: #e5f1e8;
   --warning: #85540a;
@@ -24,18 +25,24 @@
   --danger-soft: #f9e4e2;
   --info: #1d5f8a;
   --info-soft: #e2eef6;
-  --sidebar: #163a31;
-  --sidebar-2: rgba(255, 255, 255, .09);
-  --sidebar-text: #dce9e2;
-  --sidebar-muted: #a3bdb2;
-  --chart-1: #1b5e4b;
-  --chart-2: #b4531a;
-  --chart-3: #3b6ea5;
-  --chart-4: #8a7a1f;
-  --chart-5: #6b6558;
-  --shadow-sm: 0 1px 2px rgba(29, 27, 23, .06);
-  --shadow: 0 1px 2px rgba(29, 27, 23, .06), 0 2px 8px rgba(29, 27, 23, .04);
-  --shadow-lg: 0 8px 24px rgba(29, 27, 23, .16);
+  --sidebar: #0f2749;
+  --sidebar-2: rgba(255, 255, 255, .10);
+  --sidebar-text: #d6e5f8;
+  --sidebar-muted: #9db6d6;
+  --chart-1: #1d5ba6;
+  --chart-2: #b7862a;
+  --chart-3: #4786c4;
+  --chart-4: #2f8f9d;
+  --chart-5: #7b8ca8;
+  --hero-bg: linear-gradient(150deg, #e4effc 0%, #c9dff8 100%);
+  --hero-text: #0e2240;
+  --hero-chip-bg: rgba(255, 255, 255, .8);
+  --hero-track: rgba(255, 255, 255, .65);
+  --hero-fill: #a67208;
+  --hero-shadow: rgba(29, 91, 166, .35);
+  --shadow-sm: 0 1px 2px rgba(14, 34, 64, .06);
+  --shadow: 0 1px 2px rgba(14, 34, 64, .06), 0 2px 8px rgba(14, 34, 64, .05);
+  --shadow-lg: 0 8px 24px rgba(14, 34, 64, .18);
   --radius: 8px;
   --radius-sm: 5px;
   /* Spacing scale: use these for gaps, padding and margins. */
@@ -47,12 +54,14 @@
 }
 /* Dark is opt-in through the theme button; light is always the default. */
 :root[data-theme="dark"] {
-  --bg: #16150f; --surface: #1e1c16; --surface-2: #26241c; --surface-3: #312e24; --border: #38352a; --border-strong: #857f6b;
-  --text: #f1eee6; --text-2: #d3cebf; --text-3: #aca695; --primary: #6fbf9f; --primary-2: #8fd1b6; --primary-soft: #1d3329;
-  --primary-text: #a8dcc5; --accent: #e08a52; --accent-soft: #3a2616; --success: #7bd096; --success-soft: #1a2f20; --warning: #e7b755; --warning-soft: #33280f;
-  --danger: #f08a82; --danger-soft: #3a1b19; --info: #7fb8e0; --info-soft: #16293a; --sidebar: #0e1f1a; --sidebar-2: rgba(255, 255, 255, .08);
-  --sidebar-text: #e1ece6; --sidebar-muted: #a3bdb2; --shadow: 0 1px 2px rgba(0, 0, 0, .35);
-  --chart-1: #6fbf9f; --chart-2: #e08a52; --chart-3: #7fa8d6; --chart-4: #cdb94b; --chart-5: #a8a290;
+  --bg: #0b1630; --surface: #122041; --surface-2: #182a52; --surface-3: #20355f; --border: #2a4070; --border-strong: #7088b0;
+  --text: #eaf2ff; --text-2: #c4d4ee; --text-3: #9fb3d4; --primary: #8db8f0; --primary-2: #aecbf6; --primary-soft: #172b52;
+  --primary-text: #bbd4f8; --accent: #e3bc5a; --accent-soft: #3a2e12; --gold: #e3bc5a; --success: #7bd096; --success-soft: #1a2f20; --warning: #e7b755; --warning-soft: #33280f;
+  --danger: #f08a82; --danger-soft: #3a1b19; --info: #8db8f0; --info-soft: #172b52; --sidebar: #081329; --sidebar-2: rgba(255, 255, 255, .08);
+  --sidebar-text: #dce9fb; --sidebar-muted: #9db6d6; --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --chart-1: #8db8f0; --chart-2: #e3bc5a; --chart-3: #6fa8dc; --chart-4: #5fc0cc; --chart-5: #a9b6ce;
+  --hero-bg: linear-gradient(150deg, #1d3f78 0%, #122b57 100%); --hero-text: #ffffff; --hero-chip-bg: rgba(0, 0, 0, .3);
+  --hero-track: rgba(255, 255, 255, .22); --hero-fill: #f0c95f; --hero-shadow: rgba(0, 0, 0, .55);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, .55); color-scheme: dark;
 }
 
@@ -303,7 +312,7 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .chart-tip { position: fixed; pointer-events: none; background: var(--text); color: var(--bg); padding: 7px 10px; border-radius: 7px; font-size: 12px; z-index: 100; box-shadow: var(--shadow-lg); white-space: nowrap; }
 
 /* ---------- Overlays ---------- */
-.overlay { position: fixed; inset: 0; background: rgba(29, 27, 23, .45); z-index: 60; animation: fade .15s ease-out; }
+.overlay { position: fixed; inset: 0; background: rgba(8, 19, 41, .5); z-index: 60; animation: fade .15s ease-out; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); background: var(--surface); z-index: 61; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: slide .2s ease-out; }
 .drawer-head, .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
 .drawer-head h3, .modal-head h3 { font-size: 17px; }
@@ -476,7 +485,7 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
   .sidebar.open { visibility: visible; transition: transform .2s; }
   .sidebar-close { display: inline-flex; position: absolute; top: 14px; right: 10px; color: var(--sidebar-text); }
   .sidebar-close:hover { background: var(--sidebar-2); }
-  .sidebar-backdrop.show { display: block; position: fixed; inset: 0; background: rgba(29, 27, 23, .45); z-index: 65; }
+  .sidebar-backdrop.show { display: block; position: fixed; inset: 0; background: rgba(8, 19, 41, .5); z-index: 65; }
   .page-head h1 { font-size: 21px; }
 }
 
@@ -517,8 +526,8 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 }
 
 /* Dark theme: the primary is a light green, so text on it must be dark */
-:root[data-theme="dark"] .btn.primary, :root[data-theme="dark"] .avatar, :root[data-theme="dark"] .brand-mark,
-:root[data-theme="dark"] .step.current .dot, :root[data-theme="dark"] .skip-link { color: #0f1a15; }
+:root[data-theme="dark"] .btn.primary, :root[data-theme="dark"] .avatar,
+:root[data-theme="dark"] .step.current .dot, :root[data-theme="dark"] .step.done .dot, :root[data-theme="dark"] .skip-link { color: #0b1630; }
 :root[data-theme="dark"] .nav .count { color: #1a0f08; }
 
 /* Phones and touch: controls at least 40px tall so they are easy to hit */
@@ -545,10 +554,10 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 /* ---------- Polish: brand sidebar, richer cards, matching sign-in ---------- */
 .sidebar { border-right: 0; }
 .brand-name { color: #fff; }
-.brand-mark { background: var(--accent); }
+.brand-mark { background: var(--gold); color: #0f2749; }
 .nav a:hover { background: var(--sidebar-2); color: #fff; }
 .nav a.active { background: rgba(255, 255, 255, .13); color: #fff; }
-.nav a.active::before { background: #e8a46d; }
+.nav a.active::before { background: var(--gold); }
 .nav a:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
 .sidebar-foot { border-top: 1px solid rgba(255, 255, 255, .12); }
 
@@ -570,14 +579,14 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 .kpi .value { font-size: 30px; letter-spacing: -.3px; }
 .grid.kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 
-/* Sign-in: the left panel uses the same deep green as the app. */
-.auth-art { background: #163a31; border-right: 0; color: #e6f0ea; }
-.auth-art .brand-sub { color: #a3bdb2; }
+/* Sign-in: the left panel uses the same deep navy as the app. */
+.auth-art { background: #0f2749; border-right: 0; color: #e2edfb; }
+.auth-art .brand-sub { color: #9db6d6; }
 .auth-art .art-title, .auth-art h2.art-title { color: #fff; }
-.auth-art p { color: #cfe0d7; }
+.auth-art p { color: #d0def2; }
 .auth-art ol { border-top-color: rgba(255, 255, 255, .35); }
-.auth-art li { border-bottom-color: rgba(255, 255, 255, .14); color: #eef5f1; }
-.auth-art li::before { color: #e8a46d; }
+.auth-art li { border-bottom-color: rgba(255, 255, 255, .14); color: #eef4fc; }
+.auth-art li::before { color: #e3bc5a; }
 .auth-art .note { color: #a3bdb2; }
 
 /* ---------- Layout and utilities (replace one-off inline styles) ---------- */
@@ -687,7 +696,7 @@ details.fold > summary:focus-visible { outline: 2px solid var(--primary); outlin
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-shadow: 0 -6px 18px -10px rgba(15, 23, 42, .25); }
   .portal-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; padding: 6px 2px; margin: 0;
     border-bottom: 0; border-top: 3px solid transparent; font-size: 12.5px; white-space: nowrap; }
-  .portal-tabs button.on { border-top-color: var(--primary); }
+  .portal-tabs button.on { border-top-color: var(--accent); }
   .portal-tabs .tab-ic { display: block; line-height: 0; }
   .portal-tabs .tab-ic svg { width: 22px; height: 22px; }
   .portal-tabs .lg, .portal-tabs .cnt { display: none; }
@@ -699,18 +708,18 @@ details.fold > summary:focus-visible { outline: 2px solid var(--primary); outlin
 
 /* ---------- App feel: hero card, grouped lists, skeletons, motion ---------- */
 html { -webkit-tap-highlight-color: transparent; }
-.hero { position: relative; overflow: hidden; color: #fff; border-radius: 22px; padding: 20px 20px 18px; margin-bottom: 14px;
-  background: linear-gradient(150deg, #1f6f58 0%, #17543f 58%, #0f3a2e 100%); box-shadow: 0 14px 28px -16px rgba(15, 58, 46, .75); }
+.hero { position: relative; overflow: hidden; color: var(--hero-text); border-radius: 22px; padding: 20px 20px 18px; margin-bottom: 14px;
+  background: var(--hero-bg); box-shadow: 0 14px 28px -16px var(--hero-shadow); }
 .hero::before { content: ""; position: absolute; right: -60px; top: -70px; width: 220px; height: 220px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0)); pointer-events: none; }
-.hero .h-top { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: #fff; }
-.hero .h-chip { background: rgba(0, 0, 0, .28); color: #fff; padding: 3px 11px; border-radius: 99px; font-size: 13px; font-weight: 600; }
-.hero .h-label { margin-top: 16px; font-size: 14.5px; color: #fff; }
+  background: radial-gradient(closest-side, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0)); pointer-events: none; }
+.hero .h-top { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: var(--hero-text); }
+.hero .h-chip { background: var(--hero-chip-bg); color: var(--hero-text); padding: 3px 11px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+.hero .h-label { margin-top: 16px; font-size: 14.5px; color: var(--hero-text); }
 .hero .h-amount { font: 600 44px/1.1 var(--font-display); letter-spacing: -.5px; margin: 4px 0 6px; font-variant-numeric: tabular-nums; word-break: break-word; }
-.hero .h-amount small { font: 600 20px var(--font); margin-right: 6px; color: #fff; letter-spacing: 0; }
-.hero .h-foot { font-size: 14px; color: #fff; }
-.hero .h-bar { height: 9px; border-radius: 99px; background: rgba(255, 255, 255, .24); overflow: hidden; margin-top: 18px; }
-.hero .h-bar span { display: block; height: 100%; background: #fff; border-radius: 99px; animation: grow .8s cubic-bezier(.2, .8, .2, 1); }
+.hero .h-amount small { font: 600 20px var(--font); margin-right: 6px; color: var(--hero-text); letter-spacing: 0; }
+.hero .h-foot { font-size: 14px; color: var(--hero-text); }
+.hero .h-bar { height: 9px; border-radius: 99px; background: var(--hero-track); overflow: hidden; margin-top: 18px; }
+.hero .h-bar span { display: block; height: 100%; background: var(--hero-fill); border-radius: 99px; animation: grow .8s cubic-bezier(.2, .8, .2, 1); }
 .hero .h-bar + .h-foot { margin-top: 8px; }
 @keyframes grow { from { width: 0 !important; } }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
