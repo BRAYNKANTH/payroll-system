@@ -388,6 +388,7 @@ export async function render({ moveFocus = false } = {}) {
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");
+    view.classList.add("page-in");
     nameTables(view);
     enhanceTabs(view);
     fadeScrollers(view);
@@ -439,14 +440,25 @@ export async function boot() {
   }
   state.user = s.user;
   if (isStaff()) { state.hubs = []; state.settings = { company_name: s.company_name }; }
+  else if (s.hubs && s.settings) { state.hubs = s.hubs; state.settings = s.settings; }
   else [state.hubs, state.settings] = await Promise.all([get("/api/hubs"), get("/api/settings")]);
   if (state.user.hub) state.hub = state.user.hub;
   else if (state.hub && !state.hubs.some((h) => h.code === state.hub)) state.hub = "";
   shell();
   await render();
   if (!isStaff()) refreshPending();
+  warmPages();
 }
 
+// Once the first screen is up, fetch the code of the other pages in the background so the next tap has nothing to download.
+function warmPages() {
+  const names = [...new Set(NAV.filter((n) => n.page && (isStaff() ? n.perm === "self" : !n.perm || can(n.perm))).map((n) => n.page)), "employee"];
+  const run = () => names.forEach((n) => loadPage(n).catch(() => {}));
+  if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 3000 }); else setTimeout(run, 1500);
+}
+
+// Start downloading this address's page code now, in parallel with the sign-in check, instead of after it.
+{ const first = resolve(location.pathname).page; if (first) loadPage(first).catch(() => {}); }
 boot().catch((e) => {
   document.body.innerHTML = `<div style="padding:40px;font-family:system-ui" role="alert">Could not start the app: ${esc(e.message)}</div>`;
 });

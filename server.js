@@ -68,7 +68,16 @@ function createHandler(dbReady) {
   let database;
   const routes = [
     ["GET", /^\/api\/health$/, null, async () => ({ ok: true, db: !!(await database.get("SELECT 1 AS ok")).ok, schema: db.SCHEMA_VERSION })],
-    ["GET", /^\/api\/auth\/state$/, null, async ({ user }) => ({ needs_setup: !(await auth.hasUsers(database)), user, company_name: (await db.getSettings(database)).company_name })],
+    ["GET", /^\/api\/auth\/state$/, null, async ({ user }) => {
+      const settings = await db.getSettings(database);
+      const out = { needs_setup: !(await auth.hasUsers(database)), user, company_name: settings.company_name };
+      // Everything the shell needs to draw itself, so start-up is one round trip instead of three.
+      if (user && auth.can(user, "read")) {
+        out.hubs = await svc.listEntries(database, "hubs", { hub: user.hub || undefined });
+        out.settings = settings;
+      }
+      return out;
+    }],
     ["POST", /^\/api\/auth\/setup$/, null, async ({ body, req, res }) => {
       const s = await auth.setup(database, body);
       res.setHeader("Set-Cookie", sessionCookie(req, s.token, s.maxAge));

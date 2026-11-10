@@ -822,3 +822,11 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
   .shell.has-bnav .savebar { bottom: calc(58px + env(safe-area-inset-bottom)); padding-bottom: 8px; }
   body:has(.bottom-nav) .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); }
 }
+
+
+/* ---------- Page changes: no spinner flash on a quick load, a short fade when the page arrives ---------- */
+#view > .loading-screen { opacity: 0; animation: fade-in .2s .2s both; }
+#view.page-in { animation: view-in .18s ease-out; } /* opacity only: a transform would break the fixed bottom bars inside the page */
+@keyframes view-in { from { opacity: 0; } }
+@keyframes fade-in { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #view > .loading-screen, #view.page-in { animation: none; opacity: 1; } }
