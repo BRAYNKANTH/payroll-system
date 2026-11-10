@@ -18,6 +18,8 @@ export function auditDiff(a) {
     if (!n) return "";
     if (typeof n !== "object") return raw(`<div class="diff"><s>${esc(show(a.row_key, o))}</s> → <ins>${esc(show(a.row_key, n))}</ins></div>`);
   }
+  // No earlier value (e.g. a document upload): list what was added.
+  if (!o) return raw(`<div class="diff"><ins>added</ins> <span class="faint">${esc(Object.entries(n).filter(([k]) => !HIDE.test(k)).map(([k, v]) => `${k}=${show(k, v)}`).join(", "))}</span></div>`);
   if (!n) return raw(`<div class="diff"><s>deleted</s> <span class="faint">${esc(Object.entries(o).filter(([k]) => !HIDE.test(k)).map(([k, v]) => `${k}=${show(k, v)}`).join(", "))}</span></div>`);
   const keys = Object.keys(n).filter((k) => !HIDE.test(k) && JSON.stringify(o[k]) !== JSON.stringify(n[k]));
   if (!keys.length) return raw(`<span class="faint">no visible change</span>`);
@@ -26,8 +28,8 @@ export function auditDiff(a) {
     : `<div><b>${esc(k)}</b>: <s>${esc(show(k, o[k]))}</s> → <ins>${esc(show(k, n[k]))}</ins></div>`).join("")}</div>`);
 }
 
-const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["allowances", "Allowances"],
-  ["staff", "Employees"], ["hubs", "Hubs"], ["pay_period_summary", "Approvals"], ["periods", "Periods"], ["users", "Users"], ["settings", "Settings"]];
+const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["hub_stock", "Branch stock"], ["allowances", "Allowances"],
+  ["staff", "Employees"], ["staff_documents", "Documents"], ["hubs", "Hubs"], ["pay_period_summary", "Approvals"], ["periods", "Periods"], ["users", "Users"], ["settings", "Settings"]];
 let f = { table: "", user: "", from: "", to: "", key: "" };
 
 export default {
