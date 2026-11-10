@@ -20,7 +20,7 @@ export default {
       ${!can("review") ? html`<div class="alert info mb-4">${icon("info")}<div>You can see the queue, but only accountants and admins can approve or reject.</div></div>` : ""}
       <div class="grid two">
         <div class="stack" id="queue"></div>
-        <div class="card"><div class="card-head"><div><h3>Recent decisions</h3><div class="sub">From the audit trail</div></div></div>
+        <div class="card"><div class="card-head"><div><h2>Recent decisions</h2><div class="sub">From the audit trail</div></div></div>
           <div class="card-body flush" id="recent"></div></div>
       </div>`;
 
@@ -28,7 +28,7 @@ export default {
       ? html`<div class="card">${emptyState("All clear", "No payroll entries are waiting for review.", "checkCircle")}</div>`.toString()
       : periods.map((p) => {
         const items = queue.filter((r) => r.period === p);
-        return html`<div class="card"><div class="card-head"><div><h3>${monthName(p)}</h3><div class="sub">${items.length} to resolve</div></div></div>
+        return html`<div class="card"><div class="card-head"><div><h2>${monthName(p)}</h2><div class="sub">${items.length} to resolve</div></div></div>
           <div class="card-body">${items.map((r) => html`
             <div class="row" style="align-items:flex-start;padding:12px 0;border-top:1px solid var(--border);gap:14px" data-open="${r.period}|${r.employee_id}">
               <div class="avatar">${initials(r.name)}</div>

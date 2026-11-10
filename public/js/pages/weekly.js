@@ -56,7 +56,7 @@ export default {
         })}</div></div>
         <div class="card-body flush" id="grid"></div>
       </div>
-      <div class="card"><div class="card-head"><div><h3>Month overview</h3><div class="sub">Weekly balances per manager</div></div></div>
+      <div class="card"><div class="card-head"><div><h2>Month overview</h2><div class="sub">Weekly balances per manager</div></div></div>
         <div class="card-body flush" id="overview"></div></div>`;
 
     if (!managers.length) {

@@ -34,7 +34,7 @@ export default {
         <a href="/approvals" data-link>Open approvals →</a></div></div>` : ""}
 
       <div class="grid kpis">
-        ${kpi("Hub business", compact(k.hub_business), "store", "blue", `Guys' sales Rs ${compact(k.guys_business)}`)}
+        ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
         ${kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} guys · ${k.active_managers} managers` : "Run payroll to calculate")}
         ${kpi("To bank", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Net pay Rs ${compact(k.net_pay)}` : "&nbsp;")}
         ${kpi("Settle-up + stock short", compact(k.settle_up + k.stock_shortfall), "coins", "amber", `Stock Rs ${compact(k.stock_shortfall)}`)}
@@ -42,25 +42,25 @@ export default {
       </div>
 
       <div class="grid two mt-4">
-        <div class="card"><div class="card-head"><div><h3>Six-month trend</h3><div class="sub">Guys' business vs payroll cost</div></div></div>
+        <div class="card"><div class="card-head"><div><h2>Six-month trend</h2><div class="sub">Guys' business vs payroll cost</div></div></div>
           <div class="card-body" id="trend"></div></div>
-        <div class="card"><div class="card-head"><div><h3>Business by hub</h3><div class="sub">From managers' weekly sheets</div></div></div>
+        <div class="card"><div class="card-head"><div><h2>Business by hub</h2><div class="sub">From managers' weekly sheets</div></div></div>
           <div class="card-body" id="hub-donut"></div></div>
       </div>
 
       <div class="grid two mt-4">
-        <div class="card"><div class="card-head"><div><h3>Hubs at a glance</h3><div class="sub">${monthName(d.period)}</div></div>
+        <div class="card"><div class="card-head"><div><h2>Hubs at a glance</h2><div class="sub">${monthName(d.period)}</div></div>
           <a class="btn sm" href="/reports" data-link>Reports</a></div>
           <div class="card-body flush" id="hub-table"></div></div>
-        <div class="card"><div class="card-head"><div><h3>Exceptions</h3><div class="sub">Flagged by the payroll rules</div></div>
+        <div class="card"><div class="card-head"><div><h2>Exceptions</h2><div class="sub">Flagged by the payroll rules</div></div>
           ${d.exceptions.length ? html`<a class="btn sm" href="/approvals" data-link>Review</a>` : ""}</div>
           <div class="card-body flush" id="exceptions"></div></div>
       </div>
 
       <div class="grid halves mt-4">
-        <div class="card"><div class="card-head"><div><h3>Top performers</h3><div class="sub">Business vs monthly target</div></div></div>
+        <div class="card"><div class="card-head"><div><h2>Top performers</h2><div class="sub">Business vs monthly target</div></div></div>
           <div class="card-body flush" id="top"></div></div>
-        <div class="card"><div class="card-head"><div><h3>Daily sheet completeness</h3><div class="sub">Working days without an entry</div></div>
+        <div class="card"><div class="card-head"><div><h2>Daily sheet completeness</h2><div class="sub">Working days without an entry</div></div>
           ${can("enter_data") ? html`<a class="btn sm" href="/daily" data-link>Fill in</a>` : ""}</div>
           <div class="card-body flush" id="complete"></div></div>
       </div>`;

@@ -521,7 +521,7 @@ async function getPeriod(db, period) {
   assertPeriod(period);
   const info = (await db.get("SELECT * FROM periods WHERE period = ?", period)) || { period, status: "open" };
   const rows = (await db.all(`
-    SELECT p.*, s.name, s.hub, s.manager_id FROM pay_period_summary p JOIN staff s USING (employee_id)
+    SELECT p.*, s.name, s.hub, s.manager_id, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
     WHERE p.period = ? ORDER BY p.role DESC, s.hub, p.employee_id`, period))
     .map((r) => ({ ...r, detail: JSON.parse(r.detail), flags: JSON.parse(r.flags) }));
   return { ...info, rows };
@@ -696,7 +696,7 @@ async function dashboard(db, period, hub) {
   const completeness = activeGuys.map((s) => {
     const logged = new Set((dailyBy.get(s.employee_id)?.dates || "").split(",").filter(Boolean));
     const missing = expected.filter((d) => !logged.has(d));
-    return { employee_id: s.employee_id, name: s.name, hub: s.hub, expected: expected.length, logged: logged.size, missing };
+    return { employee_id: s.employee_id, name: s.name, hub: s.hub, expected: expected.length, logged: expected.length - missing.length, missing };
   });
 
   const byHub = hubs.map((h) => {
@@ -863,7 +863,7 @@ async function commissionReport(db, period) {
 }
 
 async function reviewQueue(db, hub) {
-  return (await db.all(`SELECT p.*, s.name, s.hub FROM pay_period_summary p JOIN staff s USING (employee_id)
+  return (await db.all(`SELECT p.*, s.name, s.hub, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
       LEFT JOIN periods x USING (period)
       WHERE p.status IN ('pending_review','rejected') AND COALESCE(x.status,'open') = 'open' ORDER BY p.period, s.hub, p.employee_id`))
     .filter((r) => !hub || r.hub === hub)
@@ -881,6 +881,6 @@ async function listPeriods(db) {
 module.exports = {
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
   runPeriod, getPeriod, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
-  listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, MANAGER_LEVELS,
+  listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
   dashboard, employeeProfile, balancesReport, stockReport, commissionReport, reviewQueue, listPeriods, shiftPeriod,
 };

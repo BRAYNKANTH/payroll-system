@@ -13,7 +13,7 @@ export default {
           <div><h2>${u.full_name}</h2><div class="muted">${u.username} · ${u.role}${u.hub ? ` · hub ${u.hub}` : ""}</div></div></div>
           <div class="card-body"><div class="faint" style="font-size:12px;margin-bottom:6px">You can</div>
             <div class="row" style="gap:6px">${u.permissions.map((p) => html`<span class="badge plain">${p.replace(/_/g, " ")}</span>`)}</div></div></div>
-        <div class="card"><div class="card-head"><h3>Change password</h3></div><div class="card-body">
+        <div class="card"><div class="card-head"><h2>Change password</h2></div><div class="card-body">
           <form id="pf" class="stack" style="gap:14px">
             <div class="field"><label>Current password</label><input class="input" type="password" name="current_password" autocomplete="current-password" required></div>
             <div class="field"><label>New password</label><input class="input" type="password" name="new_password" autocomplete="new-password" required><span class="hint">At least 8 characters, letters and numbers</span></div>

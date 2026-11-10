@@ -27,7 +27,7 @@ export default {
     const views = {
       async hubs() {
         const d = await get("/api/dashboard" + qs({ period: p, hub: scopeHub() }));
-        pane.innerHTML = html`<div class="card mb-4"><div class="card-head"><h3>Business and payroll by hub</h3></div><div class="card-body" id="c"></div></div>
+        pane.innerHTML = html`<div class="card mb-4"><div class="card-head"><h2>Business and payroll by hub</h2></div><div class="card-body" id="c"></div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows: d.by_hub, footer: true,
             cols: [
@@ -117,7 +117,7 @@ export default {
       async periods() {
         const rows = await get("/api/periods");
         const asc = [...rows].reverse().slice(-12);
-        pane.innerHTML = html`${rows.length ? html`<div class="card mb-4"><div class="card-head"><h3>Payroll cost by month</h3></div><div class="card-body" id="c"></div></div>` : ""}
+        pane.innerHTML = html`${rows.length ? html`<div class="card mb-4"><div class="card-head"><h2>Payroll cost by month</h2></div><div class="card-body" id="c"></div></div>` : ""}
           <div class="card"><div class="card-body flush">${dataTable({
             rows, empty: "No months calculated yet",
             cols: [

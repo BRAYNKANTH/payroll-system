@@ -14,12 +14,12 @@ export default {
     el.innerHTML = html`
       <div class="page-head"><div><h1>Settings</h1><p>Company details and the rules the payroll engine uses. Every change is recorded in the audit trail.</p></div></div>
       <form id="sf" class="stack">
-        <div class="card"><div class="card-head"><div><h3>Company</h3></div></div><div class="card-body form-grid">
+        <div class="card"><div class="card-head"><div><h2>Company</h2></div></div><div class="card-body form-grid">
           <div class="field"><label>Company name</label><input class="input" name="company_name" value="${s.company_name}"></div>
           <div class="field"><label>Company debit account</label><input class="input mono" name="company_account_no" value="${s.company_account_no}"><span class="hint">Shown on the bank file total line</span></div>
         </div></div>
 
-        <div class="card"><div class="card-head"><div><h3>Payroll rules</h3><div class="sub">Changes apply the next time a month is calculated</div></div></div><div class="card-body form-grid">
+        <div class="card"><div class="card-head"><div><h2>Payroll rules</h2><div class="sub">Changes apply the next time a month is calculated</div></div></div><div class="card-body form-grid">
           <div class="field"><label>Company return (% of manager business)</label><input class="input" name="company_return_rate" inputmode="decimal" value="${+(s.company_return_rate * 100).toFixed(4)}"></div>
           <div class="field"><label>Flag when net pay changes by more than (%)</label><input class="input" name="net_pay_change_threshold" inputmode="decimal" value="${+(s.net_pay_change_threshold * 100).toFixed(4)}"></div>
           <div class="field"><label>Flag stock shortfall above (Rs / month)</label><input class="input" name="stock_shortfall_threshold" inputmode="decimal" value="${s.stock_shortfall_threshold / 100}"></div>
@@ -27,7 +27,7 @@ export default {
             <div class="row" style="margin-top:6px">${DAYS.map((d, i) => html`<label class="badge plain" style="cursor:pointer;padding:6px 12px"><input type="checkbox" name="closed" value="${i}" ${closed.includes(String(i)) ? "checked" : ""}> ${d}</label>`)}</div></div>
         </div></div>
 
-        <div class="card"><div class="card-head"><div><h3>Pay defaults by position</h3><div class="sub">Pre-filled when you add someone at that position. Each person can still have their own target and rates on their profile.</div></div></div>
+        <div class="card"><div class="card-head"><div><h2>Pay defaults by position</h2><div class="sub">Pre-filled when you add someone at that position. Each person can still have their own target and rates on their profile.</div></div></div>
           <div class="card-body flush"><div class="table-wrap"><table class="table" id="pd">
             <thead><tr><th scope="col">Position</th><th scope="col">Pay scheme</th><th scope="col" class="r">Target (Rs)</th><th scope="col" class="r">Basic (Rs)</th><th scope="col" class="r">Commission over target %</th>
               <th scope="col" class="r">Commission under target %</th><th scope="col" class="r">Food (Rs/day)</th><th scope="col" class="r">Food after days</th><th scope="col">Security</th></tr></thead>
@@ -40,7 +40,7 @@ export default {
                 <td><div class="row" style="gap:6px;flex-wrap:nowrap"><select class="input sm" data-l="${k}" data-f="sec_kind" aria-label="${l} security type" style="width:auto">${[["none", "None"], ["fixed", "Fixed Rs"], ["pct_gross", "% gross"], ["pct_basic", "% basic"], ["pct_business", "% business"]].map(([v, n]) => html`<option value="${v}" ${(sec[1] || "none") === v ? "selected" : ""}>${n}</option>`)}</select>
                   <input class="input sm" style="width:70px;text-align:right" inputmode="decimal" data-l="${k}" data-f="sec_value" aria-label="${l} security amount" value="${sec[2] || ""}"></div></td></tr>`; })}</tbody></table></div></div></div>
 
-        <div class="card"><div class="card-head"><div><h3>Manager pay</h3><div class="sub">The weekly sheet fills these in for a new week. Every figure can still be changed on the sheet.</div></div></div><div class="card-body form-grid">
+        <div class="card"><div class="card-head"><div><h2>Manager pay</h2><div class="sub">The weekly sheet fills these in for a new week. Every figure can still be changed on the sheet.</div></div></div><div class="card-body form-grid">
           <div class="field"><label>Higher commission from weekly business of (Rs)</label><input class="input" name="manager_commission_threshold" inputmode="decimal" value="${s.manager_commission_threshold / 100}"></div>
           <div class="field"><label>Commission at or above that (%)</label><input class="input" name="manager_commission_high" inputmode="decimal" value="${+(s.manager_commission_high * 100).toFixed(4)}"></div>
           <div class="field"><label>Commission below that (%)</label><input class="input" name="manager_commission_low" inputmode="decimal" value="${+(s.manager_commission_low * 100).toFixed(4)}"></div>
@@ -52,17 +52,17 @@ export default {
             <input class="input" inputmode="decimal" data-l="${k}" data-f="basic_pay" value="${pd[k]?.basic_pay || ""}"><span class="hint">Pre-filled when you add a ${l.toLowerCase()}</span></div>`)}
         </div></div>
 
-        <div class="card"><div class="card-head"><div><h3>Sign-in</h3></div></div><div class="card-body form-grid">
+        <div class="card"><div class="card-head"><div><h2>Sign-in</h2></div></div><div class="card-body form-grid">
           <div class="field"><label>Session length (hours)</label><input class="input" name="session_hours" inputmode="numeric" value="${s.session_hours}"></div>
         </div></div>
 
-        <div class="card"><div class="card-head"><div><h3>Bank file</h3></div></div><div class="card-body">
+        <div class="card"><div class="card-head"><div><h2>Bank file</h2></div></div><div class="card-body">
           <div class="alert warn">${icon("alert")}<div><b>Format: ${s.bank_format} (placeholder).</b> Get the exact bulk-upload / SLIPS column specification from your bank and add it to <code>reports.js</code> before uploading a live file.</div></div>
         </div></div>
 
         <div class="row" style="justify-content:flex-end"><button class="btn primary" id="save">${icon("check")} Save settings</button></div>
       </form>
-      <div class="card mt-4"><div class="card-head"><div><h3>Backup</h3><div class="sub">Download every record (staff, sheets, payroll, audit trail) as one file. Passwords are not included.</div></div>
+      <div class="card mt-4"><div class="card-head"><div><h2>Backup</h2><div class="sub">Download every record (staff, sheets, payroll, audit trail) as one file. Passwords are not included.</div></div>
         <button class="btn" id="backup">${icon("download")} Download backup</button></div><div class="card-body muted">Neon also keeps its own point-in-time history of the database. Download a copy here after each month is finalized and keep it somewhere safe.</div></div>`;
     $("#backup").onclick = (e) => busy(e.currentTarget, async () => {
       const res = await fetch("/api/backup", { credentials: "same-origin" });

@@ -4,6 +4,7 @@ import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromC
 import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
 
 const INTS = ["opening_stock", "issued", "sold", "counted_stock"];
+const STOCK_LABEL = { opening_stock: "Opening", issued: "Issued", sold: "Sold", counted_stock: "Counted" };
 const prevPeriod = (p) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
 
 export default {
@@ -48,10 +49,10 @@ export default {
           <th class="r">Unit price</th><th class="r">Short qty</th><th class="r">Short value</th><th></th></tr></thead>
         <tbody>${rows.map((r, i) => r._state === "deleted" ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint text-sm">${r.employee_id}</div>`
-            : html`<select class="input sm" data-f="employee_id" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
-          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
-          ${INTS.map((k) => html`<td><input data-f="${k}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
-          <td><input data-f="unit_price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
+            : html`<select class="input sm" data-f="employee_id" aria-label="Employee" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
+          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
+          ${INTS.map((k) => html`<td><input data-f="${k}" aria-label="${STOCK_LABEL[k]}, ${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
+          <td><input data-f="unit_price" aria-label="Unit price, ${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-q></td><td class="calc" data-v></td>
           <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove line">${icon("trash")}</button>` : ""}</td>
         </tr>`)}</tbody>

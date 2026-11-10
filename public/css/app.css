@@ -64,6 +64,7 @@ body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); -w
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 h1, h2, h3, h4 { margin: 0; line-height: 1.25; }
+:where(#view) h2 { font-size: 1.17em; }
 h1, h2, .card-head h3, .kpi .value, .brand-name { font-family: var(--font-display); font-weight: 600; }
 code, .mono { font-family: var(--mono); font-size: .92em; }
 .num { font-variant-numeric: tabular-nums; }
@@ -133,7 +134,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 /* ---------- Cards / grid ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: 14px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.card-head h3 { font-size: 15px; font-weight: 650; }
+.card-head h2, .card-head h3 { font-size: 15px; font-weight: 650; }
 .card-head .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .card-body { padding: 20px; }
 .card-body.flush { padding: 0; }
@@ -330,7 +331,7 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 
 /* ---------- Profile ---------- */
 .profile-head { display: flex; gap: 18px; align-items: center; padding: 20px; flex-wrap: wrap; }
-.profile-head h2 { font-size: 20px; }
+.profile-head h1, .profile-head h2 { font-size: 20px; }
 .kv { display: grid; grid-template-columns: 140px 1fr; gap: 8px 16px; font-size: 13.5px; }
 .kv dt { color: var(--text-3); }
 .kv dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
@@ -528,8 +529,17 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
   .btn.sm, .btn.sm.icon { min-height: 40px; }
   .btn.sm.icon { min-width: 40px; }
   .input.sm { height: 40px; }
-  .seg button { min-height: 36px; padding: 6px 14px; }
-  .th-sort { min-height: 32px; }
+  .seg button { min-height: 44px; padding: 6px 14px; }
+  .th-sort, .user-chip { min-height: 44px; }
+  .period-picker select { font-size: 16px; }
+  .btn, .btn.sm, .btn.sm.icon, .period-picker, .period-picker button, .period-picker select { min-height: 44px; }
+  .btn.icon, .btn.sm.icon, .period-picker button { min-width: 44px; }
+  .input, .input.sm { height: auto; min-height: 44px; font-size: 16px; }
+  .sheet input { height: 44px; font-size: 16px; }
+  .nav a { min-height: 44px; }
+  .tabs button { min-height: 44px; }
+  .table tbody td:first-child, .table thead th:first-child, .table tfoot td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 1px 0 0 var(--border); }
+  .table thead th:first-child { background: var(--surface-2); z-index: 2; }
 }
 
 /* ---------- Polish: brand sidebar, richer cards, matching sign-in ---------- */
@@ -588,7 +598,7 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 /* Cards that open something respond to hover and keyboard focus. */
 .card[data-href], .card.clickable { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
 .card[data-href]:hover, .card.clickable:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg); }
-.card-head h3 { display: flex; align-items: center; gap: var(--sp-2); }
+.card-head h2, .card-head h3 { display: flex; align-items: center; gap: var(--sp-2); }
 .card-head .sub { margin-top: 2px; }
 /* A person's name is the row's anchor: keep it on one line where it can. */
 .card-body.flush .table td:first-child b { white-space: nowrap; }

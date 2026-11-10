@@ -23,7 +23,7 @@ export default {
       const st = stats[h.code] || {};
       return html`<div class="card">
         <div class="card-head"><div class="row" style="gap:12px"><div class="kpi" style="padding:0"><span class="icon blue" style="width:40px;height:40px">${icon("store")}</span></div>
-          <div><h3>${h.name}</h3><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
+          <div><h2>${h.name}</h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
         <div class="card-body">
           <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
             <div><div class="faint" style="font-size:11.5px">Business</div><b class="num">${compact(st.hub_business || 0)}</b></div>

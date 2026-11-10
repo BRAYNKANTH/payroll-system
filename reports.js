@@ -1,6 +1,6 @@
 // Payslips, payroll register and bank disbursement file.
 const { getSettings } = require("./db");
-const { getPeriod, httpError, isFinalized } = require("./service");
+const { getPeriod, httpError, isFinalized, LEVEL_NAME } = require("./service");
 const { fmt } = require("./engine");
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -50,7 +50,7 @@ async function payslipHtml(db, period, employeeId, hub) {
       <h1>${esc(company)} — Payslip ${esc(period)}${draft ? ' <span class="flag">(DRAFT — period not finalized)</span>' : ""}</h1>
       <div class="grid">
         <div><b>${esc(r.name)}</b> (${esc(r.employee_id)})</div><div>Hub: ${esc(r.hub)}</div>
-        <div>Role: ${r.role === "guy" ? "Guy / Supervisor" : "Manager"}</div>
+        <div>Position: ${LEVEL_NAME[r.staff_level] || (r.role === "guy" ? "Distributor" : "Manager")}</div>
         <div>Bank: ${esc(r.bank_name || "—")} ${r.bank_account_no ? "…" + esc(r.bank_account_no.slice(-4)) : ""}</div>
         <div>Business this period: Rs ${fmt(d.total_business)}</div>
         ${r.role === "guy" ? `<div>Target: Rs ${fmt(d.target)} · Over target: Rs ${fmt(d.over_target_amount)}</div>` : `<div>Weeks logged: ${d.weeks_logged}</div>`}

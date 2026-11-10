@@ -1,7 +1,7 @@
 // Detailed breakdown drawer for one payroll summary row, with approve / reject actions.
 import { post } from "../api.js";
 import { can, refreshPending } from "../app.js";
-import { $, html, icon, money, badge, drawer, toast, busy, confirmDialog, dateTime, roleLabel, initials, pct, modal } from "../ui.js";
+import { $, html, icon, money, badge, drawer, toast, busy, confirmDialog, dateTime, roleLabel, levelLabel, initials, pct, modal } from "../ui.js";
 
 const lines = (items) => items.filter((i) => i.amount !== 0 || /Basic|Profit/.test(i.label))
   .map((i) => html`<tr><td>${i.label}</td><td class="${i.amount < 0 ? "neg" : ""}">${money(i.amount)}</td></tr>`);
@@ -25,7 +25,7 @@ export function breakdownDrawer(r, { finalized, onChange }) {
   const body = html`
     <div class="row" style="gap:14px;margin-bottom:18px">
       <div class="avatar lg">${initials(r.name)}</div>
-      <div style="flex:1"><h3 style="font-size:18px">${r.name}</h3><div class="muted">${r.employee_id} · ${roleLabel(r.role)} · ${r.hub}</div></div>
+      <div style="flex:1"><h3 style="font-size:18px">${r.name}</h3><div class="muted">${r.employee_id} · ${r.staff_level ? levelLabel(r.staff_level) : roleLabel(r.role)} · ${r.hub}</div></div>
       ${badge(r.status)}
     </div>
     ${r.flags.length ? html`<div class="mb-4">${flagList(r.flags)}</div>` : html`<div class="alert ok mb-4">${icon("checkCircle")}<div>No exceptions — processed automatically.</div></div>`}

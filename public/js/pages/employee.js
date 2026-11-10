@@ -36,7 +36,7 @@ export default {
         <div class="profile-head">
           <div class="avatar lg" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div>
           <div style="flex:1;min-width:200px">
-            <h2>${s.name}</h2>
+            <h1>${s.name}</h1>
             <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
           </div>
           <div class="row" style="gap:28px">
@@ -54,7 +54,7 @@ export default {
 
     const panes = {
       overview: () => html`<div class="grid halves">
-        <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="kv">
+        <div class="card"><div class="card-head"><h2>Details</h2></div><div class="card-body"><dl class="kv">
           <dt>Employee ID</dt><dd class="mono">${s.employee_id}</dd><dt>Hub</dt><dd>${s.hub_name} (${s.hub})</dd>
           <dt>Position</dt><dd>${levelLabel(s.staff_level)}</dd>${s.role === "guy" || s.upline_id ? html`<dt>Reports to</dt><dd>${s.upline_id ? html`<a href="/employees/${encodeURIComponent(s.upline_id)}" data-link>${s.upline_name}</a>` : "—"}</dd>
           ${s.manager_id && s.manager_id !== s.upline_id ? html`<dt>Payroll manager</dt><dd><a href="/employees/${encodeURIComponent(s.manager_id)}" data-link>${s.manager_name}</a></dd>` : ""}` : ""}
@@ -62,7 +62,7 @@ export default {
           <dt>Phone</dt><dd>${s.phone || "—"}</dd><dt>NIC</dt><dd>${s.nic || "—"}</dd><dt>Joined</dt><dd>${s.join_date || "—"}</dd>
           <dt>Added by</dt><dd>${s.created_by} · ${dateTime(s.created_at)}</dd></dl></div></div>
         <div class="stack">
-          ${s.role === "guy" ? html`<div class="card"><div class="card-head"><h3>Pay setup</h3></div><div class="card-body"><dl class="kv">
+          ${s.role === "guy" ? html`<div class="card"><div class="card-head"><h2>Pay setup</h2></div><div class="card-body"><dl class="kv">
             ${s.pay_scheme === "tiered" ? html`<dt>Scheme</dt><dd>Tiered</dd>
             <dt>Under target</dt><dd>${pct(s.base_commission_rate, 2)} of all business, no basic</dd>
             <dt>Over target</dt><dd>Rs ${money(s.basic_pay)} fixed basic + ${pct(s.commission_rate, 2)} of business over target</dd>
@@ -71,22 +71,22 @@ export default {
             : html`<dt>Basic pay</dt><dd>Rs ${money(s.basic_pay)} / month</dd><dt>Target</dt><dd>Rs ${money(s.target)} / month</dd>
             <dt>Commission</dt><dd>${pct(s.commission_rate, 2)} of business over target</dd>`}
             <dt>Security rule</dt><dd class="mono">${s.security_deduction_rule}</dd></dl></div></div>`
-            : html`<div class="card"><div class="card-head"><h3>How manager pay works</h3></div><div class="card-body muted">Each week: business × profit % − rent − hub fee − security − personal draw. Each month the company return and the guys' net salaries are charged, and the result is carried as a running balance.
+            : html`<div class="card"><div class="card-head"><h2>How manager pay works</h2></div><div class="card-body muted">Each week: business × profit % − rent − hub fee − security − personal draw. Each month the company return and the guys' net salaries are charged, and the result is carried as a running balance.
               <dl class="kv mt-4"><dt>Basic salary</dt><dd>${s.basic_pay ? html`Rs ${money(s.basic_pay)} / month, paid to the bank separately` : "None"}</dd></dl></div></div>`}
-          <div class="card"><div class="card-head"><h3>Bank</h3>${badge(bankState[0], bankState[1])}</div><div class="card-body"><dl class="kv">
+          <div class="card"><div class="card-head"><h2>Bank</h2>${badge(bankState[0], bankState[1])}</div><div class="card-body"><dl class="kv">
             <dt>Bank</dt><dd>${s.bank_name || "—"}</dd><dt>Bank / branch</dt><dd class="mono">${s.bank_code || "—"} / ${s.branch_code || "—"}</dd>
             <dt>Account</dt><dd class="mono">${s.bank_account_no || "—"}</dd>
             ${s.bank_account_no !== s.bank_account_verified ? html`<dt>Verified account</dt><dd class="mono">${s.bank_account_verified || "none"}</dd>` : ""}</dl></div></div>
         </div></div>`,
       history: () => p.history.length ? html`
-        <div class="card mb-4"><div class="card-head"><h3>Net pay over time</h3></div><div class="card-body" id="chart"></div></div>
+        <div class="card mb-4"><div class="card-head"><h2>Net pay over time</h2></div><div class="card-body" id="chart"></div></div>
         <div class="card"><div class="card-body flush" id="hist"></div></div>` : html`<div class="card">${emptyState("No pay history yet", "", "file")}</div>`,
       team: () => html`<div class="card"><div class="card-body flush">${dataTable({
         rows: p.team, empty: "No guys report to this manager", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),
         cols: [{ key: "name", label: "Name", render: (g) => html`<b>${g.name}</b> <span class="faint">${g.employee_id}</span>` }, { key: "basic_pay", label: "Basic", align: "r", render: (g) => money(g.basic_pay) },
           { key: "target", label: "Target", align: "r", render: (g) => money(g.target) }, { key: "status", label: "Status", render: (g) => badge(g.status) }],
       })}</div></div>`,
-      documents: () => html`<div class="card"><div class="card-head"><div><h3>Documents</h3><div class="sub">JPG, PNG, WebP or PDF, up to 3 MB each</div></div></div>
+      documents: () => html`<div class="card"><div class="card-head"><div><h2>Documents</h2><div class="sub">JPG, PNG, WebP or PDF, up to 3 MB each</div></div></div>
         <div class="card-body" id="docs"><div class="loading-screen"><div class="spinner"></div></div></div></div>`,
       changes: () => html`<div class="card"><div class="card-body flush">${dataTable({
         rows: p.changes, sortable: false, empty: "No changes since the record was created",
@@ -132,7 +132,7 @@ export default {
           ...(s.role === "guy" ? [{ name: "Gross", color: PALETTE[1], values: h.map((r) => r.gross_earnings) }] : [{ name: "Closing balance", color: PALETTE[2], values: h.map((r) => r.closing_balance) }]),
         ] });
         $("#hist").innerHTML = dataTable({
-          rows: p.history, onRow: (r) => breakdownDrawer({ ...r, name: s.name, hub: s.hub }, { finalized: r.period_status === "finalized", onChange: () => this.render(ctx) }),
+          rows: p.history, onRow: (r) => breakdownDrawer({ ...r, name: s.name, hub: s.hub, staff_level: s.staff_level }, { finalized: r.period_status === "finalized", onChange: () => this.render(ctx) }),
           cols: [
             { key: "period", label: "Month", render: (r) => html`<b>${monthName(r.period)}</b>` },
             { key: "opening_balance", label: "Opening", align: "r", render: (r) => money(r.opening_balance) },

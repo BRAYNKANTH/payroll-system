@@ -75,7 +75,12 @@ export function positionDefaults(settings) {
   return { ...POSITION_FALLBACK, ...saved };
 }
 export const levelRank = (l) => LEVELS.findIndex(([k]) => k === l);
-export const levelLabel = (l) => LEVELS.find(([k]) => k === l)?.[1] || titleCase(l);
+// levelLabel("supervisor") → "Supervisor"; with a count other than 1 → "Supervisors".
+const LEVEL_PLURAL = { distributor: "Distributors / Guys" };
+export const levelLabel = (l, count = 1) => {
+  const one = LEVELS.find(([k]) => k === l)?.[1] || titleCase(l);
+  return count === 1 ? one : LEVEL_PLURAL[l] || one + "s";
+};
 
 // ---- icons (Lucide-style, stroke based)
 const P = {

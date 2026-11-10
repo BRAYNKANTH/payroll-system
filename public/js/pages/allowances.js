@@ -31,7 +31,7 @@ export default {
         { key: "description", label: "Description" },
         { key: "amount", label: "Amount (Rs)", align: "r", render: (r) => money(r.amount), total: (rs) => money(rs.reduce((t, r) => t + r.amount, 0)) },
         { key: "created_by", label: "Entered by", render: (r) => html`${r.updated_by || r.created_by}` },
-        { key: "id", label: "", sort: false, align: "r", render: (r) => editable ? html`<button class="btn sm ghost" data-edit="${r.id}">${icon("edit")}</button><button class="btn sm icon danger-ghost" data-del="${r.id}" aria-label="Delete">${icon("trash")}</button>` : "" },
+        { key: "id", label: "", sort: false, align: "r", render: (r) => editable ? html`<button class="btn sm ghost" data-edit="${r.id}" aria-label="Edit allowance">${icon("edit")}</button><button class="btn sm icon danger-ghost" data-del="${r.id}" aria-label="Delete">${icon("trash")}</button>` : "" },
       ],
     }).toString() : emptyState("No allowances this month", editable ? "Use “Add allowance” to record one." : "", "gift").toString();
 

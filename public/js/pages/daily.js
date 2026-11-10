@@ -37,7 +37,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Daily sheet</h1><p>Business and settlements for guys / supervisors. Settle-up minus is calculated automatically.</p></div>
+        <div><h1>Daily sheet</h1><p>Business and settlements for distributors, supervisors and group managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions">
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button></div>
           ${editable ? html`<button class="btn" id="import">${icon("upload")} Import CSV</button>` : ""}
@@ -60,7 +60,7 @@ export default {
     $("#import")?.addEventListener("click", () => importCsv(guys, () => this.render(ctx)));
 
     if (!guys.length) {
-      $("#grid").innerHTML = emptyState("No active guys", "Add guys / supervisors on the Employees page first.", "users",
+      $("#grid").innerHTML = emptyState("No active sales staff", "Add distributors and supervisors on the Employees page first.", "users",
         can("manage_staff") ? `<a class="btn primary" href="/employees" data-link>Go to employees</a>` : "").toString();
       return;
     }
@@ -221,7 +221,7 @@ async function dayMode(ctx, guys, days, editable) {
       <button class="btn icon sm" id="prev-day" ${idx <= 0 ? "disabled" : ""} aria-label="Previous day">${icon("left")}</button>
       <input type="date" class="input sm" id="day" aria-label="Date" value="${currentDate}" min="${days[0]}" max="${days[days.length - 1]}" style="width:160px">
       <button class="btn icon sm" id="next-day" ${idx >= days.length - 1 ? "disabled" : ""} aria-label="Next day">${icon("right")}</button>
-      <h3 style="margin-left:6px">${dateLabel(currentDate)}</h3>
+      <h2 style="margin-left:6px">${dateLabel(currentDate)}</h2>
     </div>
     <span class="badge ${entries.length === guys.length ? "green" : entries.length ? "amber" : ""}">${entries.length} of ${guys.length} entered</span>`;
   const go = async (d) => { if (d && (await guardUnsaved())) { currentDate = d; ctx.el && (await dayMode(ctx, guys, days, editable)); } };

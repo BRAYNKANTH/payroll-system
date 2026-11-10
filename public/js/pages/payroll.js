@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal } from "../ui.js";
+import { $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal, levelLabel } from "../ui.js";
 import { breakdownDrawer } from "./breakdown.js";
 
 let filter = "all";
@@ -57,8 +57,8 @@ export default {
       <div class="card">
         <div class="card-head">
           <div class="row">
-            <div class="seg" id="filters">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Guys"], ["manager", "Managers"]].map(([f, l]) => html`<button data-f="${f}" class="${filter === f ? "on" : ""}">${l}</button>`)}</div>
-            <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" placeholder="Search name or ID" value="${search}" style="width:220px"></div>
+            <div class="seg" id="filters">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button data-f="${f}" class="${filter === f ? "on" : ""}">${l}</button>`)}</div>
+            <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name or ID" value="${search}" style="width:220px"></div>
           </div>
           <div class="row">
             <a class="btn sm" href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Register</a>
@@ -82,7 +82,7 @@ export default {
         onRow: (r) => breakdownDrawer(r, { finalized, onChange: () => this.render(ctx) }),
         cols: [
           { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>`, total: (rs) => `${rs.length} employees` },
-          { key: "role", label: "Role", render: (r) => badge(r.role, r.role === "guy" ? "Guy" : "Manager") },
+          { key: "role", label: "Position", render: (r) => badge(r.role, levelLabel(r.staff_level)) },
           { key: "opening_balance", label: "Opening", align: "r", render: (r) => html`<span class="${r.opening_balance < 0 ? "neg" : ""}">${money(r.opening_balance)}</span>`, total: (rs) => money(sum("opening_balance", rs)) },
           { key: "gross_earnings", label: "Gross", align: "r", render: (r) => money(r.gross_earnings), total: (rs) => money(sum("gross_earnings", rs)) },
           { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions), total: (rs) => money(sum("total_deductions", rs)) },
