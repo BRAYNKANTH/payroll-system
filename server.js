@@ -14,10 +14,10 @@ const portal = require("./portal");
 
 const PUBLIC = path.join(__dirname, "public");
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml", ".webmanifest": "application/manifest+json", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json" };
+  ".svg": "image/svg+xml", ".webmanifest": "application/manifest+json", ".png": "image/png", ".woff2": "font/woff2", ".ico": "image/x-icon", ".json": "application/json" };
 const BASE_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin", "X-Frame-Options": "SAMEORIGIN" };
-const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-  "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'";
+const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+  "font-src 'self'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'";
 const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:; base-uri 'none'";
 const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "periods", "pay_period_summary", "audit_log"];
 
