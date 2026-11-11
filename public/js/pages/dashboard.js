@@ -13,6 +13,22 @@ function greeting() {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
+// The home page opens with where this month stands and the one thing to do next, written on a ledger page.
+function monthCard(d, k) {
+  const done = d.status === "finalized";
+  let say, go;
+  if (done) { say = "This month is finalized. The bank file and payslips are ready."; go = ["/payslips", "Open payslips", "sheet"]; }
+  else if (k.pending) { say = `${k.pending} ${k.pending === 1 ? "entry needs" : "entries need"} review before this month can be finalized.`; go = can("review") ? ["/approvals", "Open approvals", "checkCircle"] : null; }
+  else if (!k.calculated) { say = "Payroll has not been calculated yet. Finish the daily sheets, then calculate."; go = can("run_payroll") ? ["/payroll", "Open payroll run", "play"] : can("enter_data") ? ["/daily", "Open the daily sheet", "sheet"] : null; }
+  else { say = "Everything passed the checks. The month is ready to finalize."; go = can("run_payroll") ? ["/payroll", "Open payroll run", "play"] : null; }
+  return html`<section class="card month-card" aria-label="Where this month stands">
+    <div class="mc-left"><h2>${monthName(d.period)}</h2><p>${say}</p>
+      ${go ? html`<a class="btn primary" href="${go[0]}" data-link>${icon(go[2])} ${go[1]}</a>` : ""}</div>
+    <dl class="mc-right"><div><dt>Paid to bank</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.to_bank)}` : "Not calculated"}</dd></div>
+      <div><dt>Net pay</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.net_pay)}` : "—"}</dd></div></dl>
+  </section>`;
+}
+
 export default {
   title: "Dashboard",
   periodic: true,
@@ -31,8 +47,7 @@ export default {
         </div>
       </div>
 
-      ${k.pending ? html`<div class="alert warn mb-4">${icon("alert")}<div><b>${k.pending} payroll ${k.pending === 1 ? "entry needs" : "entries need"} review</b> before ${monthName(d.period)} can be finalized.
-        <a href="/approvals" data-link>Open approvals →</a></div></div>` : ""}
+      ${monthCard(d, k)}
 
       <div class="grid kpis">
         ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}

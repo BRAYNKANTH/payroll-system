@@ -10,15 +10,17 @@ export default {
       <section class="auth-art" aria-label="About">
         <div class="brand" style="padding:0"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">Payroll</div><div class="brand-sub">Hub payroll and manager accounts</div></div></div>
         <div>
-          <h2 class="art-title">Daily sheets in, payslips and a bank file out.</h2>
-          <p>Staff enter each day's business and settlements. The system works out commission, deductions and balances carried from last month.</p>
-          <ol>
-            <li>Enter the daily sheets for each hub</li>
-            <li>Calculate the month's payroll</li>
-            <li>Review the rows that were flagged</li>
-            <li>Finalize, which locks the month</li>
-            <li>Download the bank file and payslips</li>
-          </ol>
+          <h2 class="art-title">Every day's sheet ends up on a payslip.</h2>
+          <p>Enter business and handed-in cash for each person. The system works out commission, shortfalls and the balance carried to next month.</p>
+          <figure class="ledger" aria-label="Example of one day on the daily sheet">
+            <figcaption>One day, one person (example)</figcaption>
+            <dl>
+              <div><dt>Business</dt><dd>48,000.00</dd></div>
+              <div><dt>Handed in</dt><dd>46,500.00</dd></div>
+              <div class="short"><dt>Short, taken off pay</dt><dd>1,500.00</dd></div>
+            </dl>
+          </figure>
+          <p class="flow">Daily sheets, then the month's payroll, then review, finalize and the bank file.</p>
         </div>
         <div class="note">Amounts are in Sri Lankan rupees (LKR). Every change is recorded in the audit trail.</div>
       </section>

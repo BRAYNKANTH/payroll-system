@@ -944,3 +944,39 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .m-card .mc-kv .k { color: var(--text-3); }
 .m-card .mc-kv .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .m-list .m-card:has(.mc-kv) { align-items: flex-start; }
+
+/* ---------- Sign-in: a ledger page is the one thing worth remembering ---------- */
+.auth-art .ledger { margin: 28px 0 0; max-width: 26em; position: relative; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px;
+  box-shadow: 0 18px 30px -22px var(--hero-shadow); padding: 12px 18px 10px 56px; transform: rotate(-1.2deg);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 35px, var(--border) 35px 36px); background-position: 0 44px; background-repeat: repeat-y; }
+.auth-art .ledger::before { content: ""; position: absolute; top: 0; bottom: 0; left: 40px; width: 2px; background: var(--gold); opacity: .85; }
+.auth-art .ledger figcaption { font: 600 13px var(--font); color: var(--text-2); height: 32px; display: flex; align-items: center; margin-bottom: 4px; }
+.auth-art .ledger dl { margin: 0; }
+.auth-art .ledger dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; height: 36px; line-height: 35px; }
+.auth-art .ledger dt { color: var(--text-2); font-size: 14.5px; }
+.auth-art .ledger dd { margin: 0; font: 600 20px var(--font-display); font-variant-numeric: tabular-nums; color: var(--text); }
+.auth-art .ledger .short dt { color: var(--accent); font-weight: 600; }
+.auth-art .ledger .short dd { color: var(--accent); position: relative; }
+.auth-art .ledger .short dd::after { content: ""; position: absolute; left: 0; right: 0; bottom: 3px; height: 2px; background: var(--gold); transform-origin: left; animation: inkline .7s .4s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes inkline { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.auth-art p.flow { margin-top: 22px; font-size: 14px; color: var(--text-3); max-width: 26em; }
+@media (prefers-reduced-motion: reduce) { .auth-art .ledger .short dd::after { animation: none; } }
+
+/* ---------- Home: where the month stands, on ruled ledger paper ---------- */
+.month-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 40px; align-items: center; padding: 22px 28px 22px 64px; margin-bottom: 16px; position: relative;
+}
+.month-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 44px; width: 2px; background: var(--gold); opacity: .85; }
+.month-card h2 { font: 600 28px/1.2 var(--font-display); margin: 0 0 6px; }
+.month-card p { margin: 0 0 14px; max-width: 34em; color: var(--text-2); font-size: 15px; }
+.month-card .mc-right { margin: 0; display: grid; gap: 10px; text-align: right; }
+.month-card dt { font-size: 13px; color: var(--text-3); }
+.month-card dd { margin: 0; font: 600 30px/1.15 var(--font-display); font-variant-numeric: tabular-nums; word-break: break-word; }
+.month-card dd small { font: 600 15px var(--font); margin-right: 5px; color: var(--accent); }
+@media (max-width: 860px) {
+  .month-card { grid-template-columns: 1fr; padding: 18px 16px 18px 46px; gap: 14px; }
+  .month-card::before { left: 30px; }
+  .month-card h2 { font-size: 24px; }
+  .month-card .mc-right { text-align: left; }
+  .month-card dd { font-size: 24px; word-break: normal; white-space: nowrap; }
+  .month-card .btn { width: 100%; min-height: 48px; justify-content: center; }
+}
