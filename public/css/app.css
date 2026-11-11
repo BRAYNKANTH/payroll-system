@@ -980,3 +980,7 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
   .month-card dd { font-size: 24px; word-break: normal; white-space: nowrap; }
   .month-card .btn { width: 100%; min-height: 48px; justify-content: center; }
 }
+
+/* A price that is still missing is marked in the sheet */
+.sheet input[aria-invalid="true"] { border-color: var(--danger); background: var(--danger-soft); }
+.sheet input[data-f="unit_price"]::placeholder { color: var(--text-3); }

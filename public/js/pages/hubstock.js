@@ -49,7 +49,7 @@ export default {
             : html`<select class="input sm" data-f="hub" aria-label="Branch" style="min-width:140px">${hubOptions(r._draft?.hub ?? r.hub)}</select>`}</td>
           <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
           ${INTS.map((k) => html`<td><input data-f="${k}" aria-label="${k.replace("_", " ")}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
-          <td><input data-f="unit_price" aria-label="Unit price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
+          <td><input data-f="unit_price" aria-label="Unit price in rupees, required" aria-required="true" placeholder="Price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-e></td><td class="calc" data-q></td><td class="calc" data-v></td>
           <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove product">${icon("trash")}</button>` : ""}</td>
         </tr>`)}</tbody>
@@ -116,6 +116,15 @@ export default {
     }));
     $("#save")?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
       const out = [];
+      // Every product needs a price. Name all the lines that lack one, mark them, and put the cursor on the first.
+      $$("[data-f=unit_price]", grid).forEach((i) => i.removeAttribute("aria-invalid"));
+      const noPrice = $$("tbody tr", grid).filter((tr) => rows[tr.dataset.i]._dirty && read(tr).unit_price === "");
+      if (noPrice.length) {
+        noPrice.forEach((tr) => tr.querySelector("[data-f=unit_price]").setAttribute("aria-invalid", "true"));
+        noPrice[0].querySelector("[data-f=unit_price]").focus();
+        const list = noPrice.map((tr) => read(tr).product || rows[tr.dataset.i].product || "a new product");
+        throw new Error(`Add a price for ${list.length === 1 ? list[0] : `${list.length} products: ${list.slice(0, 5).join(", ")}${list.length > 5 ? "…" : ""}`}. Every product needs a unit price.`);
+      }
       for (const tr of $$("tbody tr", grid)) {
         const r = rows[tr.dataset.i];
         if (!r._dirty) continue;

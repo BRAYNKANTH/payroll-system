@@ -79,7 +79,7 @@ export default {
             : html`<select class="input sm" data-f="employee_id" aria-label="Employee" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
           <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
           ${INTS.map((k) => html`<td><input data-f="${k}" aria-label="${STOCK_LABEL[k]}, ${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
-          <td><input data-f="unit_price" aria-label="Unit price, ${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
+          <td><input data-f="unit_price" aria-required="true" placeholder="Price" aria-label="Unit price (required),${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-q></td><td class="calc" data-v></td>
           <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove line">${icon("trash")}</button>` : ""}</td>
         </tr>`)}</tbody>
@@ -173,6 +173,13 @@ export default {
     $("#save")?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
       const out = [];
       snap(); // what is on screen joins what was typed for the other people
+      const noPrice = rows.filter((r) => r._dirty && r._state !== "deleted" && r._state !== "gone" && (r._draft || {}).unit_price === "");
+      if (noPrice.length) {
+        const list = noPrice.map((r) => `${r._draft.product || r.product || "a new product"} (${names[empOf(r)] || empOf(r)})`);
+        if (phone && empOf(noPrice[0]) !== who) goWho(empOf(noPrice[0]));
+        $$("[data-f=unit_price]", grid).find((i) => i.value.trim() === "")?.setAttribute("aria-invalid", "true");
+        throw new Error(`Add a price for ${list.length === 1 ? list[0] : `${list.length} lines: ${list.slice(0, 4).join(", ")}${list.length > 4 ? "…" : ""}`}. Every product needs a unit price.`);
+      }
       for (const r of rows) {
         if (!r._dirty || r._state === "deleted" || r._state === "gone") continue;
         const v = r._draft || {};
