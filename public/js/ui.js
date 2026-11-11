@@ -296,9 +296,38 @@ export function confirmDialog({ title, message, confirmText = "Confirm", danger 
 // cols: [{ key, label, align: 'r'|'c', render(row) -> html/raw, sort(row) -> value | false, total(rows) -> html }]
 // onRow: makes rows clickable for mouse users AND adds a real button per row (rowLabel names it) so the
 // same action works from the keyboard and for screen readers.
-export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100 }) {
+export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100, card, summary }) {
   const id = "t" + Math.random().toString(36).slice(2, 8);
   if (!rows.length) return raw(`<div class="empty"><div class="ico">${icon("sheet")}</div><h4>${esc(empty)}</h4></div>`);
+  // On a phone a list of cards is easier to read and tap than a wide table. Each card is one button, so the whole row works as one control.
+  // A table with more than four columns and no card of its own becomes cards too: the first column is the title, the rest are label and value pairs.
+  const labelled = cols.filter((c) => c.label);
+  if (!card && labelled.length > 4 && matchMedia("(max-width: 860px)").matches) {
+    card = (r) => `<span class="mc-main"><b>${cols[0].render ? cols[0].render(r) : esc(r[cols[0].key])}</b>${labelled.slice(1).map((c) =>
+      `<span class="mc-kv"><span class="k">${esc(c.label)}</span><span class="v">${c.render ? c.render(r) : esc(r[c.key])}</span></span>`).join("")}</span>`;
+  }
+  if (card && matchMedia("(max-width: 860px)").matches) {
+    let shownCards = Math.min(rows.length, pageSize);
+    const cardHtml = (r, ri) => `<li>${onRow ? `<button type="button" class="m-card" data-i="${ri}">${card(r)}<span class="chev" aria-hidden="true"></span></button>` : `<div class="m-card">${card(r)}</div>`}</li>`;
+    const bar = () => (rows.length > shownCards ? `<div class="more-rows"><span class="muted" role="status">Showing ${shownCards} of ${rows.length}</span><button type="button" class="btn" data-more>Show ${Math.min(pageSize, rows.length - shownCards)} more</button></div>` : "");
+    queueMicrotask(() => {
+      const box = document.getElementById(id);
+      if (!box) return;
+      const ul = box.querySelector("ul");
+      const bind = () => { const b = box.nextElementSibling; if (b?.matches(".more-rows")) b.querySelector("[data-more]").onclick = more; };
+      const more = () => {
+        const next = Math.min(rows.length, shownCards + pageSize);
+        ul.insertAdjacentHTML("beforeend", rows.slice(shownCards, next).map((r, i) => cardHtml(r, shownCards + i)).join(""));
+        shownCards = next;
+        if (box.nextElementSibling?.matches(".more-rows")) box.nextElementSibling.remove();
+        if (rows.length > shownCards) box.insertAdjacentHTML("afterend", bar());
+        bind();
+      };
+      bind();
+      if (onRow) ul.addEventListener("click", (e) => { const b = e.target.closest("[data-i]"); if (b) onRow(rows[b.dataset.i]); });
+    });
+    return raw(`<div class="m-list" id="${id}" role="region" aria-label="${esc(caption || "List")}">${summary ? `<p class="m-summary" role="status">${summary(rows)}</p>` : ""}<ul role="list">${rows.slice(0, shownCards).map(cardHtml).join("")}</ul></div>${bar()}`);
+  }
   const sortableCol = (c) => sortable && c.sort !== false && c.label;
   const head = cols.map((c, i) => sortableCol(c)
     ? `<th class="${c.align || ""}" scope="col" aria-sort="none" data-col="${i}"><button type="button" class="th-sort">${esc(c.label)}<span class="sort-ind" aria-hidden="true"></span></button></th>`

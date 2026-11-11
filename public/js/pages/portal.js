@@ -109,6 +109,7 @@ export default {
       <div class="page-head">
         <div><h1>Hello, ${me.name.split(" ")[0]}</h1>
           <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""}</p></div>
+        <div class="actions"><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""], ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
         ...(hasTeam ? [["team", "My team", "Team", "users", d.team.length]] : []), ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
@@ -256,6 +257,7 @@ export default {
     if (!panes[tab] || (tab === "team" && !hasTeam)) tab = "month";
     show(!ctx.refresh);
 
+    $("#refresh").onclick = (e) => busy(e.currentTarget, async () => { await this.render({ ...ctx, refresh: true }); toast("Up to date"); });
     setupPull();
     ptr.fn = () => this.render({ ...ctx, refresh: true });
   },

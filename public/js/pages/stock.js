@@ -2,6 +2,8 @@ import { get, post, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
 import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, raw } from "../ui.js";
 import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
+import { isPhone, stackTable } from "../phone.js";
+import { announce } from "../ui.js";
 
 const INTS = ["opening_stock", "issued", "sold", "counted_stock"];
 const STOCK_LABEL = { opening_stock: "Opening", issued: "Issued", sold: "Sold", counted_stock: "Counted" };
@@ -41,13 +43,35 @@ export default {
 
     // A month can have hundreds of lines; draw the first ones, plus any being edited, and the rest on request.
     let shown = 120;
-    const visible = (r, i) => i < shown || r._state === "new" || !!r._draft;
+    // On a phone the count is taken one person at a time: pick a person, see only their lines.
+    const phone = isPhone();
+    const empOf = (r) => r._draft?.employee_id ?? r.employee_id;
+    const peopleIds = () => [...new Set(rows.filter((r) => r._state !== "deleted" && r._state !== "gone").map(empOf))].sort((a, b) => (names[a] || a).localeCompare(names[b] || b));
+    let who = peopleIds()[0] || null;
+    const visible = phone ? (r) => empOf(r) === who : (r, i) => i < shown || r._state === "new" || !!r._draft;
+    const personBar = () => {
+      const ids = peopleIds();
+      const at = Math.max(0, ids.indexOf(who));
+      const count = (id) => rows.filter((r) => r._state !== "deleted" && r._state !== "gone" && empOf(r) === id).length;
+      const edited = (id) => rows.some((r) => r._dirty && empOf(r) === id);
+      return html`<div class="person-nav"><p class="step-count" id="who-count">Person ${at + 1} of ${ids.length}</p>
+        <div class="person-row"><button type="button" class="btn icon" id="who-prev" aria-label="Previous person" ${at === 0 ? "disabled" : ""}>${icon("left")}</button>
+          <select class="input" id="who-sel" aria-label="Choose a person">${ids.map((id) => html`<option value="${id}" ${id === who ? "selected" : ""}>${names[id] || id} · ${count(id)} line${count(id) === 1 ? "" : "s"}${edited(id) ? " · edited" : ""}</option>`)}</select>
+          <button type="button" class="btn icon" id="who-next" aria-label="Next person" ${at >= ids.length - 1 ? "disabled" : ""}>${icon("right")}</button></div></div>`;
+    };
+    const goWho = (id) => {
+      snap(); who = id;
+      const keep = document.activeElement?.id;
+      draw();
+      if (keep) $("#" + keep)?.focus();
+      announce(`${names[id] || id}, ${rows.filter((r) => empOf(r) === id && r._state !== "deleted").length} lines`);
+    };
     const draw = () => {
       if (!rows.length) {
         grid.innerHTML = emptyState("No stock lines for this month", editable ? "Add a line or carry over last month's products." : "", "box").toString();
         return;
       }
-      grid.innerHTML = html`<div class="table-wrap"><table class="table sheet">
+      grid.innerHTML = html`${phone ? personBar() : ""}<div class="table-wrap"><table class="table sheet">
         <thead><tr><th>Employee</th><th>Product</th><th class="r">Opening</th><th class="r">Issued</th><th class="r">Sold</th><th class="r">Counted</th>
           <th class="r">Unit price</th><th class="r">Short qty</th><th class="r">Short value</th><th></th></tr></thead>
         <tbody>${rows.map((r, i) => r._state === "deleted" || !visible(r, i) ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
@@ -63,6 +87,13 @@ export default {
         ${rows.some((r, i) => r._state !== "deleted" && !visible(r, i)) ? html`<div class="more-rows"><span class="muted" role="status">Showing ${rows.filter(visible).length} of ${rows.length} lines</span>
           <button type="button" class="btn" id="more-lines">Show ${Math.min(150, rows.length - shown)} more</button></div>` : ""}`.toString();
       $("#more-lines")?.addEventListener("click", () => { snap(); shown += 150; draw(); });
+      if (phone) {
+        stackTable(grid.querySelector("table"), { grid: true, wideFirst: 2 });
+        $("#who-sel").onchange = (e) => goWho(e.target.value);
+        const ids = peopleIds(), at = ids.indexOf(who);
+        $("#who-prev").onclick = () => ids[at - 1] && goWho(ids[at - 1]);
+        $("#who-next").onclick = () => ids[at + 1] && goWho(ids[at + 1]);
+      }
       refresh();
     };
 
@@ -73,8 +104,17 @@ export default {
       let total = 0, dirty = 0;
       const perEmp = {};
       const drawn = new Set($$("tbody tr", grid).map((tr) => Number(tr.dataset.i)));
-      rows.forEach((r, i) => { // lines not drawn are unchanged, so their saved values still count toward the totals
+      rows.forEach((r, i) => { // lines not on screen count with their saved values, or what was typed before moving on
         if (drawn.has(i) || r._state === "deleted" || r._state === "gone") return;
+        if (r._draft) {
+          const n = (k) => Number(r._draft[k] || 0);
+          const q = n("opening_stock") + n("issued") - n("sold") - n("counted_stock");
+          const val = Math.max(0, q) * Math.round(n("unit_price") * 100);
+          total += val; perEmp[empOf(r)] = (perEmp[empOf(r)] || 0) + val;
+          r._dirty = r._state === "new" || INTS.some((k) => n(k) !== r[k]) || Math.round(n("unit_price") * 100) !== r.unit_price;
+          if (r._dirty) dirty++;
+          return;
+        }
         total += r.shortfall_value || 0;
         perEmp[r.employee_id] = (perEmp[r.employee_id] || 0) + (r.shortfall_value || 0);
       });
@@ -116,7 +156,7 @@ export default {
 
     $("#add")?.addEventListener("click", () => {
       snap();
-      rows.push({ _state: "new", employee_id: guys.find((g) => g.status === "active")?.employee_id, product: "", opening_stock: 0, issued: 0, sold: 0, counted_stock: null, unit_price: null });
+      rows.push({ _state: "new", employee_id: (phone && who) || guys.find((g) => g.status === "active")?.employee_id, product: "", opening_stock: 0, issued: 0, sold: 0, counted_stock: null, unit_price: null });
       draw();
       $$("tbody tr:last-child [data-f=product]", grid)[0]?.focus();
     });
@@ -132,10 +172,10 @@ export default {
     }));
     $("#save")?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
       const out = [];
-      for (const tr of $$("tbody tr", grid)) {
-        const r = rows[tr.dataset.i];
-        if (!r._dirty) continue;
-        const v = read(tr);
+      snap(); // what is on screen joins what was typed for the other people
+      for (const r of rows) {
+        if (!r._dirty || r._state === "deleted" || r._state === "gone") continue;
+        const v = r._draft || {};
         const product = v.product ?? r.product;
         const emp = v.employee_id ?? r.employee_id;
         if (!product) throw new Error("Every line needs a product name");

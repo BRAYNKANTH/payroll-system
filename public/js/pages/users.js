@@ -83,6 +83,8 @@ export default {
     $("#list").innerHTML = dataTable({
       rows: users,
       onRow: (u) => open(u),
+      card: (u) => html`<span class="mc-main"><b>${u.full_name}</b><span class="mc-sub">${u.username}${u.role === "staff" ? ` · ${u.employee_id}` : u.hub ? ` · ${u.hub} only` : " · all hubs"} · last sign-in ${ago(u.last_login_at)}</span></span>
+        <span class="mc-end">${roleBadge(u.role)}<br>${badge(u.status)}</span>`,
       cols: [
         { key: "full_name", label: "User", render: (u) => html`<div class="who"><div class="avatar">${initials(u.full_name)}</div><div><b>${u.full_name}</b><span>${u.username}</span></div></div>` },
         { key: "role", label: "Role", render: (u) => roleBadge(u.role) },

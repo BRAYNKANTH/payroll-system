@@ -2,6 +2,7 @@ import { get, post, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
 import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents } from "../ui.js";
 import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
+import { isPhone, stackTable } from "../phone.js";
 
 const INTS = ["opening_stock", "received", "issued", "counted_stock"];
 const prevPeriod = (p) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
@@ -53,6 +54,7 @@ export default {
           <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove product">${icon("trash")}</button>` : ""}</td>
         </tr>`)}</tbody>
         <tfoot><tr><td colspan="8">Totals</td><td class="r" id="tot-short"></td><td class="r" id="tot-val"></td><td></td></tr></tfoot></table></div>`.toString();
+      if (isPhone()) stackTable(grid.querySelector("table"));
       refresh();
     };
 

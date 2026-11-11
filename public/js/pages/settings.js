@@ -1,6 +1,7 @@
 import { get, put } from "../api.js";
 import { state } from "../app.js";
 import { $, $$, html, icon, toast, busy, LEVELS, isManagerLevel, positionDefaults } from "../ui.js";
+import { isPhone, sectionScreens, stackTable } from "../phone.js";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -64,6 +65,11 @@ export default {
       </form>
       <div class="card mt-4"><div class="card-head"><div><h2>Backup</h2><div class="sub">Download every record (staff, sheets, payroll, audit trail) as one file. Passwords are not included.</div></div>
         <button class="btn" id="backup">${icon("download")} Download backup</button></div><div class="card-body muted">Neon also keeps its own point-in-time history of the database. Download a copy here after each month is finalized and keep it somewhere safe.</div></div>`;
+    if (isPhone()) {
+      stackTable($("#pd"));
+      const sections = [...el.querySelectorAll("#sf > .card, #sf ~ .card")].map((c) => ({ el: c, title: c.querySelector("h2, h3")?.textContent.trim() || "Section", sub: c.querySelector(".sub")?.textContent.trim() || "" }));
+      sectionScreens({ container: el, sections, saveRow: $("#save").closest(".row"), noun: "Settings" });
+    }
     $("#backup").onclick = (e) => busy(e.currentTarget, async () => {
       const res = await fetch("/api/backup", { credentials: "same-origin" });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Backup failed");

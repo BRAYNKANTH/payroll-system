@@ -28,6 +28,8 @@ export default {
       $("#list").innerHTML = rows.length ? dataTable({
         rows: shown, empty: "No matching employees",
         onRow: (r) => openPayslip(p, r.employee_id),
+        card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span></span>
+          <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
         cols: [
           { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>` },
           { key: "role", label: "Position", render: (r) => levelLabel(r.staff_level) },

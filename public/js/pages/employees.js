@@ -1,5 +1,6 @@
 import { get, post, put, qs } from "../api.js";
 import { state, can, scopeHub, navigate } from "../app.js";
+import { isPhone, stepForm } from "../phone.js";
 import { $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
 let filters = { q: "", role: "", status: "active" };
@@ -20,14 +21,15 @@ export async function employeeForm(existing, onSaved) {
       <div class="form-section">Identity</div>
       <div class="field"><label>Employee ID</label><input class="input" name="employee_id" value="${e.employee_id || ""}" ${existing ? "disabled" : ""} required placeholder="e.g. G05"></div>
       <div class="field"><label>Full name</label><input class="input" name="name" value="${e.name || ""}" required></div>
+      <div class="field"><label>Phone</label><input class="input" name="phone" value="${e.phone || ""}" inputmode="tel"></div>
+      <div class="field"><label>NIC</label><input class="input" name="nic" value="${e.nic || ""}"></div>
+      <div class="field"><label>Join date</label><input class="input" type="date" name="join_date" value="${e.join_date || ""}"></div>
+      <div class="form-section">Role and place</div>
       <div class="field"><label for="ef-level">Position</label><select class="input" id="ef-level" name="staff_level">
         ${LEVELS.filter(([v]) => !(scopeHub() && isManagerLevel(v))).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Reports to</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Who sits directly above this person in the chain</span></div>
       <div class="field"><label>Hub</label><select class="input" name="hub" ${scopeHub() ? "disabled" : ""}>${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
-      <div class="field"><label>Phone</label><input class="input" name="phone" value="${e.phone || ""}" inputmode="tel"></div>
-      <div class="field"><label>NIC</label><input class="input" name="nic" value="${e.nic || ""}"></div>
-      <div class="field"><label>Join date</label><input class="input" type="date" name="join_date" value="${e.join_date || ""}"></div>
       <div class="field"><label>Status</label><select class="input" name="status"><option value="active" ${e.status === "active" ? "selected" : ""}>Active</option><option value="inactive" ${e.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
 
       <div class="form-section">Pay setup</div>
@@ -38,6 +40,7 @@ export async function employeeForm(existing, onSaved) {
       <div class="field" data-guy><label>Monthly target (Rs)</label><input class="input" name="target" inputmode="decimal" value="${fromCents(e.target)}"></div>
       <div class="field" data-guy data-tiered><label>Commission on all business when target not reached (%)</label><input class="input" name="base_commission_pct" inputmode="decimal" value="${e.base_commission_rate ? +(e.base_commission_rate * 100).toFixed(4) : ""}"></div>
       <div class="field" data-guy><label>Commission on business over target (%)</label><input class="input" name="commission_pct" inputmode="decimal" value="${e.commission_rate ? +(e.commission_rate * 100).toFixed(4) : ""}"></div>
+      <div class="form-section" data-guy>Food and security</div>
       <div class="field" data-guy data-tiered><label>Food allowance (Rs / day worked)</label><input class="input" name="food_per_day" inputmode="decimal" value="${e.food_per_day ? fromCents(e.food_per_day) : ""}"></div>
       <div class="field" data-guy data-tiered><label>Food paid only after (days worked)</label><input class="input" name="food_min_days" inputmode="numeric" value="${e.food_min_days || ""}" placeholder="0 = always"><span class="hint">Blank or 0 pays food from the first day</span></div>
       <div class="field" data-guy><label>Security deduction</label><select class="input" name="sec_kind">
@@ -101,6 +104,25 @@ export async function employeeForm(existing, onSaved) {
   f.addEventListener("change", (ev) => { if (ev.target === f.staff_level) { fillUpline(); if (!existing) applyDefaults(); } sync(); });
   sync();
 
+  // On a phone the long form is shown one step at a time, then a summary to check before saving.
+  if (isPhone()) {
+    const sel = (name) => f[name].selectedOptions?.[0]?.textContent.trim() || "";
+    stepForm({
+      form: f, foot: d.panel.querySelector(".drawer-foot"), noun: "employee form", finishLabel: existing ? "Save changes" : "Add employee",
+      titles: { Identity: "Who is this?", "Role and place": "Role and place", "Pay setup": "How are they paid?", "Food and security": "Food and security", "Starting balance": "Starting balance", "Bank details": "Bank details" },
+      onFinish: () => $("#ef-save", d.panel).click(),
+      review: () => {
+        const guy = !isManagerLevel(f.staff_level.value);
+        const last4 = f.bank_account_no.value.trim().slice(-4);
+        return [["Employee ID", f.employee_id.value], ["Name", f.name.value], ["Position", sel("staff_level")], ["Reports to", sel("upline_id") && f.upline_id.value ? sel("upline_id") : "Not set"],
+          ["Hub", sel("hub")], ["Phone", f.phone.value], ["Status", sel("status")],
+          ...(guy ? [["Target", f.target.value ? `Rs ${f.target.value}` : ""], ["Basic pay", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""]] : [["Basic salary", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""]]),
+          ["Balance brought forward", f.opening_balance.value ? `Rs ${f.opening_balance.value}` : "None"],
+          ["Bank", [f.bank_name.value, last4 ? `…${last4}` : ""].filter(Boolean).join(" ")]];
+      },
+    });
+  }
+
   $("#ef-save", d.panel).onclick = (ev) => busy(ev.currentTarget, async () => {
     const v = Object.fromEntries(new FormData(f));
     const guy = !isManagerLevel(v.staff_level);
@@ -154,7 +176,10 @@ export default {
       const rows = staff.filter((s) => (!filters.role || s.staff_level === filters.role) && (!filters.status || s.status === filters.status) &&
         (!q || [s.name, s.employee_id, s.phone || "", s.nic || ""].some((x) => x.toLowerCase().includes(q))));
       $("#list").innerHTML = staff.length ? dataTable({
-        rows, empty: "No employees match these filters", cls: "people", rowAction: "", rowLabel: (s) => `Open ${s.name}`,
+        rows, empty: "No employees match these filters", cls: "people",
+        card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${hubName(s.hub)}${(s.upline_id || s.manager_id) && byId[s.upline_id || s.manager_id] ? ` · reports to ${byId[s.upline_id || s.manager_id].name}` : ""}</span></span>
+          <span class="mc-end">${badge(s.role, levelLabel(s.staff_level))}<br>${badge(s.status)}</span>`,
+        summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"}`, rowAction: "", rowLabel: (s) => `Open ${s.name}`,
         onRow: (s) => navigate(`/employees/${encodeURIComponent(s.employee_id)}`),
         cols: [
           { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },

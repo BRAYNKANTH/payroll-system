@@ -2,6 +2,7 @@ import { get, post, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
 import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, dateLabel, raw } from "../ui.js";
 import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
+import { isPhone, stackTable } from "../phone.js";
 
 const MONEY = [
   { k: "business_total", label: "Business" },
@@ -93,6 +94,7 @@ export default {
       ${editable ? html`<div class="row between card-foot">
         <span class="muted" id="dirty-info"></span><button class="btn primary" id="save">${icon("check")} Save week</button></div>` : ""}`;
 
+    if (isPhone()) stackTable(grid.querySelector("table"), { grid: true });
     const rowVals = (tr) => Object.fromEntries([...tr.querySelectorAll("[data-f]")].map((i) => [i.dataset.f, i.value.trim()]));
     const refresh = () => {
       let dirty = 0;
@@ -144,7 +146,7 @@ export default {
       this.render(ctx);
     }));
 
-    // Month overview
+    // Month overview (a card per manager on a phone)
     const tbl = managers.map((mg) => {
       const cells = weeks.map((w) => {
         const e = entries.find((x) => x.manager_id === mg.employee_id && x.week_start === w);
@@ -157,5 +159,6 @@ export default {
       <thead><tr><th>Manager</th>${weeks.map((w) => html`<th class="r">w/c ${dateLabel(w).replace(/^\w+ /, "")}</th>`)}<th class="r">Month</th></tr></thead>
       <tbody>${tbl.map((r) => html`<tr><td><b>${r.mg.name}</b></td>${r.cells.map((c) => html`<td class="r">${c == null ? html`<span class="badge amber plain">missing</span>` : html`<span class="${c < 0 ? "neg" : ""}">${money(c)}</span>`}</td>`)}
         <td class="r"><b class="${r.total < 0 ? "neg" : ""}">${money(r.total)}</b></td></tr>`)}</tbody></table></div>`.toString();
+    if (isPhone()) stackTable($("#overview table"));
   },
 };

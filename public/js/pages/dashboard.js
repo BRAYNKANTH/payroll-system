@@ -2,6 +2,7 @@ import { get, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
 import { $, html, esc, icon, money, rs, compact, pct, badge, shortMonth, monthName, dataTable, initials, emptyState, raw } from "../ui.js";
 import { lineChart, donutChart, barChart, PALETTE } from "../charts.js";
+import { isPhone, foldCards } from "../phone.js";
 
 const kpi = (label, value, ic, color, foot = "") => html`
   <div class="card kpi"><div class="label"><span class="icon ${color}">${icon(ic)}</span>${label}</div>
@@ -118,5 +119,8 @@ export default {
           <div class="grow"><b>${c.name}</b><span>${c.hub} · missing ${c.missing.slice(0, 4).map((m) => m.slice(8)).join(", ")}${c.missing.length > 4 ? "…" : ""}</span></div>
           <div class="progress ${c.logged / c.expected >= 0.9 ? "green" : "amber"}" style="width:90px"><span style="width:${(c.logged / Math.max(1, c.expected)) * 100}%"></span></div>
           <span class="num" style="font-size:12px;width:48px;text-align:right">${c.logged}/${c.expected}</span></div>`).join("");
+
+    // On a phone the summary cards stay up top and each section below opens on tap. Exceptions open first when there are any.
+    if (isPhone()) foldCards([...el.querySelectorAll(".grid.two > .card, .grid.halves > .card")], { open: d.exceptions.length ? [3] : [] });
   },
 };

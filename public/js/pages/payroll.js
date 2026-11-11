@@ -2,6 +2,7 @@ import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
 import { $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal, levelLabel } from "../ui.js";
 import { openBreakdown } from "./breakdown.js";
+import { isPhone, compactSteps } from "../phone.js";
 
 let filter = "all";
 let search = "";
@@ -57,7 +58,7 @@ export default {
       <div class="card">
         <div class="card-head">
           <div class="row">
-            <div class="seg" id="filters">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button data-f="${f}" class="${filter === f ? "on" : ""}">${l}</button>`)}</div>
+            <div class="seg" id="pay-filters">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button data-f="${f}" class="${filter === f ? "on" : ""}">${l}</button>`)}</div>
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name or ID" value="${search}" style="width:220px"></div>
           </div>
           <div class="row">
@@ -72,6 +73,7 @@ export default {
         can("run_payroll") ? "When the sheets are in, press “Calculate payroll”. You can recalculate as often as you like until the month is finalized." : "An accountant or admin needs to run the payroll for this month.", "play",
         can("run_payroll") && !finalized ? `<button class="btn primary" id="run2">Calculate payroll</button>` : "")}</div>`}`;
 
+    if (isPhone()) compactSteps(el.querySelector(".steps"), { actions: { 0: ["/daily", "Open the daily sheet"], 2: ["/approvals", "Open approvals"] } });
     const drawTable = () => {
       const q = search.toLowerCase();
       const rows = all.filter((r) =>
@@ -79,6 +81,10 @@ export default {
         (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q)));
       $("#table").innerHTML = dataTable({
         rows, footer: true, empty: "No matching employees",
+        card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span>
+            ${r.flags.length ? html`<span class="mc-flags">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</span>` : ""}</span>
+          <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
+        summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"} · net pay Rs ${money(sum("net_pay", rs))} · to bank Rs ${money(sum("disbursed_amount", rs))}`,
         onRow: (r) => openBreakdown(r, p, { finalized, onChange: () => this.render(ctx) }),
         cols: [
           { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>`, total: (rs) => `${rs.length} employees` },
@@ -95,7 +101,7 @@ export default {
     };
     if (calculated) {
       drawTable();
-      $$("#filters button", el).forEach((b) => (b.onclick = () => { filter = b.dataset.f; $$("#filters button", el).forEach((x) => x.classList.toggle("on", x === b)); drawTable(); }));
+      $$("#pay-filters button", el).forEach((b) => (b.onclick = () => { filter = b.dataset.f; $$("#pay-filters button", el).forEach((x) => x.classList.toggle("on", x === b)); drawTable(); }));
       $("#q").oninput = (e) => { search = e.target.value; drawTable(); };
     }
 

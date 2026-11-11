@@ -2,6 +2,12 @@ import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
 import { $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount } from "../ui.js";
 import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons } from "./shared.js";
+import { isPhone } from "../phone.js";
+import { announce, badge } from "../ui.js";
+
+// On a phone the daily sheet is entered one person at a time ("one by one"); the grid is still there for people who prefer it.
+const viewPref = () => { try { return localStorage.getItem("pr.daily.view") || "quick"; } catch { return "quick"; } };
+const setViewPref = (v) => { try { localStorage.setItem("pr.daily.view", v); } catch { /* private mode */ } };
 
 const FIELDS = [
   { k: "business_amount", label: "Business" },
@@ -223,11 +229,18 @@ async function dayMode(ctx, guys, days, editable) {
       <button class="btn icon sm" id="next-day" ${idx >= days.length - 1 ? "disabled" : ""} aria-label="Next day">${icon("right")}</button>
       <h2 style="margin-left:6px">${dateLabel(currentDate)}</h2>
     </div>
-    <span class="badge ${entries.length === guys.length ? "green" : entries.length ? "amber" : ""}">${entries.length} of ${guys.length} entered</span>`;
+    <span class="badge ${entries.length === guys.length ? "green" : entries.length ? "amber" : ""}">${entries.length} of ${guys.length} entered</span>
+    ${isPhone() && editable ? html`<div class="seg" id="view-seg" role="group" aria-label="How to enter"><button type="button" data-view="quick" aria-pressed="${viewPref() === "quick"}" class="${viewPref() === "quick" ? "on" : ""}">One by one</button>
+      <button type="button" data-view="grid" aria-pressed="${viewPref() === "grid"}" class="${viewPref() === "grid" ? "on" : ""}">Grid</button></div>` : ""}`;
   const go = async (d) => { if (d && (await guardUnsaved())) { currentDate = d; ctx.el && (await dayMode(ctx, guys, days, editable)); } };
   $("#prev-day").onclick = () => go(days[idx - 1]);
   $("#next-day").onclick = () => go(days[idx + 1]);
   $("#day").onchange = (e) => (e.target.value.startsWith(state.period) ? go(e.target.value) : toast("Pick a date inside the selected pay period", "warn"));
+  $$("#view-seg button").forEach((b) => (b.onclick = async () => { if (b.dataset.view === viewPref() || !(await guardUnsaved())) return; setViewPref(b.dataset.view); dayMode(ctx, guys, days, editable); }));
+  if (isPhone() && editable && viewPref() === "quick") {
+    setDirtyCheck(null);
+    return quickEntry({ guys, byEmp, date: currentDate, toGrid: () => { setViewPref("grid"); dayMode(ctx, guys, days, editable); }, refresh: () => dayMode(ctx, guys, days, editable) });
+  }
   buildGrid({
     firstCol: "Employee", editable,
     rows: guys.map((g) => ({ label: g.name, sub: `${g.employee_id} · ${g.hub}`, date: currentDate, employee_id: g.employee_id, existing: byEmp[g.employee_id] })),
@@ -299,3 +312,96 @@ function importCsv(guys, done) {
   });
 }
 
+
+
+// ---------------------------------------------------------------- one person at a time
+function quickEntry({ guys, byEmp, date, toGrid, refresh }) {
+  const grid = $("#grid");
+  const done = (g) => !!byEmp[g.employee_id];
+  const firstOpen = () => Math.max(0, guys.findIndex((g) => !done(g)));
+  let i = firstOpen();
+  const rupees = (c) => (c == null ? "" : formatAmount(c / 100));
+  const diffText = (b, s) => {
+    if (b === null || s === null) return "The difference shows when both amounts are filled in.";
+    const d = Math.round((b - s) * 100);
+    return d > 0 ? `Short by Rs ${money(d)}. This is taken off their pay.` : d < 0 ? `Handed in Rs ${money(-d)} more than the business.` : "Nothing short. Business and handed-in match.";
+  };
+
+  const draw = (move = true) => {
+    const count = guys.filter(done).length;
+    if (i >= guys.length) { // everyone has been visited
+      grid.innerHTML = html`<div class="quick"><p class="step-count">${count} of ${guys.length} entered</p><h3 class="step-title" id="q-name" tabindex="-1">${count === guys.length ? "All done for this day" : "End of the list"}</h3>
+        <p class="muted">${count === guys.length ? "Everyone has an entry." : `${guys.length - count} still need an entry.`}</p>
+        <div class="q-actions"><button type="button" class="btn" id="q-first">Back to the first person</button><button type="button" class="btn" id="q-grid">Open the grid</button></div></div>`.toString();
+      $("#q-first").onclick = () => { i = firstOpen(); draw(); };
+      $("#q-grid").onclick = toGrid;
+      if (move) { announce(count === guys.length ? "All done for this day" : "End of the list"); $("#q-name").focus(); }
+      return;
+    }
+    const g = guys[i], e = byEmp[g.employee_id];
+    grid.innerHTML = html`<div class="quick">
+      <p class="step-count" id="q-count">Person ${i + 1} of ${guys.length} · ${count} entered</p>
+      <div class="step-bar" role="progressbar" aria-label="People entered" aria-valuemin="0" aria-valuemax="${guys.length}" aria-valuenow="${count}" aria-valuetext="${count} of ${guys.length} people entered"><span style="width:${(count / guys.length) * 100}%"></span></div>
+      <div class="person-row"><button type="button" class="btn icon" id="q-prev" aria-label="Previous person" ${i === 0 ? "disabled" : ""}>${icon("left")}</button>
+        <select class="input" id="q-sel" aria-label="Choose a person">${guys.map((x, j) => html`<option value="${j}" ${j === i ? "selected" : ""}>${done(x) ? "✓ " : ""}${x.name}</option>`)}</select>
+        <button type="button" class="btn icon" id="q-next" aria-label="Next person" ${i >= guys.length - 1 ? "disabled" : ""}>${icon("right")}</button></div>
+      <h3 class="step-title" id="q-name" tabindex="-1">${g.name} <small class="faint" style="font:400 14px var(--font)">${g.employee_id} · ${g.hub}</small></h3>
+      <p style="margin:0 0 10px">${e ? badge("green", "Entered") : badge("amber", "Not entered yet")}</p>
+      <form id="q-form" novalidate>
+        <div class="field"><label for="q-biz">Business (Rs)</label><input class="input" id="q-biz" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${rupees(e?.business_amount)}"></div>
+        <div class="field"><label for="q-set">Handed in (Rs)</label><input class="input" id="q-set" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${rupees(e?.settled_amount)}"></div>
+        <p class="q-diff" id="q-diff" role="status"></p>
+        <div class="field"><label for="q-adv">Advance taken (Rs), if any</label><input class="input" id="q-adv" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${e?.personal_minus ? rupees(e.personal_minus) : ""}"></div>
+        <div class="field"><label for="q-note">Note, if any</label><input class="input" id="q-note" autocomplete="off" enterkeyhint="done" value="${e?.notes || ""}"></div>
+        <div class="step-errors" id="q-err" role="alert" tabindex="-1" hidden></div>
+        <div class="q-actions"><button type="button" class="btn" id="q-skip">Skip</button><button type="submit" class="btn primary" id="q-save">Save and next</button></div>
+      </form></div>`.toString();
+    const f = $("#q-form");
+    const val = (id) => $(id).value.trim();
+    const upd = () => { $("#q-diff").textContent = diffText(parseAmount(val("#q-biz")), parseAmount(val("#q-set"))); };
+    f.addEventListener("input", upd); upd();
+    // Enter moves down the form; on the last field it saves.
+    [["#q-biz", "#q-set"], ["#q-set", "#q-adv"], ["#q-adv", "#q-note"]].forEach(([a, b]) => $(a).addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); $(b).focus(); } }));
+    $("#q-prev").onclick = () => { i--; draw(); };
+    $("#q-next").onclick = () => { i++; draw(); };
+    $("#q-sel").onchange = (ev) => { i = Number(ev.target.value); draw(); };
+    $("#q-skip").onclick = () => { i++; draw(); };
+    f.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const bad = [];
+      const money0 = (id, label, required) => {
+        const v = val(id);
+        const n = parseAmount(v);
+        if (v === "" && required) bad.push([id, `${label} is required`]);
+        else if (v !== "" && (!isAmount(v) || n < 0)) bad.push([id, `${label} must be a number of 0 or more, for example 12,500 or 12500.50`]);
+      };
+      ["#q-biz", "#q-set", "#q-adv"].forEach((id) => $(id).removeAttribute("aria-invalid"));
+      money0("#q-biz", "Business", true); money0("#q-set", "Handed in", true); money0("#q-adv", "Advance", false);
+      const box = $("#q-err");
+      if (bad.length) {
+        bad.forEach(([id]) => $(id).setAttribute("aria-invalid", "true"));
+        box.innerHTML = `${icon("alert")}<div><b>${bad.length === 1 ? "Please fix one answer" : `Please fix ${bad.length} answers`}</b><ul>${bad.map(([id, m]) => `<li><a href="${id}" data-fix="${id}">${m}</a></li>`).join("")}</ul></div>`;
+        box.hidden = false;
+        box.querySelectorAll("[data-fix]").forEach((a) => (a.onclick = (x) => { x.preventDefault(); $(a.dataset.fix).focus(); }));
+        $(bad[0][0]).focus();
+        return;
+      }
+      box.hidden = true;
+      const row = { date, employee_id: g.employee_id, business_amount: parseAmount(val("#q-biz")), settled_amount: parseAmount(val("#q-set")), personal_minus: parseAmount(val("#q-adv")) || 0, notes: val("#q-note") };
+      await busy($("#q-save"), async () => {
+        await post("/api/daily/bulk", { rows: [row] });
+        byEmp[g.employee_id] = { business_amount: Math.round(row.business_amount * 100), settled_amount: Math.round(row.settled_amount * 100), personal_minus: Math.round(row.personal_minus * 100), notes: row.notes };
+        toast(`Saved ${g.name}`);
+        const nextOpen = guys.findIndex((x, j) => j > i && !done(x));
+        i = nextOpen >= 0 ? nextOpen : i + 1;
+        draw();
+      });
+    };
+    if (move) {
+      announce(`Person ${i + 1} of ${guys.length}: ${g.name}`);
+      $("#q-name").focus({ preventScroll: true });
+      window.scrollTo({ top: 0 });
+    }
+  };
+  draw(false);
+}
