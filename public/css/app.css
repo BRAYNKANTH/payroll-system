@@ -993,3 +993,26 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 /* A price that is still missing is marked in the sheet */
 .sheet input[aria-invalid="true"] { border-color: var(--danger); background: var(--danger-soft); }
 .sheet input[data-f="unit_price"]::placeholder { color: var(--text-3); }
+
+/* ---------- Phone fixes from the 2026-11-11 audit ---------- */
+@media (max-width: 860px) {
+  /* Sheet fields in stacked cards were 22px tall: make them a real tap target. */
+  .table.stack.grid2 td > input, .table.stack.grid2 td > select { height: 44px; min-height: 44px; }
+  /* 16px stops iPhones zooming in when a field is focused. */
+  .input, .input.sm, input.input, select.input, textarea.input, .period-picker select, .period-picker input { font-size: 16px; }
+  /* A long value must wrap inside its card, not stretch the page. */
+  .m-card .mc-main { grid-template-columns: minmax(0, 1fr); }
+  .m-card .mc-main > *, .m-card .mc-kv { min-width: 0; }
+  .m-card .mc-kv .k { flex: none; }
+  .m-card .mc-kv .v { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+}
+@media (max-width: 480px) {
+  /* Header buttons wrap onto a second line instead of pushing the page wider. */
+  .page-head { flex-wrap: wrap; }
+  .page-head .actions { flex-wrap: wrap; }
+}
+/* Dynamic viewport units: no jump when the phone's browser bar shows or hides. Older browsers keep the 100vh above. */
+.shell, .auth-wrap { min-height: 100dvh; }
+/* Approvals flags: long reasons wrap inside the row. */
+.flag, .flag > div { min-width: 0; overflow-wrap: anywhere; }
+.flag b { white-space: normal; }
