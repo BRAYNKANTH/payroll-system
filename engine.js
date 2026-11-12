@@ -43,7 +43,7 @@ function securityDeduction(rule, { gross, basic, business = 0, heldToDate }) {
 //                          target exceeded     → fixed basic_pay plus commission_rate × business over target.
 //                          Food allowance = food_per_day × days logged, only once food_min_days are worked
 //                          (food_min_days 0 = always paid).
-function computeGuy({ staff, daily, stock, allowances, openingBalance, securityHeldToDate }) {
+function computeGuy({ staff, daily, stock, allowances, openingBalance, securityHeldToDate, loans = [] }) {
   const tiered = staff.pay_scheme === "tiered";
   const totalBusiness = sum(daily, "business_amount");
   const overTarget = Math.max(0, totalBusiness - staff.target);
@@ -63,7 +63,16 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
   const security = securityDeduction(staff.security_deduction_rule, {
     gross, basic, business: totalBusiness, heldToDate: securityHeldToDate,
   });
-  const totalDeductions = settleUp + personal + security;
+  // Advances and loans: each has an instalment due this month. It is taken only from pay that is left after the other
+  // deductions, so a loan never pushes anyone into a negative balance. What cannot be taken stays on the loan for next month.
+  let room = Math.max(0, gross - settleUp - personal - security);
+  const loanLines = loans.map((l) => {
+    const take = Math.min(l.planned, room);
+    room -= take;
+    return { loan_id: l.id, kind: l.kind, planned: l.planned, amount: take, outstanding_after: l.outstanding - take };
+  });
+  const loanTotal = sum(loanLines, "amount");
+  const totalDeductions = settleUp + personal + security + loanTotal;
   const netPay = gross - totalDeductions;
 
   // A negative result carries forward as money owed; anything positive is paid out.
@@ -102,7 +111,9 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
         { key: "stock_shortfall", label: "Stock shortfall", amount: stockShortfall },
         { key: "personal", label: "Personal minus", amount: personal },
         { key: "security", label: `Security (${staff.security_deduction_rule})`, amount: security },
+        ...loanLines.map((l) => ({ key: "loan", label: loanLabel(l), amount: l.amount })),
       ],
+      ...(loanLines.length ? { loans: loanLines } : {}),
       stock_lines: stock.map((s) => ({
         product: s.product, shortfall_qty: s.shortfall_qty, unit_price: s.unit_price, shortfall_value: s.shortfall_value,
       })),
@@ -215,6 +226,12 @@ function evaluateFlags(result, { staff, previous, settings }) {
     add("STOCK_SHORTFALL", `Stock shortfall Rs ${fmt(result.detail.stock_shortfall)} exceeds Rs ${fmt(stockLimit)}`);
   }
   return flags;
+}
+
+function loanLabel(l) {
+  const what = l.kind === "advance" ? "Advance repaid" : "Loan instalment";
+  const short = l.amount < l.planned ? `, only Rs ${fmt(l.amount)} of Rs ${fmt(l.planned)} could be taken` : "";
+  return `${what} (balance after: Rs ${fmt(l.outstanding_after)}${short})`;
 }
 
 function fmt(cents) {

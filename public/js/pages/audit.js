@@ -28,7 +28,7 @@ export function auditDiff(a) {
     : `<div><b>${esc(k)}</b>: <s>${esc(show(k, o[k]))}</s> → <ins>${esc(show(k, n[k]))}</ins></div>`).join("")}</div>`);
 }
 
-const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["hub_stock", "Branch stock"], ["allowances", "Allowances"],
+const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["hub_stock", "Branch stock"], ["allowances", "Allowances"], ["loans", "Advances & loans"],
   ["staff", "Employees"], ["staff_documents", "Documents"], ["hubs", "Hubs"], ["pay_period_summary", "Approvals"], ["periods", "Periods"], ["users", "Users"], ["settings", "Settings"]];
 let f = { table: "", user: "", from: "", to: "", key: "" };
 

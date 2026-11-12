@@ -58,6 +58,7 @@ supervisors and distributors, four finalized months and the current month open.
 | Allowances | Extra earnings per month |
 | Payroll run | Step-by-step: data check → calculate → review → finalize → pay; full breakdown per person |
 | Approvals | Queue of flagged entries only; approve / reject with notes |
+| Advances & loans | Give an advance (back in one month) or a loan (monthly instalments). The payroll run takes each instalment from pay; balances come from finalized months |
 | Payslips | Per person or all, printable |
 | Employees | Directory, add/edit, profile with pay history chart, team, change log |
 | Hubs | Branches with live figures |
@@ -73,7 +74,7 @@ supervisors and distributors, four finalized months and the current month open.
 | Viewer | See everything, change nothing |
 | Staff portal | A distributor, supervisor or group manager signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
 | Clerk | Enter daily / weekly / stock / allowance sheets (limited to one hub if set) |
-| Accountant | + manage staff and hubs, calculate payroll, approve / reject, export files |
+| Accountant | + manage staff and hubs, give advances and loans, calculate payroll, approve / reject, export files |
 | Admin | + finalize months, manage users, change settings |
 
 ## Monthly workflow
@@ -99,6 +100,7 @@ supervisors and distributors, four finalized months and the current month open.
 | Manager weekly | `business × profit% − rent − hub_fee − security_cost − personal_draw` |
 | Manager closing | `opening + Σ weekly − business × 15% − Σ net pay of their guys` |
 | Stock shortfall | `max(0, opening + issued − sold − counted) × unit_price` |
+| Advance / loan instalment | `min(instalment, what is left)`, taken only from pay left after the other deductions, so it never makes a balance negative; anything not taken stays on the loan for next month. No interest. For distributors, supervisors and group managers only |
 | Security rule | none, fixed amount, % of gross, % of basic or % of business (`pct_business:1`), with an optional lifetime cap |
 
 Flags that need approval: net pay moved by more than 20%; a negative deduction; deductions greater than

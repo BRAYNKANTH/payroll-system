@@ -241,6 +241,36 @@ CREATE TABLE IF NOT EXISTS allowances (
   updated_at  text
 );
 
+-- Advances and loans given to a guy / supervisor. An advance is a loan paid back in one go.
+-- amount is what was handed over; already_repaid is anything paid back before the system took over (an old Excel loan).
+-- loan_repayments is written only by the payroll run: one row per loan per month, and it locks when the month is finalized.
+CREATE TABLE IF NOT EXISTS loans (
+  id             bigserial PRIMARY KEY,
+  employee_id    text NOT NULL REFERENCES staff(employee_id),
+  kind           text NOT NULL CHECK (kind IN ('advance','loan')),
+  amount         bigint NOT NULL CHECK (amount > 0),
+  instalment     bigint NOT NULL CHECK (instalment > 0),
+  start_period   text NOT NULL ${PERIOD_CHECK("start_period")},
+  issued_on      text NOT NULL ${DATE_CHECK("issued_on")},
+  already_repaid bigint NOT NULL DEFAULT 0 CHECK (already_repaid >= 0),
+  status         text NOT NULL DEFAULT 'active' CHECK (status IN ('active','stopped')),
+  note           text,
+  created_by     text NOT NULL,
+  created_at     text NOT NULL DEFAULT ${NOW},
+  updated_by     text,
+  updated_at     text
+);
+CREATE INDEX IF NOT EXISTS loans_emp ON loans (employee_id);
+
+CREATE TABLE IF NOT EXISTS loan_repayments (
+  loan_id     bigint NOT NULL REFERENCES loans(id),
+  employee_id text NOT NULL,
+  period      text NOT NULL,
+  amount      bigint NOT NULL,
+  PRIMARY KEY (loan_id, period)
+);
+CREATE INDEX IF NOT EXISTS loan_repayments_period ON loan_repayments (period);
+
 CREATE TABLE IF NOT EXISTS periods (
   period       text PRIMARY KEY,
   status       text NOT NULL DEFAULT 'open' CHECK (status IN ('open','finalized')),
@@ -348,6 +378,7 @@ const AUDITED = {
   stock_recon: { key: "id", period: "period" },
   hub_stock:   { key: "id", period: "period" },
   allowances:  { key: "id", period: "period" },
+  loans:       { key: "id", period: null },
 };
 
 function triggerSql() {
@@ -361,6 +392,9 @@ function triggerSql() {
         CREATE TRIGGER ${table}_lock BEFORE INSERT OR UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION period_lock_trigger('${period}');\n`;
     }
   }
+  // Repayments are derived by the payroll run; once a month is final they are what the loan balance is made of.
+  sql += `DROP TRIGGER IF EXISTS loan_repayments_lock ON loan_repayments;
+    CREATE TRIGGER loan_repayments_lock BEFORE INSERT OR UPDATE OR DELETE ON loan_repayments FOR EACH ROW EXECUTE FUNCTION period_lock_trigger('period');\n`;
   // A finalized summary is the source of next period's opening balance, so it must never change.
   sql += `DROP TRIGGER IF EXISTS summary_lock ON pay_period_summary;
     CREATE TRIGGER summary_lock BEFORE UPDATE OR DELETE ON pay_period_summary FOR EACH ROW EXECUTE FUNCTION period_lock_trigger('period');\n`;

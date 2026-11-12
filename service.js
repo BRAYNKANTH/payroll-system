@@ -2,6 +2,7 @@
 const crypto = require("crypto");
 const { withUser, getSettings, httpError } = require("./db");
 const engine = require("./engine");
+const loans = require("./loans");
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -473,6 +474,7 @@ async function runPeriod(db, period, user) {
     const heldRows = await t.all(`SELECT employee_id, COALESCE(SUM(security_held), 0) AS held
       FROM pay_period_summary WHERE period < ? GROUP BY employee_id`, period);
     const heldBy = new Map(heldRows.map((r) => [r.employee_id, Number(r.held)]));
+    const loanPlan = await loans.plan(t, period); // instalments due this month, from earlier months' repayments
 
     const active = new Set([...daily.keys(), ...stock.keys(), ...allow.keys(), ...weekly.keys()]);
     const staff = (await t.all("SELECT * FROM staff ORDER BY role DESC, employee_id"))
@@ -494,6 +496,7 @@ async function runPeriod(db, period, user) {
             allowances: allow.get(s.employee_id) || [],
             openingBalance: prev ? prev.closing_balance : Number(s.opening_balance) || 0, // go-live balance until a first month exists
             securityHeldToDate: heldBy.get(s.employee_id) || 0,
+            loans: loanPlan.get(s.employee_id) || [],
           }),
         });
       } catch (err) { errors.push(`${s.employee_id}: ${err.message}`); }
@@ -551,6 +554,7 @@ async function runPeriod(db, period, user) {
           bank_account_no=excluded.bank_account_no, computed_at=excluded.computed_at, reviewed_by=excluded.reviewed_by,
           reviewed_at=excluded.reviewed_at, review_note=excluded.review_note, security_held=excluded.security_held`, ...part.flat());
     }
+    await loans.saveRepayments(t, period, new Map([...results].map(([id, r]) => [id, r.result])));
     const ids = [...results.keys()];
     await t.run(`DELETE FROM pay_period_summary WHERE period = ? AND NOT (employee_id = ANY(?::text[]))`, period, ids);
     await t.run(`INSERT INTO periods (period, last_run_by, last_run_at) VALUES (?, ?, ${NOW})

@@ -30,6 +30,7 @@ const NAV = [
   { group: "Payroll" },
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll" },
   { path: "/approvals", label: "Approvals", icon: "shield", page: "approvals", badge: true },
+  { path: "/loans", label: "Advances & loans", icon: "wallet", page: "loans" },
   { path: "/payslips", label: "Payslips", icon: "file", page: "payslips" },
   { group: "People" },
   { path: "/employees", label: "Employees", icon: "users", page: "employees" },

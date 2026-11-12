@@ -4,6 +4,7 @@ const { getSettings, httpError } = require("./db");
 const engine = require("./engine");
 const svc = require("./service");
 const reports = require("./reports");
+const loans = require("./loans");
 
 const TEAM_LEVELS = new Set(["supervisor", "group_manager"]);
 const monthBounds = (period) => [period + "-01", svc.shiftPeriod(period, 1) + "-01"];
@@ -53,7 +54,8 @@ async function summary(db, user, period) {
   } else if (daily.length || stock.length || allowances.length) {
     const prev = await db.get("SELECT closing_balance FROM pay_period_summary WHERE employee_id = ? AND period < ? ORDER BY period DESC LIMIT 1", s.employee_id, period);
     const held = await db.get(`SELECT COALESCE(SUM(security_held), 0) AS held FROM pay_period_summary WHERE employee_id = ? AND period < ?`, s.employee_id, period);
-    const r = engine.computeGuy({ staff: s, daily, stock, allowances, openingBalance: prev ? prev.closing_balance : Number(s.opening_balance) || 0, securityHeldToDate: Number(held.held) || 0 });
+    const due = (await loans.plan(db, period)).get(s.employee_id) || [];
+    const r = engine.computeGuy({ staff: s, daily, stock, allowances, openingBalance: prev ? prev.closing_balance : Number(s.opening_balance) || 0, securityHeldToDate: Number(held.held) || 0, loans: due });
     estimate = { gross: r.gross_earnings, deductions: r.total_deductions, net: r.net_pay, opening: r.opening_balance, closing: r.closing_balance,
       earnings: r.detail.earnings, deduction_lines: r.detail.deductions };
   }
@@ -79,6 +81,7 @@ async function summary(db, user, period) {
       daily, stock: stock.map((k) => ({ product: k.product, shortfall_qty: k.shortfall_qty, unit_price: k.unit_price, shortfall_value: k.shortfall_value })), allowances,
     },
     official, estimate, history, security_held: Number(security.held) || 0,
+    loans: await loans.mine(db, s.employee_id, period),
     team: TEAM_LEVELS.has(s.staff_level) ? await team(db, s.employee_id, period) : null,
   };
 }

@@ -8,6 +8,7 @@ const path = require("path");
 const crypto = require("crypto");
 const db = require("./db");
 const svc = require("./service");
+const loans = require("./loans");
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const target = args[0] || process.env.DATABASE_URL || path.join(__dirname, "data", "demo");
@@ -164,6 +165,9 @@ async function closeMonth(period) {
 const now = new Date();
 const ym = (offset) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString().slice(0, 7);
 const growth = [0.9, 0.95, 1.0, 1.04];
+// A loan that started three months ago (Rs 10,000 still to come) and an advance for the open month, so the loans page has something to show.
+await loans.create(d, { employee_id: "D01", kind: "loan", amount: 40000, instalment: 10000, start_period: ym(-3), issued_on: ym(-3) + "-02", note: "School fees" }, "accounts");
+await loans.create(d, { employee_id: "D03", kind: "advance", amount: 5000, start_period: ym(0), issued_on: ym(0) + "-04", note: "Medical" }, "accounts");
 for (let i = 0; i < 4; i++) {
   await month(ym(i - 4), { growth: growth[i], short: { D02: 1500 } });
   await closeMonth(ym(i - 4));

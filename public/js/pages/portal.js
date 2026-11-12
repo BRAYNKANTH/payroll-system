@@ -29,7 +29,7 @@ function payRules(p) {
   if (p.food_per_day) lines.push(`Food: <b>${rs(p.food_per_day)}</b> for every day you work${p.food_min_days ? `, once you have worked ${p.food_min_days} days or more` : ""}.`);
   const m = /^(fixed|pct_gross|pct_basic|pct_business):([\d.]+)/.exec(p.security_deduction_rule || "");
   if (m) lines.push(`Security held back: <b>${m[1] === "fixed" ? `Rs ${m[2]}` : `${m[2]}%`}</b>${{ fixed: " each month", pct_gross: " of your gross pay", pct_basic: " of your basic pay", pct_business: " of your sales" }[m[1]]}.`);
-  lines.push("Taken off your pay: the difference between your sales and the money you handed in, any stock that is missing, and any advance you took.");
+  lines.push("Taken off your pay: the difference between your sales and the money you handed in, any stock that is missing, and any advance or loan instalment.");
   return lines;
 }
 
@@ -112,6 +112,7 @@ export default {
         <div class="actions"><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""], ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
+        ...(d.loans.length ? [["loans", "Advances & loans", "Loans", "coins", d.loans.filter((l) => l.state !== "paid").length]] : []),
         ...(hasTeam ? [["team", "My team", "Team", "users", d.team.length]] : []), ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
         .map(([k, long, short, ic, n]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}"><span class="tab-ic">${icon(ic)}</span><span class="tab-lb"><span class="lg">${long}</span><span class="sm">${short}</span></span>${n !== "" ? html`<span class="cnt">(${n})</span>` : ""}</button>`)}</div>
       <div id="pane"></div>`;
@@ -150,6 +151,15 @@ export default {
       payslips: () => d.history.length ? html`<section class="card"><div class="card-body flush" id="hist"></div></section>
         <p class="muted" style="margin-top:12px">Security held back so far: <b class="num">Rs ${money(d.security_held)}</b>.</p>`
         : html`<div class="card">${emptyState("No payslips yet", "Your payslip for a month appears here once the office has closed that month.", "file")}</div>`,
+
+      loans: () => html`<section class="card mb-4 glist"><div class="card-head"><div><h2>Advances and loans</h2><div class="sub">Money you took from the company, and what is left to pay back. It comes off your pay each month.</div></div></div>
+        ${raw(d.loans.map((l) => group(`${l.kind === "advance" ? "Advance" : "Loan"} · given ${dateLabel(l.issued_on)}`, [
+          row("Amount given", money(l.amount)), row("Paid back so far", money(l.repaid)),
+          row("Still to pay back", l.state === "paid" ? "Paid off" : money(l.outstanding), { strong: true, cls: l.state === "paid" ? "pos" : "" }),
+          ...(l.state === "stopped" ? [row("Status", "Deductions stopped")] : l.state === "active" ? [
+            ...(l.kind === "loan" ? [row("Each month", money(l.instalment))] : []),
+            row(`Comes off ${monthName(d.period)} pay`, l.due ? money(l.due) : "—")] : []),
+        ])).join(""))}</section>`,
 
       team: () => html`<section class="card mb-4"><div class="card-head"><div><h2>Your team in ${monthName(d.period)}</h2><div class="sub">Sales only. Pay is private to each person.</div></div></div>
         <div class="card-body flush" id="team"></div></section>`,
@@ -254,7 +264,7 @@ export default {
       if (tab === "documents") drawDocs().catch((e) => toast(e.message, "err"));
     };
     $$("#tabs button", el).forEach((b) => (b.onclick = () => { if (tab !== b.dataset.t) buzz(6); tab = b.dataset.t; show(); }));
-    if (!panes[tab] || (tab === "team" && !hasTeam)) tab = "month";
+    if (!panes[tab] || (tab === "team" && !hasTeam) || (tab === "loans" && !d.loans.length)) tab = "month";
     show(!ctx.refresh);
 
     $("#refresh").onclick = (e) => busy(e.currentTarget, async () => { await this.render({ ...ctx, refresh: true }); toast("Up to date"); });
