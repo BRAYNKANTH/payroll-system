@@ -135,9 +135,13 @@ function managerCommissionRate(businessCents, settings) {
 // staff.basic_pay is a separate fixed salary (manager, promoting manager, coacher): it is paid out to the bank
 // and does not move the running balance.
 // guyNetPays: net_pay of each guy whose manager_id is this manager, for the same period.
-function computeManager({ staff, weekly, guyNetPays, openingBalance, companyReturnRate }) {
+// staff.team_commission_rate > 0 replaces the weekly profit share: the manager earns that % of the month's sales of
+// everyone below them (teamSales, from the daily sheets) instead of business × profit % from the weekly sheet. It goes
+// into the running account like the profit share did. The weekly rows still supply rent, hub fee, security and draws.
+function computeManager({ staff, weekly, guyNetPays, openingBalance, companyReturnRate, teamSales = 0 }) {
+  const teamRate = Number(staff.team_commission_rate) || 0;
   const weeks = weekly.map((w) => {
-    const profitShare = pct(w.business_total, w.profit_percent);
+    const profitShare = teamRate > 0 ? 0 : pct(w.business_total, w.profit_percent);
     return {
       week_start: w.week_start, week_end: w.week_end, business_total: w.business_total,
       profit_percent: w.profit_percent, profit_share: profitShare,
@@ -149,7 +153,9 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
   const companyReturn = pct(totalBusiness, companyReturnRate);
   const guysSalaryTotal = sum(guyNetPays, "net_pay");
   const salary = Number(staff.basic_pay) || 0;
-  const gross = sum(weeks, "profit_share") + salary;
+  const profitTotal = sum(weeks, "profit_share");
+  const teamCommission = teamRate > 0 ? pct(teamSales, teamRate) : 0;
+  const gross = profitTotal + teamCommission + salary;
   const deductions = [
     { key: "rent", label: "Rent", amount: sum(weeks, "rent") },
     { key: "hub_fee", label: "Hub fee", amount: sum(weeks, "hub_fee") },
@@ -160,7 +166,7 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
   ];
   const totalDeductions = sum(deductions, "amount");
   // closing = opening + Σweekly_balance − company_return − guys_salary_total
-  const netPay = sum(weeks, "weekly_balance") - companyReturn - guysSalaryTotal + salary;
+  const netPay = sum(weeks, "weekly_balance") + teamCommission - companyReturn - guysSalaryTotal + salary;
 
   return {
     role: "manager",
@@ -176,7 +182,10 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
       weeks,
       guys: guyNetPays,
       basic_salary: salary,
-      earnings: [{ label: "Profit share (Σ business × profit %)", amount: gross - salary },
+      ...(teamRate > 0 ? { team_sales: teamSales, team_commission: teamCommission } : {}),
+      earnings: [
+        teamRate > 0 ? { label: `Team commission (${fmtRate(teamRate)} of Rs ${fmt(teamSales)} sales of everyone below)`, amount: teamCommission }
+          : { label: "Profit share (Σ business × profit %)", amount: profitTotal },
         ...(salary ? [{ label: "Basic salary (paid to bank)", amount: salary }] : [])],
       deductions,
     },

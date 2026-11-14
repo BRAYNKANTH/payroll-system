@@ -48,6 +48,7 @@ const ENTITIES = {
       commission_rate: { type: "rate" },
       pay_scheme: { type: "enum", values: ["over_target", "tiered"] },
       base_commission_rate: { type: "rate" },
+      team_commission_rate: { type: "rate" },
       food_per_day: { type: "money" },
       food_min_days: { type: "int" },
       security_deduction_rule: { type: "text", check: (v) => engine.parseSecurityRule(v) },
@@ -238,7 +239,7 @@ async function validateRefs(db, kind, row) {
 
 // Chain of command. Payroll only knows two roles (guy, manager); staff_level adds the rungs between them.
 // Manager, promoting manager and coacher are all payroll "managers": a weekly account plus an optional fixed salary.
-const LEVEL_RANK = { distributor: 0, supervisor: 1, group_manager: 2, manager: 3, promoting_manager: 4, coacher: 5 };
+const LEVEL_RANK = { distributor: 0, supervisor: 1, group_manager: 2, promoting_manager: 3, manager: 4, coacher: 5 };
 const LEVEL_NAME = { distributor: "Distributor", supervisor: "Supervisor", group_manager: "Group manager", manager: "Manager",
   promoting_manager: "Promoting manager", coacher: "Coacher" };
 const MANAGER_LEVELS = new Set(["manager", "promoting_manager", "coacher"]);
@@ -262,8 +263,9 @@ async function applyChain(db, row, existing = {}, id) {
     if (m.role === "guy" && row.manager_id === undefined && row.upline_id !== undefined) {
       let cur = m.upline_id;
       for (let i = 0; cur && i < 10; i++) {
-        const s = await db.get("SELECT role, upline_id FROM staff WHERE employee_id = ?", cur);
-        if (s?.role === "manager") { row.manager_id = cur; break; }
+        const s = await db.get("SELECT role, staff_level, upline_id FROM staff WHERE employee_id = ?", cur);
+        // A promoting manager works under a manager and has no weekly account of their own, so the guys below them belong to the manager above.
+        if (s?.role === "manager" && s.staff_level !== "promoting_manager") { row.manager_id = cur; break; }
         cur = s?.upline_id;
       }
     }
@@ -480,6 +482,14 @@ async function runPeriod(db, period, user) {
     const staff = (await t.all("SELECT * FROM staff ORDER BY role DESC, employee_id"))
       .filter((s) => s.status === "active" || active.has(s.employee_id));
 
+    // Sales of everyone below a person (their whole team), for people paid a share of team sales.
+    const teamSales = new Map((await t.all(`WITH RECURSIVE d(root, employee_id, depth) AS (
+        SELECT s.upline_id, s.employee_id, 1 FROM staff s WHERE s.upline_id IN (SELECT employee_id FROM staff WHERE team_commission_rate > 0)
+        UNION ALL
+        SELECT d.root, s.employee_id, d.depth + 1 FROM staff s JOIN d ON s.upline_id = d.employee_id WHERE d.depth < 8)
+      SELECT d.root, COALESCE(SUM(l.business_amount), 0) AS sales FROM d
+      LEFT JOIN daily_log l ON l.employee_id = d.employee_id AND l.date >= ? AND l.date < ? GROUP BY d.root`, from, to)).map((r) => [r.root, Number(r.sales)]));
+
     const results = new Map();
     const guys = staff.filter((s) => s.role === "guy");
     const managers = staff.filter((s) => s.role === "manager");
@@ -512,6 +522,7 @@ async function runPeriod(db, period, user) {
           staff: m, weekly: weekly.get(m.employee_id) || [], guyNetPays,
           openingBalance: prev ? prev.closing_balance : Number(m.opening_balance) || 0,
           companyReturnRate: Number(settings.company_return_rate),
+          teamSales: teamSales.get(m.employee_id) || 0,
         }),
       });
     }
@@ -682,7 +693,7 @@ async function updateSettings(db, body, user) {
         try { engine.parseSecurityRule(rule); } catch (e) { throw httpError(400, `${level}: ${e.message}`); }
         out[level] = {
           pay_scheme: scheme, target: num("target"), basic_pay: num("basic_pay"), commission_rate: num("commission_rate", 1),
-          base_commission_rate: num("base_commission_rate", 1), food_per_day: num("food_per_day"), food_min_days: Math.round(num("food_min_days", 31)),
+          base_commission_rate: num("base_commission_rate", 1), team_commission_rate: num("team_commission_rate", 1), food_per_day: num("food_per_day"), food_min_days: Math.round(num("food_min_days", 31)),
           security_deduction_rule: rule,
         };
       }

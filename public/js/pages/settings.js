@@ -51,6 +51,9 @@ export default {
           <div class="form-section">Basic salary by position (Rs / month)</div>
           ${LEVELS.filter(([k]) => isManagerLevel(k)).map(([k, l]) => html`<div class="field"><label>${l}</label>
             <input class="input" inputmode="decimal" data-l="${k}" data-f="basic_pay" value="${pd[k]?.basic_pay || ""}"><span class="hint">Pre-filled when you add a ${l.toLowerCase()}</span></div>`)}
+          <div class="form-section">Share of the whole team's sales by position (%)</div>
+          ${LEVELS.filter(([k]) => isManagerLevel(k)).map(([k, l]) => html`<div class="field"><label>${l}</label>
+            <input class="input" inputmode="decimal" data-l="${k}" data-f="team_commission_pct" value="${pd[k]?.team_commission_rate ? +(pd[k].team_commission_rate * 100).toFixed(4) : ""}" placeholder="0 = none"><span class="hint">Replaces the weekly profit share when set</span></div>`)}
         </div></div>
 
         <div class="card"><div class="card-head"><div><h2>Sign-in</h2></div></div><div class="card-body form-grid">
@@ -91,6 +94,7 @@ export default {
           position_defaults[level] = {
             pay_scheme: d.pay_scheme, target: d.target, basic_pay: d.basic_pay,
             commission_rate: d.commission_pct ? Number(d.commission_pct) / 100 : 0, base_commission_rate: d.base_commission_pct ? Number(d.base_commission_pct) / 100 : 0,
+            team_commission_rate: d.team_commission_pct ? Number(d.team_commission_pct) / 100 : 0,
             food_per_day: d.food_per_day, food_min_days: d.food_min_days,
             security_deduction_rule: !d.sec_kind || d.sec_kind === "none" ? "none" : `${d.sec_kind}:${d.sec_value || 0}`,
           };

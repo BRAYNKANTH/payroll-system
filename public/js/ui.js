@@ -57,8 +57,8 @@ export const statusLabel = (s) => ({ auto_approved: "Auto-approved", pending_rev
 export const badge = (s, label) => html`<span class="badge ${s}">${label || statusLabel(s)}</span>`;
 export const roleLabel = (r) => (r === "guy" ? "Guy / Supervisor" : r === "manager" ? "Manager" : titleCase(r));
 // Chain of command, lowest to highest. Rank decides who may report to whom.
-export const LEVELS = [["distributor", "Distributor / Guy"], ["supervisor", "Supervisor"], ["group_manager", "Group manager"], ["manager", "Manager"],
-  ["promoting_manager", "Promoting manager"], ["coacher", "Coacher"]];
+export const LEVELS = [["distributor", "Distributor / Guy"], ["supervisor", "Supervisor"], ["group_manager", "Group manager"],
+  ["promoting_manager", "Promoting manager"], ["manager", "Manager"], ["coacher", "Coacher"]]; // a promoting manager works under a manager (see LEVEL_RANK in service.js)
 // Manager, promoting manager and coacher run a weekly account and can draw a fixed monthly salary.
 export const MANAGER_LEVELS = ["manager", "promoting_manager", "coacher"];
 export const isManagerLevel = (l) => MANAGER_LEVELS.includes(l);
@@ -67,7 +67,7 @@ const TIERED = { pay_scheme: "tiered", commission_rate: 0.3, base_commission_rat
 export const POSITION_FALLBACK = {
   distributor: { ...TIERED, target: 100000, basic_pay: 25000, food_min_days: 0 },
   supervisor: { ...TIERED, target: 120000, basic_pay: 30000, food_min_days: 24 },
-  manager: { basic_pay: 27000 }, promoting_manager: { basic_pay: 29000 }, coacher: { basic_pay: 30000 },
+  manager: { basic_pay: 27000, team_commission_rate: 0.2 }, promoting_manager: { basic_pay: 30000 }, coacher: { basic_pay: 30000 },
 };
 export function positionDefaults(settings) {
   let saved = {};

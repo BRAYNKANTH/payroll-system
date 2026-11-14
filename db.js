@@ -122,6 +122,8 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS pay_scheme text NOT NULL DEFAULT 'ove
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS base_commission_rate double precision NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_per_day bigint NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAULT 0;
+-- Share of the whole team's monthly sales paid to a manager-level person (a promoting manager earns 20%). 0 = none.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS team_commission_rate double precision NOT NULL DEFAULT 0;
 
 -- Existing databases were created before the hub-manager role: widen the role check (the name is Postgres's default).
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;

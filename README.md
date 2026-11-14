@@ -99,6 +99,8 @@ supervisors and distributors, four finalized months and the current month open.
 | Guy balance | `payable = opening + net`; positive is paid to the bank, negative carries forward |
 | Manager weekly | `business × profit% − rent − hub_fee − security_cost − personal_draw` |
 | Manager closing | `opening + Σ weekly − business × 15% − Σ net pay of their guys` |
+| Promoting manager | Works under a manager. Fixed `basic_pay` (Rs 30,000 by default), paid to the bank. No weekly account of their own: the guys below them belong to the manager above |
+| Manager team share (`team_commission_rate`, 20% by default for new managers) | Replaces the weekly profit share: that % of the month's sales of everyone below them (through promoting managers, supervisors and distributors), taken from the daily sheets and added to the running account. Rent, hub fee, security and draws still come from the weekly sheet. Leave it blank to keep the weekly profit share |
 | Stock shortfall | `max(0, opening + issued − sold − counted) × unit_price` |
 | Advance / loan instalment | `min(instalment, what is left)`, taken only from pay left after the other deductions, so it never makes a balance negative; anything not taken stays on the loan for next month. No interest. For distributors, supervisors and group managers only |
 | Security rule | none, fixed amount, % of gross, % of basic or % of business (`pct_business:1`), with an optional lifetime cap |

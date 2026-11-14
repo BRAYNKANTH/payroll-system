@@ -38,17 +38,50 @@ test("manager commission: 20% from Rs 100,000 of weekly business, 15% below it",
   assert.equal(engine.managerCommissionRate(20000000, s2), 0.25);
 });
 
-test("promoting manager and coacher are manager positions above the manager", async () => {
+test("a promoting manager works under a manager; a coacher sits above the manager", async () => {
   const d = await setup();
   const c = await add(d, "C1", "coacher");
-  const pm = await add(d, "PM1", "promoting_manager", { upline_id: "C1" });
-  const m = await add(d, "M1", "manager", { upline_id: "PM1" });
-  const s = await add(d, "S1", "supervisor", { upline_id: "M1" });
-  assert.deepEqual([c.role, pm.role, m.role, s.role], ["manager", "manager", "manager", "guy"]);
+  const m = await add(d, "M1", "manager", { upline_id: "C1" });
+  const pm = await add(d, "PM1", "promoting_manager", { upline_id: "M1" });
+  const s = await add(d, "S1", "supervisor", { upline_id: "PM1" });
+  assert.deepEqual([c.role, m.role, pm.role, s.role], ["manager", "manager", "manager", "guy"]);
+  // The promoting manager has no weekly account of their own, so the guys below them belong to the manager above.
   assert.equal(s.manager_id, "M1");
-  await assert.rejects(() => add(d, "C2", "coacher", { upline_id: "M1" }), /more senior/);
+  await assert.rejects(() => add(d, "M2", "manager", { upline_id: "PM1" }), /more senior/);
+  await assert.rejects(() => add(d, "PM2", "promoting_manager", { upline_id: "S1" }), /more senior/);
   // hub users still cannot add any manager position
   await assert.rejects(() => svc.createEntry(d, "staff", { employee_id: "C3", name: "C3", hub: "H1", staff_level: "coacher" }, "mgr", "H1"), /managers/);
+});
+
+test("a manager gets 20% of the whole team's sales, including the promoting manager's team; the promoting manager gets the Rs 30,000 basic", async () => {
+  const d = await setup();
+  await add(d, "M1", "manager", { team_commission_rate: 0.2, bank_account_no: "11112222" });
+  await add(d, "PM1", "promoting_manager", { upline_id: "M1", basic_pay: 30000, bank_account_no: "12345678" });
+  await add(d, "S1", "supervisor", { upline_id: "PM1" });
+  await add(d, "D1", "distributor", { upline_id: "S1" });   // two levels below the promoting manager
+  await add(d, "D2", "distributor", { upline_id: "M1" });   // straight under the manager
+  await add(d, "M2", "manager");
+  await add(d, "D3", "distributor", { upline_id: "M2" });   // another manager's team: not counted
+  const day = (employee_id, business_amount) => svc.createEntry(d, "daily", { date: "2026-10-05", employee_id, business_amount, settled_amount: business_amount }, "admin");
+  await day("S1", 100000); await day("D1", 50000); await day("D2", 400000); await day("D3", 900000);
+  await svc.updateSettings(d, { company_return_rate: 0 }, "admin");
+  // The weekly sheet still supplies costs, but its business and profit % no longer decide the manager's share.
+  await svc.createEntry(d, "weekly", { week_start: "2026-10-05", week_end: "2026-10-11", manager_id: "M1", business_total: 900000, profit_percent: 0.15,
+    rent: 4000, hub_fee: 500, security_cost: 1500, personal_draw: 2000 }, "admin");
+  await svc.runPeriod(d, "2026-10", "admin");
+  const rows = Object.fromEntries((await svc.getPeriod(d, "2026-10")).rows.map((r) => [r.employee_id, r]));
+  assert.equal(rows.M1.detail.team_sales, 55000000);                 // Rs 550,000: S1 + D1 + D2
+  assert.equal(rows.M1.detail.team_commission, 11000000);            // 20% = Rs 110,000, instead of 15% of the weekly Rs 900,000
+  assert.ok(rows.M1.detail.earnings.some((e) => e.label.startsWith("Team commission (20% of Rs 550,000.00 sales of everyone below")));
+  assert.ok(!rows.M1.detail.earnings.some((e) => /^Profit share/.test(e.label)));
+  assert.equal(rows.M1.disbursed_amount, 0);                         // it goes into the running account, not the bank
+  assert.equal(rows.M1.closing_balance, 11000000 - 800000);          // Rs 110,000 less Rs 8,000 of weekly costs
+  // The promoting manager is paid the basic only.
+  assert.equal(rows.PM1.disbursed_amount, 3000000);
+  assert.equal("team_commission" in rows.PM1.detail, false);
+  assert.equal(rows.PM1.closing_balance, 0);
+  // A manager with no team share is unchanged.
+  assert.equal("team_commission" in rows.M2.detail, false);
 });
 
 test("a manager's basic salary is paid to the bank and leaves the running balance alone", async () => {
