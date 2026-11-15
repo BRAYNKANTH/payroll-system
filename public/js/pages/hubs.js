@@ -28,8 +28,8 @@ export default {
         <div class="card-body">
           <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
             <div><div class="faint" style="font-size:11.5px">Business</div><b class="num">${compact(st.hub_business || 0)}</b></div>
-            <div><div class="faint" style="font-size:11.5px">Gross pay</div><b class="num">${compact(st.gross_pay || 0)}</b></div>
-            <div><div class="faint" style="font-size:11.5px">Mgr balance</div><b class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</b></div>
+            ${can("view_pay") ? html`<div><div class="faint" style="font-size:11.5px">Gross pay</div><b class="num">${compact(st.gross_pay || 0)}</b></div>
+            <div><div class="faint" style="font-size:11.5px">Mgr balance</div><b class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</b></div>` : ""}
           </div>
           <div class="row between"><div class="row" style="gap:4px">${people.slice(0, 6).map((p) => html`<div class="avatar" title="${p.name}" style="width:28px;height:28px;font-size:11px">${initials(p.name)}</div>`)}
             ${people.length > 6 ? html`<span class="faint">+${people.length - 6}</span>` : ""}</div>

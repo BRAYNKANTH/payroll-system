@@ -94,6 +94,11 @@ export async function employeeForm(existing, onSaved) {
     const k = f.sec_kind.value;
     $$("[data-sec]", f).forEach((x) => (x.hidden = !guy || k === "none"));
     $("#sec-val-lbl", f).textContent = k === "fixed" ? "Amount (Rs / month)" : "Percentage (%)";
+    // Those who may not see pay never see or set a person's pay terms: a new person gets the position's usual terms from the server.
+    if (!can("view_pay")) {
+      for (const n of ["pay_scheme", "basic_pay", "base_commission_pct", "commission_pct", "food_per_day", "food_min_days", "sec_kind", "sec_value", "sec_cap", "opening_balance"]) f[n].closest(".field").hidden = true;
+      $$(".form-section", f).forEach((x) => { if (["Pay setup", "Food and security", "Starting balance"].includes(x.textContent.trim())) x.hidden = true; });
+    }
   };
   // New staff start from the position's pay defaults (Settings); every field stays editable for this person.
   const applyDefaults = () => {
@@ -196,9 +201,9 @@ export default {
           { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
           { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
           { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
-          { key: "basic_pay", label: "Basic", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` },
+          ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),
           { key: "target", label: "Target", align: "r", render: (s) => s.role === "guy" ? money(s.target) : html`<span class="faint">—</span>` },
-          { key: "commission_rate", label: "Comm.", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` },
+          ...(!can("view_pay") ? [] : [{ key: "commission_rate", label: "Comm.", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` }]),
           { key: "bank_account_no", label: "Bank", render: (s) => !s.bank_account_no ? html`<span class="badge amber plain">missing</span>`
             : s.bank_account_no !== s.bank_account_verified ? html`<span class="badge red">unverified</span>` : html`<span class="mono faint">…${s.bank_account_no.slice(-4)}</span>` },
           { key: "status", label: "Status", render: (s) => badge(s.status) },

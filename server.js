@@ -67,6 +67,34 @@ function serveStatic(res, pathname) {
   });
 }
 
+// What someone who may not see pay gets from the dashboard: the sales, the shortfalls and who is late with a sheet, never pay.
+function hidePay(d) {
+  return {
+    ...d, pay_hidden: true, last_run_at: null,
+    kpis: { ...d.kpis, gross_pay: null, net_pay: null, to_bank: null, manager_balance: null, pending: 0, rejected: 0, calculated: false },
+    by_hub: d.by_hub.map((h) => ({ ...h, gross_pay: null, net_pay: null, to_bank: null, manager_balance: null })),
+    trend: d.trend.map((t) => ({ period: t.period, business: t.business })),
+    exceptions: [],
+  };
+}
+
+// Those who may not see pay do not receive the pay defaults either.
+const visibleSettings = (user, settings) => (auth.can(user, "view_pay") ? settings : { ...settings, position_defaults: "{}" });
+
+// A hub manager registers and edits their own team without seeing or setting pay: a new person gets the position's usual pay terms
+// from Settings, and any pay field sent for someone already there is ignored.
+async function staffBody(database, user, body, creating) {
+  if (auth.can(user, "view_pay")) return body;
+  const out = svc.withoutPayFields(body);
+  if (creating) {
+    let defaults = {};
+    try { defaults = JSON.parse((await db.getSettings(database)).position_defaults || "{}")[out.staff_level] || {}; } catch { /* no defaults saved */ }
+    for (const k of svc.PAY_FIELDS) if (defaults[k] !== undefined && k !== "opening_balance") out[k] = defaults[k];
+    if (out.target === undefined && defaults.target !== undefined) out.target = defaults.target;
+  }
+  return out;
+}
+
 // dbReady: a Database or a promise of one (so a serverless cold start can begin connecting immediately).
 function createHandler(dbReady) {
   let database;
@@ -78,7 +106,7 @@ function createHandler(dbReady) {
       // Everything the shell needs to draw itself, so start-up is one round trip instead of three.
       if (user && auth.can(user, "read")) {
         out.hubs = await svc.listEntries(database, "hubs", { hub: user.hub || undefined });
-        out.settings = settings;
+        out.settings = visibleSettings(user, settings);
       }
       return out;
     }],
@@ -115,7 +143,7 @@ function createHandler(dbReady) {
     ["POST", /^\/api\/users$/, "manage_users", ({ user, body }) => auth.createUser(database, user, body)],
     ["PUT", /^\/api\/users\/([\w.-]+)$/, "manage_users", ({ user, body, m }) => auth.updateUser(database, user, m[1], body)],
 
-    ["GET", /^\/api\/settings$/, "read", () => db.getSettings(database)],
+    ["GET", /^\/api\/settings$/, "read", async ({ user }) => visibleSettings(user, await db.getSettings(database))],
     ["PUT", /^\/api\/settings$/, "settings", ({ user, body }) => svc.updateSettings(database, body, user.username)],
     ["GET", /^\/api\/backup$/, "settings", async ({ user }) => {
       const out = { exported_at: new Date().toISOString(), exported_by: user.username, schema: db.SCHEMA_VERSION, tables: {} };
@@ -128,15 +156,16 @@ function createHandler(dbReady) {
 
     ["GET", /^\/api\/(hubs|staff|daily|weekly|stock|hubstock|allowances)$/, "read", ({ user, m, q }) =>
       svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
-        hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })],
+        hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })
+        .then((rows) => (m[1] === "staff" && !auth.can(user, "view_pay") ? rows.map(svc.withoutPayFields) : rows))],
     ["POST", /^\/api\/hubs$/, "manage_hubs", ({ user, body }) => svc.createEntry(database, "hubs", body, user.username)],
     ["PUT", /^\/api\/hubs\/([\w-]+)$/, "manage_hubs", ({ user, body, m }) => svc.updateEntry(database, "hubs", m[1], body, user.username)],
-    ["POST", /^\/api\/staff$/, ["manage_staff", "manage_team"], ({ user, body }) => svc.createEntry(database, "staff", body, user.username, user.hub)],
-    ["PUT", /^\/api\/staff\/([\w.-]+)$/, ["manage_staff", "manage_team"], ({ user, body, m }) => svc.updateEntry(database, "staff", m[1], body, user.username, user.hub)],
+    ["POST", /^\/api\/staff$/, ["manage_staff", "manage_team"], async ({ user, body }) => svc.createEntry(database, "staff", await staffBody(database, user, body, true), user.username, user.hub)],
+    ["PUT", /^\/api\/staff\/([\w.-]+)$/, ["manage_staff", "manage_team"], async ({ user, body, m }) => svc.updateEntry(database, "staff", m[1], await staffBody(database, user, body, false), user.username, user.hub)],
     ["GET", /^\/api\/staff\/([\w.-]+)\/profile$/, "read", async ({ m, user }) => {
       const p = await svc.employeeProfile(database, m[1]);
       if (user.hub && p.staff.hub !== user.hub) throw svc.httpError(403, "Outside your hub");
-      return p;
+      return auth.can(user, "view_pay") ? p : { ...p, staff: svc.withoutPayFields(p.staff), history: [], security_held: null }; // no pay terms or pay history for those who may not see pay
     }],
     ["GET", /^\/api\/staff\/([\w.-]+)\/documents$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.listDocuments(database, m[1], user.hub)],
     ["POST", /^\/api\/staff\/([\w.-]+)\/documents$/, ["manage_staff", "manage_team"], ({ m, user, body }) => svc.addDocument(database, m[1], body, user.username, user.hub)],
@@ -165,16 +194,22 @@ function createHandler(dbReady) {
     ["PUT", /^\/api\/loans\/(\d+)$/, "manage_loans", ({ user, body, m }) => loans.update(database, m[1], body, user.username, user.hub)],
     ["DELETE", /^\/api\/loans\/(\d+)$/, "manage_loans", ({ user, m }) => loans.remove(database, m[1], user.username, user.hub)],
 
-    ["GET", /^\/api\/dashboard$/, "read", ({ user, q }) => svc.dashboard(database, q.get("period"), user.hub || q.get("hub") || undefined)],
-    ["GET", /^\/api\/audit$/, "read", ({ q }) => svc.auditSearch(database, {
-      table: q.get("table"), key: q.get("key"), user: q.get("user"), from: q.get("from"), to: q.get("to"), limit: q.get("limit") })],
-    ["GET", /^\/api\/periods$/, "read", () => svc.listPeriods(database)],
-    ["GET", /^\/api\/review-queue$/, "read", ({ user }) => svc.reviewQueue(database, user.hub)],
-    ["GET", /^\/api\/reports\/balances$/, "read", async ({ user }) => (await svc.balancesReport(database)).filter((r) => !user.hub || r.hub === user.hub)],
+    ["GET", /^\/api\/dashboard$/, "read", async ({ user, q }) => {
+      const d = await svc.dashboard(database, q.get("period"), user.hub || q.get("hub") || undefined);
+      return auth.can(user, "view_pay") ? d : hidePay(d);
+    }],
+    ["GET", /^\/api\/audit$/, "read", ({ user, q }) => svc.auditSearch(database, {
+      table: q.get("table"), key: q.get("key"), user: q.get("user"), from: q.get("from"), to: q.get("to"), limit: q.get("limit"), noPay: !auth.can(user, "view_pay") })],
+    ["GET", /^\/api\/periods$/, "read", async ({ user }) => {
+      const rows = await svc.listPeriods(database);
+      return auth.can(user, "view_pay") ? rows : rows.map(({ to_bank, net_pay, ...rest }) => rest);
+    }],
+    ["GET", /^\/api\/review-queue$/, "view_pay", ({ user }) => svc.reviewQueue(database, user.hub)],
+    ["GET", /^\/api\/reports\/balances$/, "view_pay", async ({ user }) => (await svc.balancesReport(database)).filter((r) => !user.hub || r.hub === user.hub)],
     ["GET", /^\/api\/reports\/stock$/, "read", async ({ user, q }) => (await svc.stockReport(database, q.get("period"))).filter((r) => !user.hub || r.hub === user.hub)],
-    ["GET", /^\/api\/reports\/commission$/, "read", async ({ user, q }) => (await svc.commissionReport(database, q.get("period"))).filter((r) => !user.hub || r.hub === user.hub)],
+    ["GET", /^\/api\/reports\/commission$/, "view_pay", async ({ user, q }) => (await svc.commissionReport(database, q.get("period"))).filter((r) => !user.hub || r.hub === user.hub)],
 
-    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})$/, "read", async ({ m, user, q }) => {
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})$/, "view_pay", async ({ m, user, q }) => {
       const p = await svc.getPeriod(database, m[1], { detail: q.get("slim") !== "1" }); // ?slim=1 leaves out each person's full working
       return user.hub ? { ...p, rows: p.rows.filter((r) => r.hub === user.hub) } : p;
     }],
@@ -182,9 +217,9 @@ function createHandler(dbReady) {
     ["POST", /^\/api\/payroll\/(\d{4}-\d{2})\/finalize$/, "finalize", ({ m, user }) => svc.finalizePeriod(database, m[1], user.username)],
     ["POST", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)\/(approve|reject)$/, "review", ({ m, user, body }) =>
       svc.review(database, m[1], m[2], user.username, m[3] === "approve" ? "approved" : "rejected", body.note)],
-    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?$/, "read", async ({ m, user }) =>
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?$/, "view_pay", async ({ m, user }) =>
       ({ html: await reports.payslipHtml(database, m[1], m[2], user.hub) })],
-    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/register$/, "read", async ({ m }) => ({ html: await reports.registerHtml(database, m[1]) })],
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/register$/, "view_pay", async ({ m }) => ({ html: await reports.registerHtml(database, m[1]) })],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/register\.csv$/, "export", async ({ m }) =>
       ({ csv: await reports.registerCsv(database, m[1]), filename: `payroll-register-${m[1]}.csv` })],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/bank-file$/, "export", async ({ m, user }) => {
@@ -193,7 +228,7 @@ function createHandler(dbReady) {
       return { csv: f.body, filename: f.filename };
     }],
     // One person's full working. Listed last so it never shadows /register, /payslips or /bank-file.
-    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, "read", ({ m, user }) => svc.getPeriodRow(database, m[1], m[2], user.hub)],
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, "view_pay", ({ m, user }) => svc.getPeriodRow(database, m[1], m[2], user.hub)],
   ];
 
   return async function handler(req, res) {

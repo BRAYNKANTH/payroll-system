@@ -660,16 +660,26 @@ async function finalizePeriod(db, period, user) {
   return getPeriod(db, period);
 }
 
-async function auditSearch(db, { table, key, user, from, to, limit = 300 } = {}) {
+// The fields of a person's record that are their pay terms. People who may not see pay never receive them.
+const PAY_FIELDS = ["basic_pay", "commission_rate", "base_commission_rate", "food_per_day", "food_min_days", "security_deduction_rule", "pay_scheme", "opening_balance", "team_commission_rate"];
+const withoutPayFields = (row) => { const o = { ...row }; for (const k of PAY_FIELDS) delete o[k]; return o; };
+
+// noPay leaves out the pay calculations' own history (approvals of a person's pay), for people who may not see pay.
+async function auditSearch(db, { table, key, user, from, to, limit = 300, noPay = false } = {}) {
   const where = [];
   const args = [];
+  if (noPay) where.push("table_name NOT IN ('pay_period_summary', 'settings')");
   if (table) { where.push("table_name = ?"); args.push(table); }
   if (key) { where.push("row_key = ?"); args.push(String(key)); }
   if (user) { where.push("lower(changed_by) = lower(?)"); args.push(user); }
   if (from) { where.push("changed_at >= ?"); args.push(from); }
   if (to) { where.push("changed_at < ((?::date) + 1)::text"); args.push(to); }
   args.push(Math.min(Number(limit) || 300, 2000));
-  return db.all(`SELECT * FROM audit_log ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY id DESC LIMIT ?`, ...args);
+  const rows = await db.all(`SELECT * FROM audit_log ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY id DESC LIMIT ?`, ...args);
+  if (!noPay) return rows;
+  // A change to a person's record shows, but not their pay terms.
+  const strip = (json) => { try { return json ? JSON.stringify(withoutPayFields(JSON.parse(json))) : json; } catch { return json; } };
+  return rows.map((r) => (r.table_name === "staff" ? { ...r, old_value: strip(r.old_value), new_value: strip(r.new_value) } : r));
 }
 const auditLog = auditSearch;
 
@@ -971,6 +981,6 @@ async function listPeriods(db) {
 module.exports = {
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
   runPeriod, getPeriod, getPeriodRow, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
-  listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
+  PAY_FIELDS, withoutPayFields, listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
   dashboard, employeeProfile, balancesReport, stockReport, commissionReport, reviewQueue, listPeriods, shiftPeriod,
 };

@@ -86,17 +86,17 @@ export default {
             <h1>${s.name}</h1>
             <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
           </div>
-          <div class="row" style="gap:28px">
+          <div class="row" style="gap:28px" ${can("view_pay") ? "" : "hidden"}>
             <div><div class="faint text-sm">Latest net pay</div><div class="num stat-lg ${last?.net_pay < 0 ? "neg" : ""}">${last ? `Rs ${money(last.net_pay)}` : "—"}</div><div class="faint text-sm">${last ? monthName(last.period) : ""}</div></div>
             <div><div class="faint text-sm">Balance carried</div><div class="num stat-lg ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
-            ${s.role === "guy" ? html`<div><div class="faint text-sm">Security held</div><div class="num stat-lg">Rs ${money(p.security_held)}</div></div>` : ""}
+            ${s.role === "guy" ? html`<div><div class="faint text-sm">Security held</div><div class="num stat-lg">Rs ${money(p.security_held ?? 0)}</div></div>` : ""}
           </div>
           ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<div class="row" style="gap:8px"><button class="btn" id="edit">${icon("edit")} Edit</button>
             ${s.status === "active" ? html`<button class="btn" id="leave">${icon("logout")} Mark as left</button>` : html`<button class="btn primary" id="rehire">${icon("refresh")} Re-hire</button>`}</div>` : ""}
         </div>
       </div>
 
-      <div class="tabs" id="tabs">${[["overview", "Overview"], ["history", `Pay history (${p.history.length})`], ...(s.role === "manager" ? [["team", `Team (${p.team.length})`]] : []), ...(canDocs ? [["documents", "Documents"]] : []), ["changes", "Change log"]]
+      <div class="tabs" id="tabs">${[["overview", "Overview"], ...(can("view_pay") ? [["history", `Pay history (${p.history.length})`]] : []), ...(s.role === "manager" ? [["team", `Team (${p.team.length})`]] : []), ...(canDocs ? [["documents", "Documents"]] : []), ["changes", "Change log"]]
         .map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
       <div id="pane"></div>`;
 
@@ -110,7 +110,7 @@ export default {
           <dt>Phone</dt><dd>${s.phone || "—"}</dd><dt>NIC</dt><dd>${s.nic || "—"}</dd><dt>Joined</dt><dd>${s.join_date || "—"}</dd>${s.leave_date ? html`<dt>Left</dt><dd>${s.leave_date}${s.leave_reason ? html` <span class="faint">· ${s.leave_reason}</span>` : ""}</dd>` : ""}
           <dt>Added by</dt><dd>${s.created_by} · ${dateTime(s.created_at)}</dd></dl></div></div>
         <div class="stack">
-          ${s.role === "guy" ? html`<div class="card"><div class="card-head"><h2>Pay setup</h2></div><div class="card-body"><dl class="kv">
+          ${!can("view_pay") ? "" : s.role === "guy" ? html`<div class="card"><div class="card-head"><h2>Pay setup</h2></div><div class="card-body"><dl class="kv">
             ${s.pay_scheme === "tiered" ? html`<dt>Scheme</dt><dd>Tiered</dd>
             <dt>Under target</dt><dd>${pct(s.base_commission_rate, 2)} of all business, no basic</dd>
             <dt>Over target</dt><dd>Rs ${money(s.basic_pay)} fixed basic + ${pct(s.commission_rate, 2)} of business over target</dd>
@@ -194,7 +194,7 @@ export default {
       }
     };
     $$("#tabs button", el).forEach((b) => (b.onclick = () => { tab = b.dataset.t; show(); }));
-    if (!panes[tab]) tab = "overview";
+    if (!panes[tab] || (tab === "history" && !can("view_pay"))) tab = "overview";
     show();
     $("#edit")?.addEventListener("click", () => employeeForm(s, () => this.render(ctx)));
     $("#leave")?.addEventListener("click", () => leaveDrawer(p, () => this.render(ctx)));

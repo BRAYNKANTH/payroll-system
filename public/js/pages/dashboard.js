@@ -35,30 +35,31 @@ export default {
   async render({ el }) {
     const d = await get("/api/dashboard" + qs({ period: state.period, hub: scopeHub() }));
     const k = d.kpis;
+    const pay = can("view_pay"); // without it the server has already removed every pay figure
     const first = state.user.full_name.split(" ")[0];
 
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>${greeting()}, ${first}</h1>
-          <p>${monthName(d.period)} · ${badge(d.status)} ${d.last_run_at ? `· payroll last calculated ${new Date(d.last_run_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "· payroll not calculated yet"}</p></div>
+          <p>${monthName(d.period)} · ${badge(d.status)} ${!can("view_pay") ? "" : d.last_run_at ? `· payroll last calculated ${new Date(d.last_run_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "· payroll not calculated yet"}</p></div>
         <div class="actions">
           ${can("enter_data") ? html`<a class="btn" href="/daily" data-link>${icon("sheet")} Daily sheet</a>` : ""}
           ${can("run_payroll") ? html`<a class="btn primary" href="/payroll" data-link>${icon("play")} Payroll run</a>` : ""}
         </div>
       </div>
 
-      ${monthCard(d, k)}
+      ${pay ? monthCard(d, k) : ""}
 
       <div class="grid kpis">
         ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
-        ${kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "guy" : "guys"} · ${k.active_managers} ${k.active_managers === 1 ? "manager" : "managers"}` : "Run payroll to calculate")}
-        ${kpi("To bank", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Net pay Rs ${compact(k.net_pay)}` : "&nbsp;")}
+        ${!pay ? "" : kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "guy" : "guys"} · ${k.active_managers} ${k.active_managers === 1 ? "manager" : "managers"}` : "Run payroll to calculate")}
+        ${!pay ? "" : kpi("To bank", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Net pay Rs ${compact(k.net_pay)}` : "&nbsp;")}
         ${kpi("Settle-up + stock short", compact(k.settle_up + k.stock_shortfall), "coins", "amber", `Stock Rs ${compact(k.stock_shortfall)}`)}
-        ${kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
+        ${!pay ? "" : kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
       </div>
 
       <div class="grid two mt-4">
-        <div class="card"><div class="card-head"><div><h2>Six-month trend</h2><div class="sub">Guys' business vs payroll cost</div></div></div>
+        <div class="card"><div class="card-head"><div><h2>Six-month trend</h2><div class="sub">${pay ? "Guys' business vs payroll cost" : "Guys' business"}</div></div></div>
           <div class="card-body" id="trend"></div></div>
         <div class="card"><div class="card-head"><div><h2>Business by hub</h2><div class="sub">From managers' weekly sheets</div></div></div>
           <div class="card-body" id="hub-donut"></div></div>
@@ -68,9 +69,9 @@ export default {
         <div class="card"><div class="card-head"><div><h2>Hubs at a glance</h2><div class="sub">${monthName(d.period)}</div></div>
           <a class="btn sm" href="/reports" data-link>Reports</a></div>
           <div class="card-body flush" id="hub-table"></div></div>
-        <div class="card"><div class="card-head"><div><h2>Exceptions</h2><div class="sub">Flagged by the payroll rules</div></div>
+        ${pay ? html`<div class="card"><div class="card-head"><div><h2>Exceptions</h2><div class="sub">Flagged by the payroll rules</div></div>
           ${d.exceptions.length ? html`<a class="btn sm" href="/approvals" data-link>Review</a>` : ""}</div>
-          <div class="card-body flush" id="exceptions"></div></div>
+          <div class="card-body flush" id="exceptions"></div></div>` : ""}
       </div>
 
       <div class="grid halves mt-4">
@@ -85,8 +86,8 @@ export default {
       labels: d.trend.map((t) => shortMonth(t.period)),
       series: [
         { name: "Guys' business", color: PALETTE[1], values: d.trend.map((t) => t.business) },
-        { name: "Gross payroll", color: PALETTE[0], values: d.trend.map((t) => t.gross_pay) },
-        { name: "Paid to bank", color: PALETTE[2], values: d.trend.map((t) => t.to_bank) },
+        ...(pay ? [{ name: "Gross payroll", color: PALETTE[0], values: d.trend.map((t) => t.gross_pay) },
+          { name: "Paid to bank", color: PALETTE[2], values: d.trend.map((t) => t.to_bank) }] : []),
       ],
     });
 
@@ -98,20 +99,19 @@ export default {
       });
     } else $("#hub-donut").innerHTML = emptyState("No weekly sheets yet", "", "calendar").toString();
 
-    $("#hub-table").innerHTML = dataTable({
-      rows: d.by_hub,
-      empty: "No hubs yet",
-      footer: d.by_hub.length > 1,
-      cols: [
+    const hubCols = [
         { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b><div class="faint text-sm">${h.code} · ${h.staff} staff</div>`, total: () => "All hubs" },
         { key: "hub_business", label: "Business", align: "r", render: (h) => money(h.hub_business), total: (r) => money(r.reduce((t, h) => t + h.hub_business, 0)) },
         { key: "gross_pay", label: "Gross pay", align: "r", render: (h) => money(h.gross_pay), total: (r) => money(r.reduce((t, h) => t + h.gross_pay, 0)) },
         { key: "stock_shortfall", label: "Stock short", align: "r", render: (h) => h.stock_shortfall ? html`<span class="neg">${money(h.stock_shortfall)}</span>` : "—", total: (r) => money(r.reduce((t, h) => t + h.stock_shortfall, 0)) },
         { key: "manager_balance", label: "Mgr balance", align: "r", render: (h) => html`<span class="${h.manager_balance < 0 ? "neg" : ""}">${money(h.manager_balance)}</span>`, total: (r) => money(r.reduce((t, h) => t + h.manager_balance, 0)) },
-      ],
+    ];
+    $("#hub-table").innerHTML = dataTable({
+      rows: d.by_hub, empty: "No hubs yet", footer: d.by_hub.length > 1,
+      cols: pay ? hubCols : hubCols.filter((c) => !["gross_pay", "manager_balance"].includes(c.key)),
     }).toString();
 
-    $("#exceptions").innerHTML = d.exceptions.length
+    if (pay) $("#exceptions").innerHTML = d.exceptions.length
       ? d.exceptions.slice(0, 7).map((x) => html`
         <div class="list-item"><div class="avatar" style="background:var(--accent)">${initials(x.name)}</div>
           <div class="grow"><b>${x.name}</b><span>${x.hub} · ${x.flags.map((f) => f.code.replace(/_/g, " ").toLowerCase()).join(", ")}</span></div>

@@ -29,10 +29,10 @@ const NAV = [
   { path: "/branch-stock", label: "Branch stock", icon: "store", page: "hubstock" },
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances" },
   { group: "Payroll" },
-  { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll" },
-  { path: "/approvals", label: "Approvals", icon: "shield", page: "approvals", badge: true },
+  { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
+  { path: "/approvals", label: "Approvals", icon: "shield", page: "approvals", badge: true, perm: "view_pay" },
   { path: "/loans", label: "Advances & loans", icon: "wallet", page: "loans" },
-  { path: "/payslips", label: "Payslips", icon: "file", page: "payslips" },
+  { path: "/payslips", label: "Payslips", icon: "file", page: "payslips", perm: "view_pay" },
   { group: "People" },
   { path: "/employees", label: "Employees", icon: "users", page: "employees" },
   { path: "/hubs", label: "Hubs", icon: "store", page: "hubs" },
@@ -450,7 +450,7 @@ export async function boot() {
   else if (state.hub && !state.hubs.some((h) => h.code === state.hub)) state.hub = "";
   shell();
   await render();
-  if (!isStaff()) refreshPending();
+  if (!isStaff() && can("view_pay")) refreshPending(); // the approvals queue shows pay, so only those who may see pay ask for it
   warmPages();
 }
 

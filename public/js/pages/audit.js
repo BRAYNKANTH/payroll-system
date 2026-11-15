@@ -1,4 +1,5 @@
 import { get, qs } from "../api.js";
+import { can } from "../app.js";
 import { $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
 
 const MONEY = new Set(["business_amount", "settled_amount", "settle_up_minus", "personal_minus", "business_total", "rent", "hub_fee", "security_cost",
@@ -42,7 +43,7 @@ export default {
       </div>
       <div class="card">
         <div class="card-head"><form class="row" id="af">
-          <select class="input sm" name="table" aria-label="Record type" style="width:auto">${TABLES.map(([v, l]) => html`<option value="${v}" ${f.table === v ? "selected" : ""}>${l}</option>`)}</select>
+          <select class="input sm" name="table" aria-label="Record type" style="width:auto">${TABLES.filter(([v]) => can("view_pay") || !["pay_period_summary", "settings"].includes(v)).map(([v, l]) => html`<option value="${v}" ${f.table === v ? "selected" : ""}>${l}</option>`)}</select>
           <input class="input sm" name="user" aria-label="User" placeholder="User" value="${f.user}" style="width:130px">
           <input class="input sm" name="key" aria-label="Record ID" placeholder="Record ID" value="${f.key}" style="width:120px">
           <input class="input sm" type="date" name="from" value="${f.from}" style="width:150px" aria-label="From">

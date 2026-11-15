@@ -6,9 +6,9 @@ const ROLES = [
   ["staff", "Staff portal", "A distributor or supervisor who signs in to see their own sales, pay and payslips"],
   ["admin", "Admin", "Everything, including finalizing months, users and settings"],
   ["accountant", "Accountant", "Run payroll, approve exceptions, manage staff and hubs, export files"],
-  ["manager", "Hub manager", "Enter sheets and register the team of their own hub"],
+  ["manager", "Hub manager", "Enter sheets, confirm sales and register the team of their own hub. Sees sales, the money handed in and advances, never pay"],
   ["clerk", "Clerk", "Enter daily, weekly, stock and allowance sheets"],
-  ["viewer", "Viewer", "Read-only access to dashboards, payroll and reports"],
+  ["viewer", "Viewer", "Read-only access to dashboards, sales and reports. Never pay"],
 ];
 const roleBadge = (r) => badge(r === "admin" ? "admin" : r === "accountant" ? "blue" : r === "clerk" || r === "manager" || r === "staff" ? "green" : "", ROLES.find((x) => x[0] === r)?.[1] || r);
 

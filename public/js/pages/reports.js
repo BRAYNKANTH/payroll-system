@@ -4,7 +4,9 @@ import { $, $$, html, icon, money, pct, badge, dataTable, downloadCsv, monthName
 import { barChart, lineChart, PALETTE } from "../charts.js";
 
 let tab = "hubs";
-const tabsFor = () => (can("manage_products") ? [...TABS, ["profit", "Product profit"]] : TABS);
+// The commission, balances and month-history tabs are pay, so only those who may see pay get them.
+const PAY_TABS = new Set(["commission", "balances", "periods"]);
+const tabsFor = () => [...TABS.filter(([k]) => can("view_pay") || !PAY_TABS.has(k)), ...(can("manage_products") ? [["profit", "Product profit"]] : [])];
 const TABS = [["hubs", "Hub summary"], ["commission", "Commission"], ["stock", "Stock shortfall"], ["hubstock", "Branch stock"], ["balances", "Balances"], ["periods", "Month history"]];
 
 export default {
@@ -12,11 +14,13 @@ export default {
   periodic: true,
   async render({ el }) {
     const p = state.period;
+    const pay = can("view_pay");
+    if (!tabsFor().some(([k]) => k === tab)) tab = "hubs";
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Reports</h1><p>${monthName(p)} — switch the month in the top bar.</p></div>
         <div class="actions">
-          <a class="btn" href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Payroll register</a>
+          ${can("view_pay") ? html`<a class="btn" href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Payroll register</a>` : ""}
           <button class="btn primary" id="csv">${icon("download")} Export CSV</button>
         </div>
       </div>
@@ -28,21 +32,22 @@ export default {
     const views = {
       async hubs() {
         const d = await get("/api/dashboard" + qs({ period: p, hub: scopeHub() }));
-        pane.innerHTML = html`<div class="card mb-4"><div class="card-head"><h2>Business and payroll by hub</h2></div><div class="card-body" id="c"></div></div>
+        pane.innerHTML = html`<div class="card mb-4"><div class="card-head"><h2>${pay ? "Business and payroll by hub" : "Business by hub"}</h2></div><div class="card-body" id="c"></div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows: d.by_hub, footer: true,
             cols: [
               { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b> <span class="faint">${h.code}</span>`, total: () => "All hubs" },
               { key: "staff", label: "Staff", align: "r", total: (r) => r.reduce((t, h) => t + h.staff, 0) },
               ...[["hub_business", "Hub business"], ["guys_business", "Guys' business"], ["gross_pay", "Gross pay"], ["net_pay", "Net pay"], ["to_bank", "To bank"], ["stock_shortfall", "Stock short"], ["manager_balance", "Mgr balance"]]
+                .filter(([k]) => pay || !["gross_pay", "net_pay", "to_bank", "manager_balance"].includes(k))
                 .map(([k, l]) => ({ key: k, label: l, align: "r", render: (h) => html`<span class="${h[k] < 0 ? "neg" : ""}">${money(h[k])}</span>`, total: (r) => money(r.reduce((t, h) => t + h[k], 0)) })),
-              { key: "ratio", label: "Payroll / business", align: "r", render: (h) => (h.hub_business ? pct(h.gross_pay / h.hub_business) : "—"), sort: (h) => (h.hub_business ? h.gross_pay / h.hub_business : 0) },
+              ...(pay ? [{ key: "ratio", label: "Payroll / business", align: "r", render: (h) => (h.hub_business ? pct(h.gross_pay / h.hub_business) : "—"), sort: (h) => (h.hub_business ? h.gross_pay / h.hub_business : 0) }] : []),
             ],
           })}</div></div>`.toString();
         barChart($("#c"), { labels: d.by_hub.map((h) => h.name), series: [
           { name: "Hub business", color: PALETTE[1], values: d.by_hub.map((h) => h.hub_business) },
-          { name: "Gross pay", color: PALETTE[0], values: d.by_hub.map((h) => h.gross_pay) },
-          { name: "Manager balance", color: PALETTE[2], values: d.by_hub.map((h) => h.manager_balance) },
+          ...(pay ? [{ name: "Gross pay", color: PALETTE[0], values: d.by_hub.map((h) => h.gross_pay) },
+            { name: "Manager balance", color: PALETTE[2], values: d.by_hub.map((h) => h.manager_balance) }] : []),
         ] });
         exporter = () => downloadCsv(`hub-summary-${p}.csv`, ["code", "hub", "staff", "hub_business", "guys_business", "gross_pay", "net_pay", "to_bank", "stock_shortfall", "manager_balance"],
           d.by_hub.map((h) => [h.code, h.name, h.staff, fromCents(h.hub_business), fromCents(h.guys_business), fromCents(h.gross_pay), fromCents(h.net_pay), fromCents(h.to_bank), fromCents(h.stock_shortfall), fromCents(h.manager_balance)]));

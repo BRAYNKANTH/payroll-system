@@ -45,7 +45,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Weekly sheet</h1><p>One row per manager per week. Weekly balance = business × profit % − rent − hub fee − security − personal draw.
+        <div><h1>Weekly sheet</h1><p>One row per manager per week.${can("view_pay") ? " Weekly balance = business × profit % − rent − hub fee − security − personal draw." : ""}
           Business starts as the manager's own sales plus his team's from the daily sheets. Profit is ${+(rule.high * 100).toFixed(2)}% when that reaches the manager's weekly target, otherwise ${+(rule.low * 100).toFixed(2)}%. You can change any figure.</p></div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
@@ -57,7 +57,7 @@ export default {
         })}</div></div>
         <div class="card-body flush" id="grid"></div>
       </div>
-      <div class="card"><div class="card-head"><div><h2>Month overview</h2><div class="sub">Weekly balances per manager</div></div></div>
+      <div class="card"><div class="card-head"><div><h2>Month overview</h2><div class="sub">${can("view_pay") ? "Weekly balances per manager" : "Which weeks are entered"}</div></div></div>
         <div class="card-body flush" id="overview"></div></div>`;
 
     if (!managers.length) {
@@ -83,7 +83,7 @@ export default {
     const grid = $("#grid");
     grid.innerHTML = html`
       <div class="table-wrap"><table class="table sheet">
-        <thead><tr><th scope="col">Manager</th><th scope="col" class="r">Business</th><th scope="col" class="r">Profit %</th>${MONEY.slice(1).map((f) => html`<th class="r">${f.label}</th>`)}<th class="r">Weekly balance</th></tr></thead>
+        <thead><tr><th scope="col">Manager</th><th scope="col" class="r">Business</th><th scope="col" class="r">Profit %</th>${MONEY.slice(1).map((f) => html`<th class="r">${f.label}</th>`)}${can("view_pay") ? html`<th class="r">Weekly balance</th>` : ""}</tr></thead>
         <tbody>${managers.map((mg, i) => {
           const e = byMgr[mg.employee_id];
           const sales = e || !editable ? 0 : salesOf(mg);
@@ -97,7 +97,7 @@ export default {
             <td><input data-f="profit_percent" ${raw(auto)} aria-label="Profit %, ${mg.name}" inputmode="decimal" value="${p != null ? +(p * 100).toFixed(4) : ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>
             ${MONEY.slice(1).map((f) => html`<td><input data-f="${f.k}" ${raw(f.k === "security_cost" ? auto : "")} aria-label="${f.label}, ${mg.name}" inputmode="decimal"
               value="${e ? (e[f.k] ? fromCents(e[f.k]) : "") : f.k === "security_cost" && sales && rule.security ? fromCents(Math.round(sales * rule.security)) : pre[f.k] ? fromCents(pre[f.k]) : ""}" ${editable ? "" : "disabled"}></td>`)}
-            <td class="calc" data-calc></td></tr>`;
+            ${can("view_pay") ? html`<td class="calc" data-calc></td>` : ""}</tr>`;
         })}</tbody>
       </table></div>
       ${editable ? html`<div class="row between card-foot">
@@ -111,7 +111,8 @@ export default {
         const v = rowVals(tr);
         const n = (k) => Number(v[k] || 0);
         const bal = Math.round(n("business_total") * n("profit_percent")) - Math.round((n("rent") + n("hub_fee") + n("security_cost") + n("personal_draw")) * 100);
-        tr.querySelector("[data-calc]").innerHTML = v.business_total !== "" ? `<b class="${bal < 0 ? "neg" : ""}">${money(bal)}</b>` : "";
+        const calc = tr.querySelector("[data-calc]");
+        if (calc) calc.innerHTML = v.business_total !== "" ? `<b class="${bal < 0 ? "neg" : ""}">${money(bal)}</b>` : "";
         const e = byMgr[managers[tr.dataset.i].employee_id];
         const changed = e
           ? MONEY.some((f) => Math.round(n(f.k) * 100) !== e[f.k]) || Math.abs(n("profit_percent") / 100 - e.profit_percent) > 1e-9
@@ -165,9 +166,9 @@ export default {
       return { mg, cells, total: cells.reduce((t, c) => t + (c || 0), 0) };
     });
     $("#overview").innerHTML = html`<div class="table-wrap"><table class="table">
-      <thead><tr><th>Manager</th>${weeks.map((w) => html`<th class="r">w/c ${dateLabel(w).replace(/^\w+ /, "")}</th>`)}<th class="r">Month</th></tr></thead>
+      <thead><tr><th>Manager</th>${weeks.map((w) => html`<th class="r">w/c ${dateLabel(w).replace(/^\w+ /, "")}</th>`)}${can("view_pay") ? html`<th class="r">Month</th>` : ""}</tr></thead>
       <tbody>${tbl.map((r) => html`<tr><td><b>${r.mg.name}</b></td>${r.cells.map((c) => html`<td class="r">${c == null ? html`<span class="badge amber plain">missing</span>` : html`<span class="${c < 0 ? "neg" : ""}">${money(c)}</span>`}</td>`)}
-        <td class="r"><b class="${r.total < 0 ? "neg" : ""}">${money(r.total)}</b></td></tr>`)}</tbody></table></div>`.toString();
+        ${can("view_pay") ? html`<td class="r"><b class="${r.total < 0 ? "neg" : ""}">${money(r.total)}</b></td>` : ""}</tr>`)}</tbody></table></div>`.toString();
     if (isPhone()) stackTable($("#overview table"));
   },
 };
