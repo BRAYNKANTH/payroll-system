@@ -10,6 +10,7 @@ const db = require("./db");
 const svc = require("./service");
 const loans = require("./loans");
 const products = require("./products");
+const sales = require("./sales");
 const people = require("./people");
 const auth = require("./auth");
 const reports = require("./reports");
@@ -101,6 +102,8 @@ function createHandler(dbReady) {
     // Staff portal: a signed-in distributor, supervisor or group manager sees only their own figures.
     ["GET", /^\/api\/me\/portal$/, "self", ({ user, q }) => portal.summary(database, user, q.get("period") || new Date().toISOString().slice(0, 7))],
     ["GET", /^\/api\/me\/payslip\/(\d{4}-\d{2})$/, "self", async ({ user, m }) => ({ html: await portal.payslip(database, user, m[1]) })],
+    ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],
+    ["DELETE", /^\/api\/me\/sales\/(\d{4}-\d{2}-\d{2})$/, "self", ({ user, m }) => sales.removeSale(database, user, m[1])],
     ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],
     ["POST", /^\/api\/me\/documents$/, "self", ({ user, body }) => portal.addDocument(database, user, body)],
     ["GET", /^\/api\/me\/documents\/(\d+)$/, "self", async ({ user, m }) => {
@@ -147,6 +150,9 @@ function createHandler(dbReady) {
     ["PUT", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
     ["DELETE", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
 
+    // Live sales: everyone who can read sees the sales; only those who may see pay get the commission and pay-so-far columns.
+    ["GET", /^\/api\/live$/, "read", ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined }, auth.can(user, "view_pay"))],
+    ["POST", /^\/api\/sales\/confirm$/, "enter_data", ({ user, body }) => sales.confirm(database, user, body, user.hub)],
     ["GET", /^\/api\/products$/, "manage_products", () => products.list(database)],
     ["POST", /^\/api\/products$/, "manage_products", ({ user, body }) => products.create(database, body, user.username)],
     ["PUT", /^\/api\/products\/(\d+)$/, "manage_products", ({ user, body, m }) => products.update(database, m[1], body, user.username)],

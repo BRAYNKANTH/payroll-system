@@ -23,6 +23,7 @@ const NAV = [
   { path: "/", label: "Dashboard", icon: "dashboard", page: "dashboard" },
   { group: "Data entry" },
   { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily" },
+  { path: "/live", label: "Live sales", icon: "trend", page: "live" },
   { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly" },
   { path: "/stock", label: "Stock count", icon: "box", page: "stock" },
   { path: "/branch-stock", label: "Branch stock", icon: "store", page: "hubstock" },

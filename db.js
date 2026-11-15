@@ -176,6 +176,10 @@ CREATE TABLE IF NOT EXISTS daily_log (
   updated_at      text,
   UNIQUE (date, employee_id)
 );
+-- A day a seller entered themselves on the staff portal stays unconfirmed until the office confirms it (see sales.js).
+ALTER TABLE daily_log ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'office' CHECK (source IN ('office','portal'));
+ALTER TABLE daily_log ADD COLUMN IF NOT EXISTS confirmed_by text;
+ALTER TABLE daily_log ADD COLUMN IF NOT EXISTS confirmed_at text;
 
 CREATE TABLE IF NOT EXISTS weekly_log (
   id             bigserial PRIMARY KEY,

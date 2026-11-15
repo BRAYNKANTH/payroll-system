@@ -64,6 +64,8 @@ supervisors and distributors, four finalized months and the current month open. 
 | Employees | Directory, add/edit, profile with pay history chart, team, change log |
 | Hubs | Branches with live figures, and each branch's coach |
 | Products | Admin and accountant: each product's selling price and purchase price, with the workers' 45% and the profit per unit shown live as the prices are typed. Reports gets a Product profit tab for the month |
+| Live sales | Every sale as it is entered, newest first, with the person's progress to target. The admin and accountant also see the commission on each sale (the higher rate applies to the part over target), the pay earned so far and the net so far; everyone else sees only the sales |
+| Sellers enter their own sales | On the staff portal a distributor or supervisor adds a day (sales, money handed in, advance). It is unconfirmed until a hub manager, clerk or admin confirms it; until then the seller can correct or remove it, and payroll flags it (`UNCONFIRMED_SALES`) so a month cannot be finalized with unchecked sales |
 | Leavers and joiners | Mark as left (last day, reason, and who takes over the people reporting to them, who must hold the same position in the same hub), Re-hire, and a coacher can be added for a branch. Days before someone joined or after they left are not counted as missing |
 | Reports | Hub summary, commission, stock shortfall, branch stock, balances, month history (CSV export) |
 | Audit trail | Every change after first entry: who, when, old → new; filters and export |

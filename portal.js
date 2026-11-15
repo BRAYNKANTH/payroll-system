@@ -6,7 +6,6 @@ const svc = require("./service");
 const reports = require("./reports");
 const loans = require("./loans");
 
-const TEAM_LEVELS = new Set(["supervisor", "group_manager"]);
 const monthBounds = (period) => [period + "-01", svc.shiftPeriod(period, 1) + "-01"];
 
 async function me(db, user) {
@@ -21,7 +20,7 @@ async function summary(db, user, period) {
   svc.assertPeriod(period);
   const s = await me(db, user);
   const finalized = await svc.isFinalized(db, period);
-  const daily = await db.all("SELECT date, business_amount, settled_amount, settle_up_minus, personal_minus, notes FROM daily_log WHERE employee_id = ? AND date >= ? AND date < ? ORDER BY date", s.employee_id, ...monthBounds(period));
+  const daily = await db.all("SELECT id, date, business_amount, settled_amount, settle_up_minus, personal_minus, notes, source, (confirmed_by IS NOT NULL OR source <> 'portal') AS confirmed FROM daily_log WHERE employee_id = ? AND date >= ? AND date < ? ORDER BY date", s.employee_id, ...monthBounds(period));
   const stock = await db.all("SELECT * FROM stock_recon WHERE employee_id = ? AND period = ? ORDER BY product", s.employee_id, period);
   const allowances = await db.all("SELECT description, amount FROM allowances WHERE employee_id = ? AND period = ? ORDER BY id", s.employee_id, period);
   const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k] || 0), 0);

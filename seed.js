@@ -184,6 +184,9 @@ await month(open, { growth: 1.06, short: { D02: 1500, D04: 9000 }, draws: { M02:
 const row = (await svc.listEntries(d, "daily", { period: open, employee_id: "D01" }))[0];
 await svc.updateEntry(d, "daily", row.id, { settled_amount: row.settled_amount / 100 - 200, notes: "Recount: Rs 200 short" }, "accounts");
 await svc.updateEntry(d, "staff", "D07", { bank_account_no: "3000999888" }, "accounts");
+// Pavan's last two days were entered by Pavan himself on the staff portal and are waiting for the office to confirm them.
+await d.run(`UPDATE daily_log SET source = 'portal', created_by = 'pavan' WHERE id IN
+  (SELECT id FROM daily_log WHERE employee_id = 'D01' AND date >= ? AND date < ? ORDER BY date DESC LIMIT 2)`, open + "-01", svc.shiftPeriod(open, 1) + "-01");
 await svc.runPeriod(d, open, "accounts");
 
 console.log(`Seeded ${remote ? "the Postgres database from DATABASE_URL" : target}`);

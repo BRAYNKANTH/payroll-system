@@ -1,5 +1,5 @@
 // Staff portal: one page for a distributor, supervisor or group manager, showing only their own figures.
-import { get, post } from "../api.js";
+import { get, post, del } from "../api.js";
 import { state } from "../app.js";
 import { $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime } from "../ui.js";
 
@@ -7,6 +7,8 @@ let tab = "month";
 const DOC_TYPES = [["nic", "ID / NIC"], ["bank_book", "Bank book front page"], ["ol_results", "O/L results sheet"], ["other", "Other"]];
 const DOC_MAX = 3_000_000;
 const fileSize = (b) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+// Today in Sri Lanka (UTC+5:30), the same as the server uses, optionally some days away.
+const slToday = (days = 0) => new Date(Date.now() + 5.5 * 3600e3 + days * 864e5).toISOString().slice(0, 10);
 const n0 = (c) => (c / 100).toLocaleString("en-LK", { maximumFractionDigits: 0 });
 const readBase64 = (file) => new Promise((ok, fail) => {
   const r = new FileReader();
@@ -142,6 +144,16 @@ export default {
           ${final ? "" : html`<div class="card-foot muted">The office calculates the final figure at the end of the month and may check some entries first. Your payslip appears here after the month is closed.</div>`}
         </section>` : html`<div class="card mb-4">${emptyState("No sales entered yet this month", "When your daily sales are entered, your progress and an estimate of your pay appear here.", "chart")}</div>`}
 
+        <section class="card mb-4" id="addsale"><div class="card-head"><div><h2>Add your sales</h2><div class="sub">Enter a day's sales and the money you handed in. Your hub manager confirms it. Until then you can correct or remove it.</div></div></div>
+          <form id="sf" class="card-body form-grid" autocomplete="off">
+            <div class="field"><label for="sf-date">Day</label><input class="input" id="sf-date" type="date" name="date" value="${slToday()}" min="${slToday(-7)}" max="${slToday()}" required></div>
+            <div class="field"><label for="sf-biz">Sales (Rs)</label><input class="input" id="sf-biz" name="business_amount" inputmode="decimal" required></div>
+            <div class="field"><label for="sf-set">Money handed in (Rs)</label><input class="input" id="sf-set" name="settled_amount" inputmode="decimal" required></div>
+            <div class="field"><label for="sf-adv">Advance taken (Rs)</label><input class="input" id="sf-adv" name="personal_minus" inputmode="decimal" placeholder="0"></div>
+            <div class="field full"><label for="sf-note">Note</label><input class="input" id="sf-note" name="notes" maxlength="200" placeholder="Optional"></div>
+            <div class="full"><button class="btn primary" id="sf-save" type="submit">${icon("check")} Save sales</button> <span class="muted">Saving the same day again replaces it.</span></div>
+          </form></section>
+
         <section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>
         ${m.stock.length ? html`<section class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></section>` : ""}
         ${m.allowances.length ? html`<section class="card mb-4"><div class="card-head"><h2>Allowances this month</h2></div><div class="card-body flush" id="allow"></div></section>` : ""}
@@ -215,14 +227,30 @@ export default {
               { key: "settle_up_minus", label: "Difference", align: "r", render: (r) => html`<span class="${r.settle_up_minus ? "neg" : ""}">${money(r.settle_up_minus)}</span>`, total: () => money(m.settle_up) },
               { key: "personal_minus", label: "Advance", align: "r", render: (r) => (r.personal_minus ? money(r.personal_minus) : "—"), total: () => money(m.personal) },
               { key: "notes", label: "Note", render: (r) => r.notes || "" },
+              { key: "status", label: "", sort: false, render: (r) => (r.source === "portal" ? (r.confirmed ? badge("green", "Confirmed") : html`${badge("amber", "Waiting")} <button class="btn sm ghost" data-rm="${r.date}">Remove</button>`) : "") },
             ],
           }).toString(),
           group("", [...m.daily.slice().reverse().map((r) => row(dateLabel(r.date), money(r.business_amount), {
-            sub: `Handed in ${money(r.settled_amount)}${r.personal_minus ? ` · Advance ${money(r.personal_minus)}` : ""}${r.notes ? ` · ${r.notes}` : ""}`,
+            sub: `Handed in ${money(r.settled_amount)}${r.personal_minus ? ` · Advance ${money(r.personal_minus)}` : ""}${r.notes ? ` · ${r.notes}` : ""}${r.source === "portal" && !r.confirmed ? " · waiting for confirmation" : ""}`,
             vsub: r.settle_up_minus ? `Short ${money(r.settle_up_minus)}` : "", cls: "",
           })), row(`Total · ${m.days} day${m.days === 1 ? "" : "s"}`, money(m.business), { strong: true, vsub: m.settle_up ? `Short ${money(m.settle_up)}` : "" })])) : emptyState("No days entered yet", "", "sheet").toString();
         if (m.stock.length && $("#stock")) $("#stock").innerHTML = group("", m.stock.map((r) => row(r.product, r.shortfall_value ? money(r.shortfall_value) : "—", { sub: `${r.shortfall_qty} missing × ${money(r.unit_price)}`, cls: r.shortfall_value ? "neg" : "" })));
         if (m.allowances.length && $("#allow")) $("#allow").innerHTML = group("", m.allowances.map((r) => row(r.description, money(r.amount))));
+        // Adding a day, and removing one that the office has not confirmed yet.
+        $("#sf").onsubmit = (ev) => {
+          ev.preventDefault();
+          busy($("#sf-save"), async () => {
+            await post("/api/me/sales", Object.fromEntries(new FormData(ev.target)));
+            toast("Sales saved. Your hub manager will confirm them.");
+            buzz(12);
+            await this.render({ ...ctx, refresh: true });
+          });
+        };
+        $$("[data-rm]").forEach((b) => (b.onclick = () => busy(b, async () => {
+          await del(`/api/me/sales/${b.dataset.rm}`);
+          toast("Removed");
+          await this.render({ ...ctx, refresh: true });
+        })));
       }
       if (tab === "payslips" && d.history.length) {
         $("#hist").innerHTML = both(

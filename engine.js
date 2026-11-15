@@ -123,6 +123,7 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
         .filter((d) => d.settle_up_minus < 0 || d.personal_minus < 0)
         .map((d) => ({ date: d.date, settle_up_minus: d.settle_up_minus, personal_minus: d.personal_minus })),
       stock_shortfall: stockShortfall,
+      unconfirmed_days: daily.filter((d) => d.source === "portal" && !d.confirmed_by).length,
       manager_extra: managerExtra,
       security_deducted: security,
     },
@@ -266,6 +267,10 @@ function evaluateFlags(result, { staff, previous, settings }) {
         ? `Account ${mask(staff.bank_account_no)} differs from verified ${mask(staff.bank_account_verified)}`
         : `Account ${mask(staff.bank_account_no)} has never been verified`);
     }
+  }
+
+  if (result.detail.unconfirmed_days > 0) {
+    add("UNCONFIRMED_SALES", `${result.detail.unconfirmed_days} day${result.detail.unconfirmed_days > 1 ? "s" : ""} entered by the seller and not yet confirmed by the office`);
   }
 
   const stockLimit = Number(settings.stock_shortfall_threshold);

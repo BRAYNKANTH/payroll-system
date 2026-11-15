@@ -11,8 +11,8 @@ const PERMISSIONS = {
   viewer: ["read"],
   clerk: ["read", "enter_data"],
   manager: ["read", "enter_data", "manage_team"],
-  accountant: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products"],
-  admin: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "finalize", "manage_users", "settings"],
+  accountant: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay"],
+  admin: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings"],
 };
 const can = (user, perm) => !!user && PERMISSIONS[user.role]?.includes(perm);
 // perm may be a list: any one of them is enough.
