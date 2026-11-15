@@ -22,6 +22,13 @@ const DEFAULT_SETTINGS = {
   manager_rent_default: "400000",      // cents -> Rs 4,000 a week, pre-filled on the weekly sheet
   manager_hub_fee_default: "50000",    // cents -> Rs 500 a week
   manager_security_rate: "0.01",       // security pre-filled as this share of the week's business
+  // A manager whose own + team sales for the month fall below the threshold is "retaining": basic salary + the retain rate on those sales.
+  manager_retain_threshold: "25000000", // cents -> Rs 250,000 a month
+  manager_retain_rate: "0.10",
+  // Promoting managers and coachers: basic salary + this share of the sales of everyone below them (1% of the company's 55%).
+  senior_commission_rate: "0.0055",
+  // A manager also sells: the seller's commission on his own sales (the 20% team share is on top).
+  manager_own_sales_rate: "0.25",
 };
 
 // Timestamps are stored as ISO-8601 UTC text so they compare and serialise exactly like before.
@@ -122,7 +129,7 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS pay_scheme text NOT NULL DEFAULT 'ove
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS base_commission_rate double precision NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_per_day bigint NOT NULL DEFAULT 0;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAULT 0;
--- Share of the whole team's monthly sales paid to a manager-level person (a promoting manager earns 20%). 0 = none.
+-- No longer used: managers now earn by the weekly target rule and promoting managers by senior_commission_rate (settings). Kept so old databases still open.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS team_commission_rate double precision NOT NULL DEFAULT 0;
 
 -- Existing databases were created before the hub-manager role: widen the role check (the name is Postgres's default).
@@ -132,16 +139,21 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','accou
 -- Balance brought forward from the old spreadsheets. Only used until the person has a first calculated month.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS opening_balance bigint NOT NULL DEFAULT 0;
 
--- Chain of command: distributor/guy -> supervisor -> group manager -> manager. upline_id is who this person reports to.
+-- Chain of command: distributor and supervisor (same level) -> manager -> promoting manager -> coacher. upline_id is who this person reports to.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS staff_level text NOT NULL DEFAULT 'distributor' CHECK (staff_level IN ('distributor','supervisor','group_manager','manager'));
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS upline_id text REFERENCES staff(employee_id);
 UPDATE staff SET staff_level = 'manager' WHERE role = 'manager' AND staff_level = 'distributor';
--- A staff-portal login belongs to one employee (a distributor, supervisor or group manager) and only ever sees that person's own figures.
+-- A staff-portal login belongs to one employee (a distributor or supervisor) and only ever sees that person's own figures.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id text REFERENCES staff(employee_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_employee_id ON users (employee_id) WHERE employee_id IS NOT NULL;
--- Promoting manager and coacher sit above the manager and draw a fixed monthly salary (staff.basic_pay), as a manager can.
+-- The group manager position no longer exists. Anyone who was one becomes a supervisor (a seller), and the people who reported to a
+-- group manager now report to that group manager's own upline. Safe to run again: it does nothing once no group managers are left.
+UPDATE staff SET upline_id = (SELECT g.upline_id FROM staff g WHERE g.employee_id = staff.upline_id)
+  WHERE upline_id IN (SELECT employee_id FROM staff WHERE staff_level = 'group_manager');
+UPDATE staff SET staff_level = 'supervisor', role = 'guy' WHERE staff_level = 'group_manager';
+-- Promoting manager and coacher sit above the manager and draw a fixed monthly salary (staff.basic_pay) plus a share of the sales below.
 ALTER TABLE staff DROP CONSTRAINT IF EXISTS staff_staff_level_check;
-ALTER TABLE staff ADD CONSTRAINT staff_staff_level_check CHECK (staff_level IN ('distributor','supervisor','group_manager','manager','promoting_manager','coacher'));
+ALTER TABLE staff ADD CONSTRAINT staff_staff_level_check CHECK (staff_level IN ('distributor','supervisor','manager','promoting_manager','coacher'));
 
 CREATE TABLE IF NOT EXISTS daily_log (
   id              bigserial PRIMARY KEY,

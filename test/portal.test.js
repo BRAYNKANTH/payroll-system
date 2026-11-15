@@ -17,10 +17,9 @@ async function setup() {
   const add = (id, level, upline, extra = {}) => svc.createEntry(d, "staff", { employee_id: id, name: `Name ${id}`, hub: "H1", staff_level: level,
     ...(upline ? { upline_id: upline } : {}), basic_pay: 30000, target: 100000, commission_rate: 0.3, bank_account_no: "1111" + id.replace(/\D/g, "").padStart(4, "0"), ...extra }, "admin");
   await add("M1", "manager");
-  await add("GM1", "group_manager", "M1");
-  await add("S1", "supervisor", "GM1");
-  await add("D1", "distributor", "S1");
-  await add("D2", "distributor", "S1");
+  await add("S1", "supervisor", "M1");
+  await add("D1", "distributor", "M1");
+  await add("D2", "distributor", "M1");
   await add("D9", "distributor", null, { hub: "H2" });
   const day = (date, id, business) => svc.createEntry(d, "daily", { date, employee_id: id, business_amount: business, settled_amount: business }, "admin");
   await day("2026-10-01", "D1", 70000); await day("2026-10-02", "D1", 60000);
@@ -29,7 +28,7 @@ async function setup() {
 }
 const login = (d, employee, username) => auth.createUser(d, ADMIN, { username, full_name: `Name ${employee}`, role: "staff", employee_id: employee, password: "portal1234" });
 
-test("a staff login is tied to one distributor, supervisor or group manager, and takes their hub", async () => {
+test("a staff login is tied to one distributor or supervisor, and takes their hub", async () => {
   const d = await setup();
   const u = await login(d, "D1", "user-d1");
   assert.deepEqual([u.role, u.employee_id, u.hub], ["staff", "D1", "H1"]);
@@ -39,7 +38,7 @@ test("a staff login is tied to one distributor, supervisor or group manager, and
   assert.throws(() => auth.requirePerm(u, "read"), /cannot do this/);
 
   await assert.rejects(() => login(d, "D1", "user-d1b"), /already has a login/);
-  await assert.rejects(() => login(d, "M1", "user-m1"), /distributors, supervisors and group managers/);
+  await assert.rejects(() => login(d, "M1", "user-m1"), /distributors and supervisors/);
   await assert.rejects(() => login(d, "NOBODY", "user-nobody"), /Choose the employee/);
   await svc.updateEntry(d, "staff", "D2", { status: "inactive" }, "admin");
   await assert.rejects(() => login(d, "D2", "user-d2"), /inactive/);
@@ -59,7 +58,7 @@ test("the portal shows only my own sales, target progress and an estimate marked
   const p = await portal.summary(d, u, "2026-10");
   assert.equal(p.me.employee_id, "D1");
   assert.equal(p.me.level_name, "Distributor");
-  assert.equal(p.me.reports_to, "Name S1");
+  assert.equal(p.me.reports_to, "Name M1");
   assert.equal(p.month.business, 13000000);       // 70,000 + 60,000
   assert.equal(p.month.days, 2);
   assert.equal(p.month.over_target, 3000000);
@@ -68,21 +67,9 @@ test("the portal shows only my own sales, target progress and an estimate marked
   assert.equal(p.official, null);
   assert.ok(p.estimate, "an estimate exists while the month is open");
   assert.equal(p.estimate.gross, 3000000 + Math.round(3000000 * 0.3)); // basic 30,000 + 30% of 30,000 over target
-  assert.equal(p.team, null, "a distributor has no team");
   assert.ok(!JSON.stringify(p).includes("Name D2") && !JSON.stringify(p).includes("D9"), "nothing about anyone else");
   // a month with no entries has no estimate
   assert.equal((await portal.summary(d, u, "2026-09")).estimate, null);
-});
-
-test("a supervisor and a group manager see their team's sales, not their pay", async () => {
-  const d = await setup();
-  const s = await portal.summary(d, await login(d, "S1", "user-s1"), "2026-10");
-  assert.deepEqual(s.team.map((t) => t.employee_id), ["D1", "D2"]);
-  assert.equal(s.team.find((t) => t.employee_id === "D1").business, 13000000);
-  assert.ok(s.team.every((t) => !("net_pay" in t) && !("gross" in t)));
-  const g = await portal.summary(d, await login(d, "GM1", "user-gm1"), "2026-10");
-  assert.deepEqual(g.team.map((t) => `${t.employee_id}:${t.depth}`), ["S1:1", "D1:2", "D2:2"], "the whole downline, nearest first");
-  assert.ok(!g.team.some((t) => t.employee_id === "D9"), "another hub's person is not on the team");
 });
 
 test("final figures and the payslip appear only after the month is finalized, and only for me", async () => {

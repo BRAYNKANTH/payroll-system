@@ -48,7 +48,7 @@ const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
   { re: /^\/account$/, page: "account", nav: null },
 ];
-// A staff-portal login (a distributor, supervisor or group manager) gets one page about themselves and nothing else.
+// A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
 const isStaff = () => state.user?.role === "staff";
 const roleText = (r) => (r === "staff" ? "Staff portal" : r);
 const groupOf = (path) => {

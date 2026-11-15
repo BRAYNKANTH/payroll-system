@@ -96,21 +96,64 @@ test("security rules", () => {
   assert.throws(() => engine.parseSecurityRule("10%"), /Invalid/);
 });
 
-test("manager: closing = opening + Σweekly − company return − guys' salaries", () => {
-  const w = (start, business) => ({ week_start: start, week_end: start, business_total: business, profit_percent: 0.3,
-    rent: 1000000, hub_fee: 200000, security_cost: 100000, personal_draw: 500000 });
+const week = (start, business) => ({ week_start: start, week_end: start, business_total: business, profit_percent: 0.2,
+  rent: 400000, hub_fee: 50000, security_cost: 100000, personal_draw: 200000 });
+const mgr = { employee_id: "M1", basic_pay: 2700000 };
+const rules = { ownRate: 0.25, retainThreshold: 25000000, retainRate: 0.1 };
+
+test("manager: weekly commission + own sales + basic salary, minus costs and the team's extras", () => {
   const r = engine.computeManager({
-    staff: { employee_id: "M1" },
-    weekly: [w("2026-09-01", 20000000), w("2026-09-08", 20000000), w("2026-09-15", 20000000), w("2026-09-22", 20000000), w("2026-09-29", 20000000)],
-    guyNetPays: [{ employee_id: "G1", net_pay: 3000000 }, { employee_id: "G2", net_pay: 2500000 }],
-    openingBalance: 1000000, companyReturnRate: 0.15,
+    staff: mgr, weekly: [week("2026-10-05", 10500000), week("2026-10-12", 10500000)],
+    team: [{ employee_id: "G1", name: "G1", over_target: 150000, food: 390000 }, { employee_id: "G2", name: "G2", over_target: 0, food: 390000 }],
+    openingBalance: 1000000, companyReturnRate: 0, teamSales: 30000000, ownSales: 6000000, rules,
   });
-  const weekly = 20000000 * 0.3 - 1800000;              // 4,200,000 per week
-  assert.equal(r.detail.total_business, 100000000);
-  assert.equal(r.net_pay, 5 * weekly - 15000000 - 5500000);
-  assert.equal(r.closing_balance, 1000000 + r.net_pay);
+  assert.equal(r.detail.retaining, false);                 // Rs 360,000 of sales is above Rs 250,000
+  assert.equal(r.gross_earnings, 4200000 + 1500000 + 2700000); // weekly 20% + 25% of own sales + basic
+  assert.equal(r.total_deductions, 800000 + 100000 + 200000 + 400000 + 150000 + 780000);
+  assert.equal(r.net_pay, 5970000);
   assert.equal(r.gross_earnings - r.total_deductions, r.net_pay);
-  assert.equal(r.disbursed_amount, 0);
+  assert.equal(r.disbursed_amount, 2700000);               // only the basic salary goes to the bank
+  assert.equal(r.closing_balance, 1000000 + 5970000 - 2700000);
+});
+
+test("manager: below Rs 250,000 of sales he is retaining: basic + 10% of those sales, instead of the weekly commission", () => {
+  const r = engine.computeManager({
+    staff: mgr, weekly: [week("2026-10-05", 10500000), week("2026-10-12", 10500000)], team: [],
+    openingBalance: 0, companyReturnRate: 0, teamSales: 10000000, ownSales: 2000000, rules,
+  });
+  assert.equal(r.detail.retaining, true);
+  assert.equal(r.gross_earnings, 1200000 + 500000 + 2700000); // 10% of Rs 120,000, own sales 25%, basic
+  assert.ok(r.detail.earnings[0].label.startsWith("Retaining commission"));
+  // exactly on the limit is not retaining
+  const edge = engine.computeManager({ staff: mgr, weekly: [], team: [], openingBalance: 0, companyReturnRate: 0, teamSales: 25000000, ownSales: 0, rules });
+  assert.equal(edge.detail.retaining, false);
+});
+
+test("promoting manager and coacher: basic salary plus a share of the sales below, all paid to the bank", () => {
+  const r = engine.computeSenior({ staff: { basic_pay: 2900000 }, belowSales: 100000000, rate: 0.0055, openingBalance: 0 });
+  assert.equal(r.gross_earnings, 2900000 + 550000);        // Rs 29,000 + 0.55% of Rs 1,000,000
+  assert.equal(r.net_pay, 3450000);
+  assert.equal(r.disbursed_amount, 3450000);
+  assert.equal(r.closing_balance, 0);
+  assert.equal(r.total_deductions, 0);
+});
+
+test("a weekly target decides the manager's rate: his own target first, the Settings figure as the fallback", () => {
+  const s = { manager_commission_threshold: "10000000", manager_commission_high: "0.20", manager_commission_low: "0.15" };
+  assert.equal(engine.managerCommissionRate(10000000, s), 0.2);
+  assert.equal(engine.managerCommissionRate(9999900, s), 0.15);
+  assert.equal(engine.managerCommissionRate(12000000, s, 15000000), 0.15, "a higher personal target is not reached");
+  assert.equal(engine.managerCommissionRate(12000000, s, 8000000), 0.2);
+  assert.equal(engine.managerCommissionRate(10000000, s, 0), 0.2, "no personal target falls back to Settings");
+});
+
+test("a seller's extra on sales over target and food are what his manager pays; the base 25% is the company's", () => {
+  const staff = { pay_scheme: "tiered", target: 10000000, basic_pay: 2500000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 15000, food_min_days: 0, security_deduction_rule: "none" };
+  const day = (business) => ({ date: "2026-10-01", business_amount: business, settled_amount: business, settle_up_minus: 0, personal_minus: 0 });
+  const over = engine.computeGuy({ staff, daily: [day(13000000)], stock: [], allowances: [], openingBalance: 0, securityHeldToDate: 0 });
+  assert.deepEqual(over.detail.manager_extra, { over_target: 900000 - 750000, food: 15000 }); // 30% − 25% of Rs 30,000, and one day's food
+  const under = engine.computeGuy({ staff, daily: [day(8000000)], stock: [], allowances: [], openingBalance: 0, securityHeldToDate: 0 });
+  assert.deepEqual(under.detail.manager_extra, { over_target: 0, food: 15000 });
 });
 
 test("flags: net pay change over 20%", () => {

@@ -55,6 +55,8 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
   const foodDays = daily.length;
   const food = tiered && staff.food_per_day > 0 && foodDays >= (staff.food_min_days || 0) ? staff.food_per_day * foodDays : 0;
   const gross = basic + baseCommission + commission + food + allowanceTotal;
+  // What a seller earns above the company's base rate is paid by his manager: the extra on sales over target, and food.
+  const managerExtra = tiered ? { over_target: metTarget ? commission - pct(overTarget, staff.base_commission_rate) : 0, food } : { over_target: 0, food: 0 };
 
   const settleUpDaily = sum(daily, "settle_up_minus");
   const stockShortfall = sum(stock, "shortfall_value");
@@ -121,27 +123,32 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
         .filter((d) => d.settle_up_minus < 0 || d.personal_minus < 0)
         .map((d) => ({ date: d.date, settle_up_minus: d.settle_up_minus, personal_minus: d.personal_minus })),
       stock_shortfall: stockShortfall,
+      manager_extra: managerExtra,
       security_deducted: security,
     },
   };
 }
 
-// Commission rate for a manager's week: the high rate once business reaches the threshold, otherwise the low rate.
-function managerCommissionRate(businessCents, settings) {
-  return businessCents >= Number(settings.manager_commission_threshold) ? Number(settings.manager_commission_high) : Number(settings.manager_commission_low);
+// Commission rate for a manager's week: the high rate when the week's business (his own plus his team's) reaches his weekly
+// target, otherwise the low rate. The target is the manager's own (staff.target); the setting is the fallback.
+function managerCommissionRate(businessCents, settings, targetCents) {
+  const target = Number(targetCents) > 0 ? Number(targetCents) : Number(settings.manager_commission_threshold);
+  return businessCents >= target ? Number(settings.manager_commission_high) : Number(settings.manager_commission_low);
 }
 
-// Managers — monthly, built from that month's weekly rows.
-// staff.basic_pay is a separate fixed salary (manager, promoting manager, coacher): it is paid out to the bank
-// and does not move the running balance.
-// guyNetPays: net_pay of each guy whose manager_id is this manager, for the same period.
-// staff.team_commission_rate > 0 replaces the weekly profit share: the manager earns that % of the month's sales of
-// everyone below them (teamSales, from the daily sheets) instead of business × profit % from the weekly sheet. It goes
-// into the running account like the profit share did. The weekly rows still supply rent, hub fee, security and draws.
-function computeManager({ staff, weekly, guyNetPays, openingBalance, companyReturnRate, teamSales = 0 }) {
-  const teamRate = Number(staff.team_commission_rate) || 0;
+// Managers — monthly, built from that month's weekly rows and the daily sheets.
+//   Commission: each week's business × that week's profit % (20% at or above the weekly target, 15% below), added up.
+//   Retaining:  when the month's sales (his own + his team's, from the daily sheets) are below rules.retainThreshold the manager is
+//               "retaining" for the month: the weekly commission is replaced by rules.retainRate of the month's sales. The basic salary stays.
+//   Own sales:  a manager sells too, so he also earns the seller's rate (rules.ownRate) on his own sales.
+//   Team extras: what the sellers earn above the company's 25% (the extra on sales over target, and food) is paid out of the manager's
+//               share, so it is charged to his account. The company pays everything else a seller earns.
+// staff.basic_pay is a separate fixed salary: it is paid out to the bank and does not move the running balance.
+// team: one row per seller with the extras charged to this manager: [{ employee_id, name, over_target, food }].
+function computeManager({ staff, weekly, team = [], openingBalance, companyReturnRate, teamSales = 0, ownSales = 0, rules = {} }) {
+  const { ownRate = 0, retainThreshold = 0, retainRate = 0 } = rules;
   const weeks = weekly.map((w) => {
-    const profitShare = teamRate > 0 ? 0 : pct(w.business_total, w.profit_percent);
+    const profitShare = pct(w.business_total, w.profit_percent);
     return {
       week_start: w.week_start, week_end: w.week_end, business_total: w.business_total,
       profit_percent: w.profit_percent, profit_share: profitShare,
@@ -150,23 +157,25 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
     };
   });
   const totalBusiness = sum(weeks, "business_total");
-  const companyReturn = pct(totalBusiness, companyReturnRate);
-  const guysSalaryTotal = sum(guyNetPays, "net_pay");
+  const monthSales = teamSales + ownSales;
+  const retaining = retainThreshold > 0 && monthSales < retainThreshold;
+  const weeklyCommission = sum(weeks, "profit_share");
+  const commission = retaining ? pct(monthSales, retainRate) : weeklyCommission;
+  const ownCommission = pct(ownSales, ownRate);
   const salary = Number(staff.basic_pay) || 0;
-  const profitTotal = sum(weeks, "profit_share");
-  const teamCommission = teamRate > 0 ? pct(teamSales, teamRate) : 0;
-  const gross = profitTotal + teamCommission + salary;
+  const companyReturn = pct(totalBusiness, companyReturnRate);
+  const gross = commission + ownCommission + salary;
   const deductions = [
     { key: "rent", label: "Rent", amount: sum(weeks, "rent") },
     { key: "hub_fee", label: "Hub fee", amount: sum(weeks, "hub_fee") },
     { key: "security_cost", label: "Security cost", amount: sum(weeks, "security_cost") },
     { key: "personal_draw", label: "Personal draw", amount: sum(weeks, "personal_draw") },
     { key: "company_return", label: `Company return (${fmtRate(companyReturnRate)} of business)`, amount: companyReturn },
-    { key: "guys_salary", label: "Guys' net salaries", amount: guysSalaryTotal },
+    { key: "team_over_target", label: "Team's extra on sales over target", amount: sum(team, "over_target") },
+    { key: "team_food", label: "Team's food allowance", amount: sum(team, "food") },
   ];
   const totalDeductions = sum(deductions, "amount");
-  // closing = opening + Σweekly_balance − company_return − guys_salary_total
-  const netPay = sum(weeks, "weekly_balance") + teamCommission - companyReturn - guysSalaryTotal + salary;
+  const netPay = gross - totalDeductions;
 
   return {
     role: "manager",
@@ -180,14 +189,43 @@ function computeManager({ staff, weekly, guyNetPays, openingBalance, companyRetu
       weeks_logged: weeks.length,
       total_business: totalBusiness,
       weeks,
-      guys: guyNetPays,
+      team,
       basic_salary: salary,
-      ...(teamRate > 0 ? { team_sales: teamSales, team_commission: teamCommission } : {}),
+      month_sales: monthSales, team_sales: teamSales, own_sales: ownSales,
+      retaining, retain_threshold: retainThreshold,
       earnings: [
-        teamRate > 0 ? { label: `Team commission (${fmtRate(teamRate)} of Rs ${fmt(teamSales)} sales of everyone below)`, amount: teamCommission }
-          : { label: "Profit share (Σ business × profit %)", amount: profitTotal },
+        retaining
+          ? { label: `Retaining commission (${fmtRate(retainRate)} of Rs ${fmt(monthSales)}: sales below Rs ${fmt(retainThreshold)})`, amount: commission }
+          : { label: "Weekly commission (Σ weekly business × profit %)", amount: commission },
+        ...(ownSales ? [{ label: `Own sales commission (${fmtRate(ownRate)} of Rs ${fmt(ownSales)})`, amount: ownCommission }] : []),
         ...(salary ? [{ label: "Basic salary (paid to bank)", amount: salary }] : [])],
       deductions,
+    },
+  };
+}
+
+// Promoting managers and coachers — monthly. A fixed basic salary plus a share (rate) of the sales of everyone below them.
+// Both are paid to the bank; they hold no weekly account.
+function computeSenior({ staff, belowSales = 0, rate = 0, openingBalance = 0 }) {
+  const salary = Number(staff.basic_pay) || 0;
+  const commission = pct(belowSales, rate);
+  const gross = salary + commission;
+  return {
+    role: "manager",
+    opening_balance: openingBalance,
+    gross_earnings: gross,
+    total_deductions: 0,
+    net_pay: gross,
+    disbursed_amount: gross,
+    closing_balance: openingBalance,
+    detail: {
+      weeks_logged: 0, total_business: belowSales, weeks: [], team: [],
+      basic_salary: salary, below_sales: belowSales, commission_rate: rate,
+      earnings: [
+        { label: "Basic salary (paid to bank)", amount: salary },
+        { label: `Share of sales below (${fmtRate(rate)} of Rs ${fmt(belowSales)})`, amount: commission },
+      ],
+      deductions: [],
     },
   };
 }
@@ -250,4 +288,4 @@ function fmt(cents) {
 function fmtRate(r) { return `${+(r * 100).toFixed(4)}%`; }
 function mask(acct) { return acct.length <= 4 ? acct : "…" + acct.slice(-4); }
 
-module.exports = { parseSecurityRule, securityDeduction, computeGuy, computeManager, managerCommissionRate, evaluateFlags, fmt, fmtRate };
+module.exports = { parseSecurityRule, securityDeduction, computeGuy, computeManager, computeSenior, managerCommissionRate, evaluateFlags, fmt, fmtRate };

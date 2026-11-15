@@ -1,8 +1,8 @@
 // Demo data: node seed.js [target]
 //   target = a folder for a local PGlite database (default data/demo), or a postgres:// URL.
 //   With no argument and DATABASE_URL set (e.g. node --env-file=.env seed.js) it seeds that database.
-// Mock data shaped like the real business: three Jaffna branches, each with a manager, a group manager,
-// supervisors and distributors. Four months are finalized and the current month is open with flagged cases.
+// Mock data shaped like the real business: three Jaffna branches, each with a coacher, a promoting manager, a manager
+// (who sells too), supervisors and distributors. One branch is small enough for its manager to be "retaining". Four months are finalized and the current month is open with flagged cases.
 // All names and numbers are made up.
 const path = require("path");
 const crypto = require("crypto");
@@ -54,11 +54,11 @@ if (!existingAdmin) await auth.setup(d, { username: DEMO_USERS[0][0], full_name:
 const adminUser = { username: existingAdmin?.username || DEMO_USERS[0][0] };
 const created = [];
 
-// Pay setup per position (the owner has not confirmed the group manager figures; they are placeholders).
+// Pay setup per position. Distributors and supervisors are the same level and differ only in target and rates. A manager's target is weekly.
 const PAY = {
   distributor: { pay_scheme: "tiered", target: 100000, basic_pay: 25000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 0, security_deduction_rule: "pct_business:1" },
   supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 24, security_deduction_rule: "pct_business:1" },
-  group_manager: { pay_scheme: "tiered", target: 150000, basic_pay: 35000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 24, security_deduction_rule: "pct_business:1" },
+  manager: { target: 100000, basic_pay: 27000 }, promoting_manager: { basic_pay: 29000 }, coacher: { basic_pay: 30000 },
 };
 await svc.updateSettings(d, {
   company_name: "World Entrepreneurs Company", company_account_no: "0001234567",
@@ -79,23 +79,22 @@ for (const [username, full_name, role, hub, password] of DEMO_USERS.slice(1)) {
   created.push(username);
 }
 
-// id, name, hub, position, reports to, usual business per working day, share of days worked
+// id, name, hub, position, reports to, usual business per working day, share of days worked.
+// Each branch: one coacher, a promoting manager, a manager (who sells too) and the sellers. Jaffna 03 is small, so its manager is "retaining".
 const TEAM = [
-  ["M01", "Arun Selvam", "J1", "manager", null, 0, 0], ["GM01", "Meena Rajan", "J1", "group_manager", "M01", 7500, 0.97],
-  ["S01", "Kavin Thirumal", "J1", "supervisor", "GM01", 6800, 0.97], ["S02", "Nila Sivakumar", "J1", "supervisor", "GM01", 6000, 0.95],
-  ["D01", "Pavan Kumar", "J1", "distributor", "S01", 4600, 0.97], ["D02", "Thevi Ganesh", "J1", "distributor", "S01", 4000, 0.95],
-  ["D03", "Sharan Raj", "J1", "distributor", "S02", 3300, 0.95], ["D04", "Anitha Jegan", "J1", "distributor", "S02", 2800, 0.7],
-  ["M02", "Ravi Shankar", "J2", "manager", null, 0, 0], ["GM02", "Uma Maheswari", "J2", "group_manager", "M02", 7200, 0.97],
-  ["S03", "Dinesh Prabu", "J2", "supervisor", "GM02", 6400, 0.97], ["S04", "Janani Vel", "J2", "supervisor", "GM02", 4200, 0.9],
-  ["D05", "Kavya Nathan", "J2", "distributor", "S03", 4400, 0.97], ["D06", "Mohan Das", "J2", "distributor", "S03", 3800, 0.95],
-  ["D07", "Sutha Pillai", "J2", "distributor", "S04", 3500, 0.95], ["D08", "Yazhini Raj", "J2", "distributor", "S04", 2500, 0.7],
-  ["M03", "Selvi Anand", "J3", "manager", null, 0, 0], ["GM03", "Karthik Rao", "J3", "group_manager", "M03", 6900, 0.97],
-  ["S05", "Lavanya Muthu", "J3", "supervisor", "GM03", 6600, 0.97], ["S06", "Ganesh Bala", "J3", "supervisor", "GM03", 5900, 0.95],
-  ["D09", "Vimal Raj", "J3", "distributor", "S05", 4300, 0.97], ["D10", "Priya Tharan", "J3", "distributor", "S05", 3900, 0.95],
-  ["D11", "Siva Kumar", "J3", "distributor", "S06", 3400, 0.95], ["D12", "Nisha Paul", "J3", "distributor", "S06", 2600, 0.7],
+  ["C01", "Jegan Muthiah", "J1", "coacher", null, 0, 0], ["PM01", "Hari Prasath", "J1", "promoting_manager", "C01", 0, 0], ["M01", "Arun Selvam", "J1", "manager", "PM01", 2500, 0.9],
+  ["S01", "Kavin Thirumal", "J1", "supervisor", "M01", 6800, 0.97], ["S02", "Nila Sivakumar", "J1", "supervisor", "M01", 6000, 0.95],
+  ["D01", "Pavan Kumar", "J1", "distributor", "M01", 4600, 0.97], ["D02", "Thevi Ganesh", "J1", "distributor", "M01", 4000, 0.95],
+  ["D03", "Sharan Raj", "J1", "distributor", "M01", 3300, 0.95], ["D04", "Anitha Jegan", "J1", "distributor", "M01", 2800, 0.7],
+  ["C02", "Mala Krishnan", "J2", "coacher", null, 0, 0], ["PM02", "Ganesan Pillai", "J2", "promoting_manager", "C02", 0, 0], ["M02", "Ravi Shankar", "J2", "manager", "PM02", 3000, 0.9],
+  ["S03", "Dinesh Prabu", "J2", "supervisor", "M02", 6400, 0.97], ["S04", "Janani Vel", "J2", "supervisor", "M02", 4200, 0.9],
+  ["D05", "Kavya Nathan", "J2", "distributor", "M02", 4400, 0.97], ["D06", "Mohan Das", "J2", "distributor", "M02", 3800, 0.95],
+  ["D07", "Sutha Pillai", "J2", "distributor", "M02", 3500, 0.95], ["D08", "Yazhini Raj", "J2", "distributor", "M02", 2500, 0.7],
+  ["C03", "Rajan Thevar", "J3", "coacher", null, 0, 0], ["PM03", "Sumathi Arul", "J3", "promoting_manager", "C03", 0, 0], ["M03", "Selvi Anand", "J3", "manager", "PM03", 1200, 0.9],
+  ["S05", "Lavanya Muthu", "J3", "supervisor", "M03", 3000, 0.97], ["D09", "Vimal Raj", "J3", "distributor", "M03", 2500, 0.95], ["D10", "Priya Tharan", "J3", "distributor", "M03", 1800, 0.95],
 ];
 const BANKS = [["7010", "Bank of Ceylon", "001"], ["7056", "Commercial Bank", "012"], ["7278", "Sampath Bank", "030"], ["7083", "Hatton National Bank", "045"], ["7135", "People's Bank", "101"]];
-// Managers first, then each level reports to someone already created.
+// Each person is created after the person they report to.
 for (const [i, [id, name, hub, position, upline]] of TEAM.entries()) {
   const [bankCode, bankName, branch] = BANKS[i % BANKS.length];
   await add("staff", {
@@ -104,13 +103,13 @@ for (const [i, [id, name, hub, position, upline]] of TEAM.entries()) {
     phone: `077 ${String(100 + i).padStart(3, "0")} ${2000 + i * 7}`, join_date: "2024-03-01",
   });
 }
-// Staff-portal logins: a distributor, a supervisor and a group manager can sign in and see their own figures.
-const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["meena", "Meena Rajan", "GM01"]]
+// Staff-portal logins: a distributor and two supervisors can sign in and see their own figures.
+const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"]]
   .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
 for (const [username, full_name, employee_id, password] of PORTAL_USERS) {
   await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id, password });
 }
-const sellers = TEAM.filter((t) => t[3] !== "manager");
+const sellers = TEAM.filter((t) => t[5] > 0); // everyone who sells, managers included
 
 // Deterministic pseudo-random so the demo is reproducible
 let seed = 42;
@@ -132,7 +131,7 @@ async function month(period, { short = {}, growth = 1, draws = {}, stockShort = 
     }
   }
   await svc.bulkUpsert(d, "daily", daily, "clerk");
-  await svc.bulkUpsert(d, "stock", sellers.filter((t) => t[3] !== "group_manager").flatMap(([id]) => [
+  await svc.bulkUpsert(d, "stock", sellers.filter((t) => t[3] === "distributor" || t[3] === "supervisor").flatMap(([id]) => [
     { period, employee_id: id, product: "Shine", opening_stock: 40, issued: 60, sold: 85, counted_stock: 15 - (stockShort[id] || 0) - (rnd() < 0.2 ? 1 : 0), unit_price: 850 },
     { period, employee_id: id, product: "Vim", opening_stock: 20, issued: 30, sold: 38, counted_stock: 12, unit_price: 500 },
   ]), "clerk");
@@ -141,12 +140,14 @@ async function month(period, { short = {}, growth = 1, draws = {}, stockShort = 
     if (new Date(y, m - 1, day).getDay() !== 1) continue;
     const start = new Date(Date.UTC(y, m - 1, day));
     const end = new Date(start.getTime() + 6 * 864e5);
-    for (const [hub, , , mgr, profit, rent] of HUBS) {
-      const perDay = sellers.filter((t) => t[2] === hub).reduce((s, t) => s + t[5] * t[6], 0);
-      const business = Math.round((perDay * 6 * (0.9 + rnd() * 0.2) * growth) / 10) * 10;
-      weekly.push({ week_start: start.toISOString().slice(0, 10), week_end: end.toISOString().slice(0, 10), manager_id: mgr,
-        business_total: business, profit_percent: profit, rent, hub_fee: 500, security_cost: Math.round(business * 0.01),
-        personal_draw: draws[mgr] || Math.round((8000 + rnd() * 12000) / 100) * 100 });
+    const from = start.toISOString().slice(0, 10), to = end.toISOString().slice(0, 10);
+    for (const [hub, , , mgr, , rent] of HUBS) {
+      const ids = new Set(sellers.filter((t) => t[2] === hub).map((t) => t[0]));
+      const business = daily.filter((r) => ids.has(r.employee_id) && r.date >= from && r.date <= to).reduce((t, r) => t + r.business_amount, 0);
+      if (!business) continue;
+      weekly.push({ week_start: from, week_end: to, manager_id: mgr,
+        business_total: business, profit_percent: business >= 100000 ? 0.2 : 0.15, rent, hub_fee: 500, security_cost: Math.round(business * 0.01),
+        personal_draw: draws[mgr] || (business < 100000 ? Math.round((2000 + rnd() * 3000) / 100) * 100 : Math.round((8000 + rnd() * 12000) / 100) * 100) });
     }
   }
   await svc.bulkUpsert(d, "weekly", weekly, "accounts");

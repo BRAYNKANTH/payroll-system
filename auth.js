@@ -122,7 +122,7 @@ async function createUser(db, actor, body) {
     // The portal login is tied to one sales person and takes that person's hub.
     const s = await db.get("SELECT employee_id, hub, role, status FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
     if (!s) throw httpError(400, "Choose the employee this login is for");
-    if (s.role !== "guy") throw httpError(400, "The staff portal is for distributors, supervisors and group managers");
+    if (s.role !== "guy") throw httpError(400, "The staff portal is for distributors and supervisors");
     if (s.status !== "active") throw httpError(400, "That employee is inactive");
     if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
     employeeId = s.employee_id;

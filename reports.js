@@ -34,7 +34,7 @@ async function payslipHtml(db, period, employeeId, hub) {
     const d = r.detail;
     const lines = (items) => items.filter((i) => i.amount !== 0 || /Basic/.test(i.label))
       .map((i) => `<tr><td>${esc(i.label)}</td><td class="n">${fmt(i.amount)}</td></tr>`).join("");
-    const weeks = r.role === "manager" ? `
+    const weeks = r.role === "manager" && d.weeks.length ? `
       <h2>Weekly balances</h2>
       <table><tr><th>Week</th><th class="n">Business</th><th class="n">Profit %</th><th class="n">Profit share</th><th class="n">Rent + fee + security + draw</th><th class="n">Weekly balance</th></tr>
       ${d.weeks.map((w) => `<tr><td>${esc(w.week_start)} → ${esc(w.week_end)}</td><td class="n">${fmt(w.business_total)}</td>
@@ -53,7 +53,9 @@ async function payslipHtml(db, period, employeeId, hub) {
         <div>Position: ${LEVEL_NAME[r.staff_level] || (r.role === "guy" ? "Distributor" : "Manager")}</div>
         <div>Bank: ${esc(r.bank_name || "—")} ${r.bank_account_no ? "…" + esc(r.bank_account_no.slice(-4)) : ""}</div>
         <div>Business this period: Rs ${fmt(d.total_business)}</div>
-        ${r.role === "guy" ? `<div>Target: Rs ${fmt(d.target)} · Over target: Rs ${fmt(d.over_target_amount)}</div>` : `<div>Weeks logged: ${d.weeks_logged}</div>`}
+        ${r.role === "guy" ? `<div>Target: Rs ${fmt(d.target)} · Over target: Rs ${fmt(d.over_target_amount)}</div>`
+          : d.month_sales != null ? `<div>Sales (own + team): Rs ${fmt(d.month_sales)}${d.retaining ? ` · <b>Retaining manager</b> (below Rs ${fmt(d.retain_threshold)})` : ""}</div>`
+          : d.below_sales != null ? `<div>Sales below: Rs ${fmt(d.below_sales)}</div>` : `<div>Weeks logged: ${d.weeks_logged}</div>`}
       </div>
       <h2>Earnings</h2><table>${lines(d.earnings)}<tr class="total"><td>Gross earnings</td><td class="n">${fmt(r.gross_earnings)}</td></tr></table>
       <h2>Deductions</h2><table>${lines(d.deductions)}<tr class="total"><td>Total deductions</td><td class="n">${fmt(r.total_deductions)}</td></tr></table>

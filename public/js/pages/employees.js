@@ -37,8 +37,7 @@ export async function employeeForm(existing, onSaved) {
         <option value="over_target" ${e.pay_scheme !== "tiered" ? "selected" : ""}>Basic + commission over target</option>
         <option value="tiered" ${e.pay_scheme === "tiered" ? "selected" : ""}>Tiered (commission under target, fixed basic over it)</option></select></div>
       <div class="field"><label id="basic-lbl">Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"><span class="hint" id="basic-hint" hidden>A separate fixed salary, paid to the bank each month on top of the weekly account. Leave at 0 for none.</span></div>
-      <div class="field" data-mgr><label>Share of the whole team's sales (%)</label><input class="input" name="team_commission_pct" inputmode="decimal" value="${e.team_commission_rate ? +(e.team_commission_rate * 100).toFixed(4) : ""}" placeholder="0 = none"><span class="hint">This % of what everyone below this person sells in the month goes into their account. When it is set it replaces the weekly profit share; rent, hub fee and draws from the weekly sheet still apply. Leave blank to use the weekly profit share.</span></div>
-      <div class="field" data-guy><label>Monthly target (Rs)</label><input class="input" name="target" inputmode="decimal" value="${fromCents(e.target)}"></div>
+      <div class="field" data-target><label id="target-lbl">Monthly target (Rs)</label><input class="input" name="target" inputmode="decimal" value="${fromCents(e.target)}"></div>
       <div class="field" data-guy data-tiered><label>Commission on all business when target not reached (%)</label><input class="input" name="base_commission_pct" inputmode="decimal" value="${e.base_commission_rate ? +(e.base_commission_rate * 100).toFixed(4) : ""}"></div>
       <div class="field" data-guy><label>Commission on business over target (%)</label><input class="input" name="commission_pct" inputmode="decimal" value="${e.commission_rate ? +(e.commission_rate * 100).toFixed(4) : ""}"></div>
       <div class="form-section" data-guy>Food and security</div>
@@ -67,7 +66,7 @@ export async function employeeForm(existing, onSaved) {
   const currentUpline = e.upline_id || e.manager_id || "";
   const fillUpline = (keep) => {
     const rank = levelRank(f.staff_level.value);
-    const top = rank === LEVELS.length - 1;
+    const top = f.staff_level.value === "coacher"; // nobody is above a coacher
     const sel = f.upline_id;
     const want = keep ?? sel.value;
     const cands = staff.filter((s) => s.status === "active" && s.employee_id !== e.employee_id && levelRank(s.staff_level || (s.role === "manager" ? "manager" : "distributor")) > rank);
@@ -79,7 +78,9 @@ export async function employeeForm(existing, onSaved) {
   const sync = () => {
     const guy = !isManagerLevel(f.staff_level.value);
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
-    $$("[data-mgr]", f).forEach((x) => (x.hidden = guy));
+    const lvl = f.staff_level.value;
+    $$("[data-target]", f).forEach((x) => (x.hidden = lvl !== "manager" && !guy));
+    $("#target-lbl", f).textContent = lvl === "manager" ? "Weekly target (Rs): sales of the manager and the team in a week" : "Monthly target (Rs)";
     $("#basic-hint", f).hidden = guy;
     const tiered = f.pay_scheme.value === "tiered";
     $$("[data-tiered]", f).forEach((x) => (x.hidden = !guy || !tiered));
@@ -95,8 +96,8 @@ export async function employeeForm(existing, onSaved) {
     const rule = parseRule(d.security_deduction_rule);
     const set = (n, v) => { f[n].value = v || ""; };
     f.pay_scheme.value = d.pay_scheme || "over_target";
-    set("target", d.target); set("basic_pay", d.basic_pay);
-    set("team_commission_pct", d.team_commission_rate ? +(d.team_commission_rate * 100).toFixed(4) : "");
+    // A manager's weekly target defaults to the figure in Settings ("Manager pay").
+    set("target", d.target || (f.staff_level.value === "manager" ? Number(state.settings.manager_commission_threshold) / 100 : 0)); set("basic_pay", d.basic_pay);
     set("commission_pct", d.commission_rate ? +(d.commission_rate * 100).toFixed(4) : "");
     set("base_commission_pct", d.base_commission_rate ? +(d.base_commission_rate * 100).toFixed(4) : "");
     set("food_per_day", d.food_per_day); set("food_min_days", d.food_min_days);
@@ -119,7 +120,7 @@ export async function employeeForm(existing, onSaved) {
         const last4 = f.bank_account_no.value.trim().slice(-4);
         return [["Employee ID", f.employee_id.value], ["Name", f.name.value], ["Position", sel("staff_level")], ["Reports to", sel("upline_id") && f.upline_id.value ? sel("upline_id") : "Not set"],
           ["Hub", sel("hub")], ["Phone", f.phone.value], ["Status", sel("status")],
-          ...(guy ? [["Target", f.target.value ? `Rs ${f.target.value}` : ""], ["Basic pay", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""]] : [["Basic salary", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""], ["Team sales share", f.team_commission_pct.value ? `${f.team_commission_pct.value}%` : ""]]),
+          ...(guy ? [["Target", f.target.value ? `Rs ${f.target.value}` : ""], ["Basic pay", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""]] : [["Basic salary", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""], ...(f.staff_level.value === "manager" ? [["Weekly target", f.target.value ? `Rs ${f.target.value}` : ""]] : [])]),
           ["Balance brought forward", f.opening_balance.value ? `Rs ${f.opening_balance.value}` : "None"],
           ["Bank", [f.bank_name.value, last4 ? `…${last4}` : ""].filter(Boolean).join(" ")]];
       },
@@ -133,10 +134,9 @@ export async function employeeForm(existing, onSaved) {
     const tiered = guy && v.pay_scheme === "tiered";
     const body = {
       name: v.name, staff_level: v.staff_level, upline_id: v.upline_id || "", hub: f.hub.value, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
-      ...(guy ? {} : { manager_id: "" }), basic_pay: v.basic_pay || 0, target: guy ? v.target || 0 : 0,
+      ...(guy ? {} : { manager_id: "" }), basic_pay: v.basic_pay || 0, target: guy || v.staff_level === "manager" ? v.target || 0 : 0,
       commission_rate: guy && v.commission_pct ? Number(v.commission_pct) / 100 : 0, security_deduction_rule: secRule,
       pay_scheme: tiered ? "tiered" : "over_target",
-      team_commission_rate: !guy && v.team_commission_pct ? Number(v.team_commission_pct) / 100 : 0,
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
       food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
       opening_balance: v.opening_balance || 0,

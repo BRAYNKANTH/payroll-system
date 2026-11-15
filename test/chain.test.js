@@ -13,25 +13,28 @@ const add = (d, id, level, upline) =>
 
 test("staff_level sets role, and the chain follows seniority", async () => {
   const d = await setup();
-  const m = await add(d, "M1", "manager");
-  const gm = await add(d, "GM1", "group_manager", "M1");
-  const s = await add(d, "S1", "supervisor", "GM1");
-  const g = await add(d, "D1", "distributor", "S1");
-  assert.equal(m.role, "manager");
-  assert.deepEqual([gm.role, s.role, g.role], ["guy", "guy", "guy"]);
-  assert.equal(g.upline_id, "S1");
-  // payroll manager is found by walking up the chain
+  const c = await add(d, "C1", "coacher");
+  const pm = await add(d, "PM1", "promoting_manager", "C1");
+  const m = await add(d, "M1", "manager", "PM1");
+  const s = await add(d, "S1", "supervisor", "M1");
+  const g = await add(d, "D1", "distributor", "M1");
+  assert.deepEqual([c.role, pm.role, m.role], ["manager", "manager", "manager"]);
+  assert.deepEqual([s.role, g.role], ["guy", "guy"]);
+  // the sellers belong to the nearest manager above them
   assert.equal(g.manager_id, "M1");
   assert.equal(s.manager_id, "M1");
 });
 
-test("reporting to someone equal or junior is refused", async () => {
+test("distributor and supervisor are the same level; nobody reports to an equal or lower rank", async () => {
   const d = await setup();
   await add(d, "M1", "manager");
   await add(d, "S1", "supervisor", "M1");
+  await assert.rejects(() => add(d, "D1", "distributor", "S1"), /more senior/);
   await assert.rejects(() => add(d, "S2", "supervisor", "S1"), /more senior/);
-  await assert.rejects(() => add(d, "D1", "distributor", "D9"), /Unknown upline/);
+  await assert.rejects(() => add(d, "D2", "distributor", "D9"), /Unknown upline/);
   await assert.rejects(() => add(d, "M2", "manager", "M1"), /more senior/);
+  await assert.rejects(() => add(d, "C1", "coacher", "M1"), /more senior/);
+  await assert.rejects(() => add(d, "G1", "group_manager", "M1"), /must be one of/);
   await assert.rejects(() => svc.updateEntry(d, "staff", "S1", { upline_id: "S1" }, "admin"), /themselves/);
 });
 

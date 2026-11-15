@@ -57,9 +57,10 @@ export const statusLabel = (s) => ({ auto_approved: "Auto-approved", pending_rev
 export const badge = (s, label) => html`<span class="badge ${s}">${label || statusLabel(s)}</span>`;
 export const roleLabel = (r) => (r === "guy" ? "Guy / Supervisor" : r === "manager" ? "Manager" : titleCase(r));
 // Chain of command, lowest to highest. Rank decides who may report to whom.
-export const LEVELS = [["distributor", "Distributor / Guy"], ["supervisor", "Supervisor"], ["group_manager", "Group manager"],
-  ["promoting_manager", "Promoting manager"], ["manager", "Manager"], ["coacher", "Coacher"]]; // a promoting manager works under a manager (see LEVEL_RANK in service.js)
-// Manager, promoting manager and coacher run a weekly account and can draw a fixed monthly salary.
+// Distributor and supervisor are the same level; a manager is above them, a promoting manager above a manager, a coacher above all.
+export const LEVELS = [["distributor", "Distributor / Guy"], ["supervisor", "Supervisor"], ["manager", "Manager"],
+  ["promoting_manager", "Promoting manager"], ["coacher", "Coacher"]]; // see LEVEL_RANK in service.js
+// Manager, promoting manager and coacher draw a fixed monthly salary plus a share of sales (only a manager holds a weekly account).
 export const MANAGER_LEVELS = ["manager", "promoting_manager", "coacher"];
 export const isManagerLevel = (l) => MANAGER_LEVELS.includes(l);
 // Used for a position until its own pay defaults are saved in Settings.
@@ -67,14 +68,17 @@ const TIERED = { pay_scheme: "tiered", commission_rate: 0.3, base_commission_rat
 export const POSITION_FALLBACK = {
   distributor: { ...TIERED, target: 100000, basic_pay: 25000, food_min_days: 0 },
   supervisor: { ...TIERED, target: 120000, basic_pay: 30000, food_min_days: 24 },
-  manager: { basic_pay: 27000, team_commission_rate: 0.2 }, promoting_manager: { basic_pay: 30000 }, coacher: { basic_pay: 30000 },
+  manager: { basic_pay: 27000, target: 100000 }, promoting_manager: { basic_pay: 29000 }, coacher: { basic_pay: 30000 },
 };
 export function positionDefaults(settings) {
   let saved = {};
   try { saved = JSON.parse(settings.position_defaults || "{}"); } catch { /* none set */ }
-  return { ...POSITION_FALLBACK, ...saved };
+  // Per position, so a saved row that leaves a field out keeps the fallback for that field.
+  return Object.fromEntries(Object.keys({ ...POSITION_FALLBACK, ...saved }).map((k) => [k, { ...POSITION_FALLBACK[k], ...saved[k] }]));
 }
-export const levelRank = (l) => LEVELS.findIndex(([k]) => k === l);
+// Same ranks as LEVEL_RANK in service.js: distributor and supervisor are one level.
+const RANK = { distributor: 0, supervisor: 0, manager: 1, promoting_manager: 2, coacher: 3 };
+export const levelRank = (l) => RANK[l] ?? -1;
 // levelLabel("supervisor") → "Supervisor"; with a count other than 1 → "Supervisors".
 const LEVEL_PLURAL = { distributor: "Distributors / Guys" };
 export const levelLabel = (l, count = 1) => {

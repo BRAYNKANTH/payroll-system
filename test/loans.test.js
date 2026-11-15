@@ -135,7 +135,7 @@ test("a loan that starts later is not taken before its first month", async () =>
 
 test("rules for who can get one and what can be changed", async () => {
   const d = await setup();
-  await assert.rejects(() => loans.create(d, { employee_id: "M1", kind: "loan", amount: 1000, instalment: 100, start_period: "2026-08" }, "a"), /distributors, supervisors/);
+  await assert.rejects(() => loans.create(d, { employee_id: "M1", kind: "loan", amount: 1000, instalment: 100, start_period: "2026-08" }, "a"), /distributors and supervisors/);
   await assert.rejects(() => give(d, { amount: 0 }), /more than zero/);
   await assert.rejects(() => give(d, { instalment: 40000 }), /cannot be more than the loan/);
   await assert.rejects(() => give(d, { already_repaid: 30000 }), /nothing left/);

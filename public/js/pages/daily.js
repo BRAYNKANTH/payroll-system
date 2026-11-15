@@ -34,7 +34,7 @@ export default {
       get("/api/staff" + qs({ hub: scopeHub() })),
       periodLocked(state.period),
     ]);
-    const guys = staff.filter((s) => s.role === "guy" && s.status === "active");
+    const guys = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager") && s.status === "active"); // everyone who sells, managers included
     const editable = can("enter_data") && !locked;
     const days = daysIn(state.period);
     const today = new Date().toISOString().slice(0, 10);
@@ -43,7 +43,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for distributors, supervisors and group managers. Settle-up minus is calculated automatically.</p></div>
+        <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for everyone who sells: distributors, supervisors and managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions">
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button></div>
           ${editable ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}

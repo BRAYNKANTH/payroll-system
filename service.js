@@ -39,7 +39,7 @@ const ENTITIES = {
       phone: { type: "text" },
       nic: { type: "text" },
       join_date: { type: "date" },
-      staff_level: { type: "enum", values: ["distributor", "supervisor", "group_manager", "manager", "promoting_manager", "coacher"] },
+      staff_level: { type: "enum", values: ["distributor", "supervisor", "manager", "promoting_manager", "coacher"] },
       opening_balance: { type: "money" }, // balance brought forward when payroll starts; negative = money owed
       upline_id: { type: "text" },
       manager_id: { type: "text" },
@@ -48,7 +48,6 @@ const ENTITIES = {
       commission_rate: { type: "rate" },
       pay_scheme: { type: "enum", values: ["over_target", "tiered"] },
       base_commission_rate: { type: "rate" },
-      team_commission_rate: { type: "rate" },
       food_per_day: { type: "money" },
       food_min_days: { type: "int" },
       security_deduction_rule: { type: "text", check: (v) => engine.parseSecurityRule(v) },
@@ -223,14 +222,18 @@ async function assertScope(db, kind, row, scopeHub) {
 
 async function validateRefs(db, kind, row) {
   const staffRole = async (id) => (await db.get("SELECT role FROM staff WHERE employee_id = ?", id))?.role;
+  const staffLevel = async (id) => (await db.get("SELECT staff_level FROM staff WHERE employee_id = ?", id))?.staff_level;
   if (kind === "staff" && row.manager_id && (await staffRole(row.manager_id)) !== "manager") {
     throw httpError(400, `manager_id ${row.manager_id} is not a manager`);
   }
-  if (kind === "weekly" && row.manager_id && (await staffRole(row.manager_id)) !== "manager") {
+  if (kind === "weekly" && row.manager_id && (await staffLevel(row.manager_id)) !== "manager") {
     throw httpError(400, `${row.manager_id} is not a manager`);
   }
-  if ((kind === "daily" || kind === "stock") && row.employee_id && (await staffRole(row.employee_id)) !== "guy") {
-    throw httpError(400, `${row.employee_id} is not a guy/supervisor`);
+  if (kind === "daily" && row.employee_id && !sellsDaily(await staffLevel(row.employee_id))) {
+    throw httpError(400, `${row.employee_id} does not sell, so has no daily sheet`);
+  }
+  if (kind === "stock" && row.employee_id && (await staffRole(row.employee_id)) !== "guy") {
+    throw httpError(400, `${row.employee_id} is not a distributor or supervisor`);
   }
   if (kind === "allowances" && row.employee_id && !(await staffRole(row.employee_id))) {
     throw httpError(400, `Unknown employee ${row.employee_id}`);
@@ -238,9 +241,11 @@ async function validateRefs(db, kind, row) {
 }
 
 // Chain of command. Payroll only knows two roles (guy, manager); staff_level adds the rungs between them.
-// Manager, promoting manager and coacher are all payroll "managers": a weekly account plus an optional fixed salary.
-const LEVEL_RANK = { distributor: 0, supervisor: 1, group_manager: 2, promoting_manager: 3, manager: 4, coacher: 5 };
-const LEVEL_NAME = { distributor: "Distributor", supervisor: "Supervisor", group_manager: "Group manager", manager: "Manager",
+// Manager, promoting manager and coacher are all payroll "managers" (a fixed salary plus a share of sales). Only a manager holds a weekly account.
+// Distributor and supervisor are the same level (they differ only in target and rates); a manager sits above them, a promoting manager above
+// a manager and a coacher above all (one per branch). Everyone must report to someone of a higher rank.
+const LEVEL_RANK = { distributor: 0, supervisor: 0, manager: 1, promoting_manager: 2, coacher: 3 };
+const LEVEL_NAME = { distributor: "Distributor", supervisor: "Supervisor", manager: "Manager",
   promoting_manager: "Promoting manager", coacher: "Coacher" };
 const MANAGER_LEVELS = new Set(["manager", "promoting_manager", "coacher"]);
 const roleOf = (level) => (MANAGER_LEVELS.has(level) ? "manager" : "guy");
@@ -264,8 +269,8 @@ async function applyChain(db, row, existing = {}, id) {
       let cur = m.upline_id;
       for (let i = 0; cur && i < 10; i++) {
         const s = await db.get("SELECT role, staff_level, upline_id FROM staff WHERE employee_id = ?", cur);
-        // A promoting manager works under a manager and has no weekly account of their own, so the guys below them belong to the manager above.
-        if (s?.role === "manager" && s.staff_level !== "promoting_manager") { row.manager_id = cur; break; }
+        // Only a manager holds a weekly account; the sellers below belong to the nearest manager above them.
+        if (s?.staff_level === "manager") { row.manager_id = cur; break; }
         cur = s?.upline_id;
       }
     }
@@ -288,16 +293,19 @@ const insertSql = (table, cols) => `INSERT INTO ${table} (${cols.join(",")}) VAL
 
 // A new weekly row with no profit % gets the commission rule: high rate at or above the threshold, else the low rate.
 const blank = (v) => v === undefined || v === null || v === "";
-function weeklyDefaults(raw, settings) {
+// The target is the manager's own weekly target (cents), with the Settings figure as the fallback.
+function weeklyDefaults(raw, settings, targetCents) {
   const business = Number(raw.business_total);
   if (!blank(raw.profit_percent) || blank(raw.business_total) || !Number.isFinite(business)) return raw;
-  return { ...raw, profit_percent: engine.managerCommissionRate(Math.round(business * 100), settings) };
+  return { ...raw, profit_percent: engine.managerCommissionRate(Math.round(business * 100), settings, targetCents) };
 }
+// Daily sheets are kept for everyone who sells: distributors, supervisors and managers.
+const sellsDaily = (level) => ["distributor", "supervisor", "manager"].includes(level);
 
 async function createEntry(db, kind, body, user, scopeHub) {
   const e = ENTITIES[kind];
   if (!e) throw httpError(404, `Unknown entity ${kind}`);
-  if (kind === "weekly") body = weeklyDefaults(body, await getSettings(db));
+  if (kind === "weekly") body = weeklyDefaults(body, await getSettings(db), (await db.get("SELECT target FROM staff WHERE employee_id = ?", body.manager_id))?.target);
   const row = clean(e, body, { creating: true });
   if (kind === "staff") await applyChain(db, row, {}, row.employee_id);
   await validateRefs(db, kind, row);
@@ -362,8 +370,9 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
   if (rows.length > 3000) throw httpError(400, "Too many rows in one save (max 3000)");
 
   // Validate everything up front, with staff looked up once.
-  const staff = new Map((await db.all("SELECT employee_id, role, hub FROM staff")).map((s) => [s.employee_id, s]));
-  const wantRole = kind === "weekly" ? "manager" : "guy";
+  const staff = new Map((await db.all("SELECT employee_id, role, hub, staff_level, target FROM staff")).map((s) => [s.employee_id, s]));
+  const okStaff = (s) => !!s && (kind === "weekly" ? s.staff_level === "manager" : kind === "daily" ? sellsDaily(s.staff_level) : s.role === "guy");
+  const wrongStaff = kind === "weekly" ? "a manager" : kind === "daily" ? "someone who sells" : "a distributor or supervisor";
   const settings = kind === "weekly" ? await getSettings(db) : null;
   const rowHub = (r) => (e.byHub ? r.hub : staff.get(r[empCol(kind)])?.hub);
   const prepared = [];
@@ -374,9 +383,9 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
         prepared.push({ del: true, key: keys.map((k) => coerce(k, { ...e.fields[k], required: true }, raw[k])) });
         return;
       }
-      const row = clean(e, settings ? weeklyDefaults(raw, settings) : raw, { creating: true });
+      const row = clean(e, settings ? weeklyDefaults(raw, settings, staff.get(raw.manager_id)?.target) : raw, { creating: true });
       const s = staff.get(row[empCol(kind)]);
-      if (!e.byHub && (!s || s.role !== wantRole)) throw httpError(400, `${row[empCol(kind)]} is not a ${wantRole === "guy" ? "guy/supervisor" : "manager"}`);
+      if (!e.byHub && !okStaff(s)) throw httpError(400, `${row[empCol(kind)]} is not ${wrongStaff}`);
       if (scopeHub && rowHub(row) !== scopeHub) throw httpError(403, `You can only enter data for hub ${scopeHub}`);
       prepared.push({ row, key: keys.map((k) => row[k]) });
     } catch (err) {
@@ -482,13 +491,11 @@ async function runPeriod(db, period, user) {
     const staff = (await t.all("SELECT * FROM staff ORDER BY role DESC, employee_id"))
       .filter((s) => s.status === "active" || active.has(s.employee_id));
 
-    // Sales of everyone below a person (their whole team), for people paid a share of team sales.
-    const teamSales = new Map((await t.all(`WITH RECURSIVE d(root, employee_id, depth) AS (
-        SELECT s.upline_id, s.employee_id, 1 FROM staff s WHERE s.upline_id IN (SELECT employee_id FROM staff WHERE team_commission_rate > 0)
-        UNION ALL
-        SELECT d.root, s.employee_id, d.depth + 1 FROM staff s JOIN d ON s.upline_id = d.employee_id WHERE d.depth < 8)
-      SELECT d.root, COALESCE(SUM(l.business_amount), 0) AS sales FROM d
-      LEFT JOIN daily_log l ON l.employee_id = d.employee_id AND l.date >= ? AND l.date < ? GROUP BY d.root`, from, to)).map((r) => [r.root, Number(r.sales)]));
+    // Sales by person for the month, and the reporting tree, for the managers' and seniors' shares of sales.
+    const salesOf = (id) => (daily.get(id) || []).reduce((t, r) => t + Number(r.business_amount), 0);
+    const kids = groupBy(staff, "upline_id");
+    const belowSales = (id, depth = 0) => (kids.get(id) || []).reduce((t, k) => t + salesOf(k.employee_id) + (depth < 8 ? belowSales(k.employee_id, depth + 1) : 0), 0);
+    const rules = { ownRate: Number(settings.manager_own_sales_rate), retainThreshold: Number(settings.manager_retain_threshold), retainRate: Number(settings.manager_retain_rate) };
 
     const results = new Map();
     const guys = staff.filter((s) => s.role === "guy");
@@ -513,16 +520,21 @@ async function runPeriod(db, period, user) {
     }
     for (const m of managers) {
       const prev = prevBy.get(m.employee_id);
-      const guyNetPays = guys
-        .filter((g) => g.manager_id === m.employee_id && results.has(g.employee_id))
-        .map((g) => ({ employee_id: g.employee_id, name: g.name, net_pay: results.get(g.employee_id).result.net_pay }));
+      const openingBalance = prev ? prev.closing_balance : Number(m.opening_balance) || 0;
+      if (m.staff_level !== "manager") {
+        // Promoting manager and coacher: basic salary plus a share of the sales of everyone below them.
+        results.set(m.employee_id, { staff: m, prev, result: engine.computeSenior({ staff: m, belowSales: belowSales(m.employee_id), rate: Number(settings.senior_commission_rate), openingBalance }) });
+        continue;
+      }
+      const sellers = guys.filter((g) => g.manager_id === m.employee_id && results.has(g.employee_id));
+      const team = sellers.map((g) => ({ employee_id: g.employee_id, name: g.name, ...results.get(g.employee_id).result.detail.manager_extra }))
+        .filter((t) => t.over_target || t.food);
       results.set(m.employee_id, {
         staff: m, prev,
         result: engine.computeManager({
-          staff: m, weekly: weekly.get(m.employee_id) || [], guyNetPays,
-          openingBalance: prev ? prev.closing_balance : Number(m.opening_balance) || 0,
+          staff: m, weekly: weekly.get(m.employee_id) || [], team, openingBalance,
           companyReturnRate: Number(settings.company_return_rate),
-          teamSales: teamSales.get(m.employee_id) || 0,
+          teamSales: sellers.reduce((t, g) => t + salesOf(g.employee_id), 0), ownSales: salesOf(m.employee_id), rules,
         }),
       });
     }
@@ -678,6 +690,10 @@ async function updateSettings(db, body, user) {
     manager_commission_low: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_commission_low must be 0–1"); return String(n); },
     manager_rent_default: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_rent_default must be ≥ 0"); return String(Math.round(n * 100)); },
     manager_hub_fee_default: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_hub_fee_default must be ≥ 0"); return String(Math.round(n * 100)); },
+    manager_retain_threshold: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_retain_threshold must be ≥ 0"); return String(Math.round(n * 100)); },
+    manager_retain_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_retain_rate must be 0–1"); return String(n); },
+    senior_commission_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "senior_commission_rate must be 0–1"); return String(n); },
+    manager_own_sales_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_own_sales_rate must be 0–1"); return String(n); },
     manager_security_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_security_rate must be 0–1"); return String(n); },
     // Pay setup pre-filled for new staff at each position. People can still be given their own target and rates.
     position_defaults: (v) => {
@@ -693,7 +709,7 @@ async function updateSettings(db, body, user) {
         try { engine.parseSecurityRule(rule); } catch (e) { throw httpError(400, `${level}: ${e.message}`); }
         out[level] = {
           pay_scheme: scheme, target: num("target"), basic_pay: num("basic_pay"), commission_rate: num("commission_rate", 1),
-          base_commission_rate: num("base_commission_rate", 1), team_commission_rate: num("team_commission_rate", 1), food_per_day: num("food_per_day"), food_min_days: Math.round(num("food_min_days", 31)),
+          base_commission_rate: num("base_commission_rate", 1), food_per_day: num("food_per_day"), food_min_days: Math.round(num("food_min_days", 31)),
           security_deduction_rule: rule,
         };
       }

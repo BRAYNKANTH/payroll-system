@@ -55,8 +55,13 @@ export function breakdownDrawer(r, { finalized, onChange }) {
       <div class="table-wrap"><table class="table compact"><thead><tr><th>Week</th><th class="r">Business</th><th class="r">Profit</th><th class="r">Costs</th><th class="r">Balance</th></tr></thead>
       <tbody>${d.weeks.map((w) => html`<tr><td>${w.week_start}</td><td class="r">${money(w.business_total)}</td><td class="r">${money(w.profit_share)}</td>
         <td class="r">${money(w.rent + w.hub_fee + w.security_cost + w.personal_draw)}</td><td class="r ${w.weekly_balance < 0 ? "neg" : ""}">${money(w.weekly_balance)}</td></tr>`)}</tbody></table></div>` : ""}
-    ${r.role === "manager" && d.guys.length ? html`<h4 class="sub-head">Guys' salaries charged</h4>
-      <table class="breakdown">${d.guys.map((g) => html`<tr><td>${g.name} (${g.employee_id})</td><td>${money(g.net_pay)}</td></tr>`)}</table>` : ""}
+    ${r.role === "manager" && d.month_sales != null ? html`<h4 class="sub-head">Month's sales</h4>
+      <table class="breakdown"><tr><td>Own sales</td><td>${money(d.own_sales)}</td></tr><tr><td>Team's sales</td><td>${money(d.team_sales)}</td></tr>
+        <tr class="total"><td>Together ${d.retaining ? html`<span class="badge amber">Retaining: below Rs ${money(d.retain_threshold)}</span>` : ""}</td><td>${money(d.month_sales)}</td></tr></table>` : ""}
+    ${r.role === "manager" && d.below_sales != null ? html`<h4 class="sub-head">Sales below</h4>
+      <table class="breakdown"><tr class="total"><td>Everyone below this person</td><td>${money(d.below_sales)}</td></tr></table>` : ""}
+    ${r.role === "manager" && d.team?.length ? html`<h4 class="sub-head">Team's extras paid from this manager's share</h4>
+      <table class="breakdown">${d.team.map((g) => html`<tr><td>${g.name} (${g.employee_id})</td><td>over target ${money(g.over_target)} · food ${money(g.food)}</td></tr>`)}</table>` : ""}
     ${r.role === "guy" && d.stock_lines.length ? html`<h4 class="sub-head">Stock shortfall</h4>
       <table class="breakdown">${d.stock_lines.map((s) => html`<tr><td>${s.product} — ${s.shortfall_qty} × Rs ${money(s.unit_price)}</td><td>${money(s.shortfall_value)}</td></tr>`)}</table>` : ""}
 

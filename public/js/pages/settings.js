@@ -42,18 +42,20 @@ export default {
                   <input class="input sm" style="width:70px;text-align:right" inputmode="decimal" data-l="${k}" data-f="sec_value" aria-label="${l} security amount" value="${sec[2] || ""}"></div></td></tr>`; })}</tbody></table></div></div></div>
 
         <div class="card"><div class="card-head"><div><h2>Manager pay</h2><div class="sub">The weekly sheet fills these in for a new week. Every figure can still be changed on the sheet.</div></div></div><div class="card-body form-grid">
-          <div class="field"><label>Higher commission from weekly business of (Rs)</label><input class="input" name="manager_commission_threshold" inputmode="decimal" value="${s.manager_commission_threshold / 100}"></div>
-          <div class="field"><label>Commission at or above that (%)</label><input class="input" name="manager_commission_high" inputmode="decimal" value="${+(s.manager_commission_high * 100).toFixed(4)}"></div>
-          <div class="field"><label>Commission below that (%)</label><input class="input" name="manager_commission_low" inputmode="decimal" value="${+(s.manager_commission_low * 100).toFixed(4)}"></div>
+          <div class="field"><label>Default weekly target when a manager has none (Rs)</label><input class="input" name="manager_commission_threshold" inputmode="decimal" value="${s.manager_commission_threshold / 100}"></div>
+          <div class="field"><label>Commission when the week reaches the target (%)</label><input class="input" name="manager_commission_high" inputmode="decimal" value="${+(s.manager_commission_high * 100).toFixed(4)}"></div>
+          <div class="field"><label>Commission when the week is below the target (%)</label><input class="input" name="manager_commission_low" inputmode="decimal" value="${+(s.manager_commission_low * 100).toFixed(4)}"></div>
           <div class="field"><label>Rent (Rs / week)</label><input class="input" name="manager_rent_default" inputmode="decimal" value="${s.manager_rent_default / 100}"></div>
           <div class="field"><label>Hub fee (Rs / week)</label><input class="input" name="manager_hub_fee_default" inputmode="decimal" value="${s.manager_hub_fee_default / 100}"></div>
           <div class="field"><label>Security (% of weekly business)</label><input class="input" name="manager_security_rate" inputmode="decimal" value="${+(s.manager_security_rate * 100).toFixed(4)}"></div>
           <div class="form-section">Basic salary by position (Rs / month)</div>
           ${LEVELS.filter(([k]) => isManagerLevel(k)).map(([k, l]) => html`<div class="field"><label>${l}</label>
             <input class="input" inputmode="decimal" data-l="${k}" data-f="basic_pay" value="${pd[k]?.basic_pay || ""}"><span class="hint">Pre-filled when you add a ${l.toLowerCase()}</span></div>`)}
-          <div class="form-section">Share of the whole team's sales by position (%)</div>
-          ${LEVELS.filter(([k]) => isManagerLevel(k)).map(([k, l]) => html`<div class="field"><label>${l}</label>
-            <input class="input" inputmode="decimal" data-l="${k}" data-f="team_commission_pct" value="${pd[k]?.team_commission_rate ? +(pd[k].team_commission_rate * 100).toFixed(4) : ""}" placeholder="0 = none"><span class="hint">Replaces the weekly profit share when set</span></div>`)}
+          <div class="form-section">Retaining managers and the people above managers</div>
+          <div class="field"><label>A manager is "retaining" when the month's sales (his own plus his team's) are below (Rs)</label><input class="input" name="manager_retain_threshold" inputmode="decimal" value="${s.manager_retain_threshold / 100}"></div>
+          <div class="field"><label>A retaining manager earns this % of those sales (plus his basic salary)</label><input class="input" name="manager_retain_rate" inputmode="decimal" value="${+(s.manager_retain_rate * 100).toFixed(4)}"></div>
+          <div class="field"><label>A manager's own sales earn the seller's rate (%)</label><input class="input" name="manager_own_sales_rate" inputmode="decimal" value="${+(s.manager_own_sales_rate * 100).toFixed(4)}"></div>
+          <div class="field"><label>Promoting manager and coacher: share of the sales below them (%)</label><input class="input" name="senior_commission_rate" inputmode="decimal" value="${+(s.senior_commission_rate * 100).toFixed(4)}"><span class="hint">1% of the company's 55% share is 0.55%. To be confirmed with the owner.</span></div>
         </div></div>
 
         <div class="card"><div class="card-head"><div><h2>Sign-in</h2></div></div><div class="card-body form-grid">
@@ -94,7 +96,6 @@ export default {
           position_defaults[level] = {
             pay_scheme: d.pay_scheme, target: d.target, basic_pay: d.basic_pay,
             commission_rate: d.commission_pct ? Number(d.commission_pct) / 100 : 0, base_commission_rate: d.base_commission_pct ? Number(d.base_commission_pct) / 100 : 0,
-            team_commission_rate: d.team_commission_pct ? Number(d.team_commission_pct) / 100 : 0,
             food_per_day: d.food_per_day, food_min_days: d.food_min_days,
             security_deduction_rule: !d.sec_kind || d.sec_kind === "none" ? "none" : `${d.sec_kind}:${d.sec_value || 0}`,
           };
@@ -113,6 +114,10 @@ export default {
           manager_rent_default: f.get("manager_rent_default"),
           manager_hub_fee_default: f.get("manager_hub_fee_default"),
           manager_security_rate: Number(f.get("manager_security_rate")) / 100,
+          manager_retain_threshold: f.get("manager_retain_threshold"),
+          manager_retain_rate: Number(f.get("manager_retain_rate")) / 100,
+          manager_own_sales_rate: Number(f.get("manager_own_sales_rate")) / 100,
+          senior_commission_rate: Number(f.get("senior_commission_rate")) / 100,
         });
         state.settings = saved;
         toast("Settings saved");

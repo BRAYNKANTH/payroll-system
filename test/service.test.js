@@ -27,7 +27,8 @@ test("run → auto-approve → finalize → opening balance carries forward", as
   assert.equal(g.status, "auto_approved");
   assert.equal(g.net_pay, 3000000 + 200000 - 100000);
   const m = await row(d, "2026-08", "M1");
-  assert.equal(m.net_pay, 18000000 - 1000000 - 9000000 - g.net_pay);
+  // weekly 30% of 600,000, less rent and the 15% company return. The guy's own pay is the company's, not charged to the manager.
+  assert.equal(m.net_pay, 18000000 - 1000000 - 9000000);
 
   await svc.finalizePeriod(d, "2026-08", "boss");
   await svc.createEntry(d, "weekly", { week_start: "2026-09-07", week_end: "2026-09-13", manager_id: "M1", business_total: 600000, profit_percent: 0.3 }, "clerk");
@@ -39,7 +40,6 @@ test("finalized period locks log entries and summaries", async () => {
   const d = await setup();
   const entry = await svc.createEntry(d, "daily", { date: "2026-08-03", employee_id: "G1", business_amount: 600000, settled_amount: 600000 }, "clerk");
   await svc.runPeriod(d, "2026-08", "clerk");
-  await svc.review(d, "2026-08", "M1", "boss", "approved", "No weekly sheets this month");
   await svc.finalizePeriod(d, "2026-08", "boss");
   await assert.rejects(() => svc.updateEntry(d, "daily", entry.id, { settled_amount: 1 }, "clerk"), /finalized/);
   await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-08-04", employee_id: "G1", business_amount: 1, settled_amount: 1 }, "clerk"), /finalized/);
@@ -79,9 +79,8 @@ test("flagged entries need approval; bank change approval verifies the account",
   await assert.rejects(() => svc.review(d, "2026-09", "G1", "boss", "rejected", ""), /note is required/);
 
   await svc.review(d, "2026-09", "G1", "boss", "approved", "Called employee, confirmed new account");
-  // M1 logged no weeks, so paying G1 pushes the manager's balance negative — also flagged.
-  assert.deepEqual((await row(d, "2026-09", "M1")).flags.map((f) => f.code), ["MANAGER_BALANCE_DEEPER_NEGATIVE"]);
-  await svc.review(d, "2026-09", "M1", "boss", "approved", "Weekly sheets arriving late");
+  // The guy's pay is paid by the company, so the manager's balance is not pushed negative by it.
+  assert.deepEqual((await row(d, "2026-09", "M1")).flags, []);
   assert.equal((await d.get("SELECT bank_account_verified FROM staff WHERE employee_id = 'G1'")).bank_account_verified, "9999888877");
   await svc.finalizePeriod(d, "2026-09", "boss");
   const file = await reports.bankFile(d, "2026-09");
@@ -95,7 +94,6 @@ test("approving a bank change plus other flags survives the re-run done by final
   await svc.runPeriod(d, "2026-09", "clerk");
   assert.deepEqual((await row(d, "2026-09", "G1")).flags.map((f) => f.code).sort(), ["BANK_ACCOUNT_CHANGED", "STOCK_SHORTFALL"]);
   await svc.review(d, "2026-09", "G1", "boss", "approved", "checked");
-  await svc.review(d, "2026-09", "M1", "boss", "approved", "checked");
   await svc.finalizePeriod(d, "2026-09", "boss");
   const g = await row(d, "2026-09", "G1");
   assert.equal(g.status, "approved");
@@ -135,7 +133,8 @@ test("bank file requires finalized period; earlier periods must be finalized fir
 test("input validation", async () => {
   const d = await setup();
   await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-9-1", employee_id: "G1", business_amount: 1, settled_amount: 1 }, "c"), /YYYY-MM-DD/);
-  await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "M1", business_amount: 1, settled_amount: 1 }, "c"), /not a guy/);
+  await svc.createEntry(d, "staff", { employee_id: "C1", name: "Coacher", role: "manager", staff_level: "coacher", hub: "Colombo" }, "admin");
+  await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "C1", business_amount: 1, settled_amount: 1 }, "c"), /does not sell/);
   await assert.rejects(() => svc.createEntry(d, "staff", { employee_id: "X", name: "X", role: "guy", hub: "Kandy", security_deduction_rule: "5%" }, "c"), /Invalid security/);
   await assert.rejects(() => svc.createEntry(d, "staff", { employee_id: "X", name: "X", role: "guy", hub: "Nowhere" }, "c"), /Unknown employee, manager or hub/);
   await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1, settled_amount: 1 }, ""), /user name/);

@@ -1,3 +1,5 @@
+> **Note:** this walkthrough was written for the earlier model (supervisors and distributors in a chain, with a group manager above them). The group manager position has since been removed and managers are paid on the new rules in README.md, so the amounts below no longer match what the system calculates.
+
 # Trial: one manager's group, from fresh
 
 A full month for one manager and seven people, using every feature. The numbers below were run end to end

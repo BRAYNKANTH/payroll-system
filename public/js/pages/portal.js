@@ -100,7 +100,6 @@ export default {
     if (!ctx.refresh) el.innerHTML = skeleton(); // grey shapes in the layout of the page, instead of a spinner on a blank screen
     const d = await get("/api/me/portal?period=" + state.period);
     const me = d.me, m = d.month;
-    const hasTeam = !!d.team;
     const attain = m.target ? m.business / m.target : 0;
     const pay = d.official || d.estimate;
     const final = !!d.official;
@@ -113,7 +112,7 @@ export default {
       </div>
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""], ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
         ...(d.loans.length ? [["loans", "Advances & loans", "Loans", "coins", d.loans.filter((l) => l.state !== "paid").length]] : []),
-        ...(hasTeam ? [["team", "My team", "Team", "users", d.team.length]] : []), ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
+        ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
         .map(([k, long, short, ic, n]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}"><span class="tab-ic">${icon(ic)}</span><span class="tab-lb"><span class="lg">${long}</span><span class="sm">${short}</span></span>${n !== "" ? html`<span class="cnt">(${n})</span>` : ""}</button>`)}</div>
       <div id="pane"></div>`;
 
@@ -161,8 +160,6 @@ export default {
             row(`Comes off ${monthName(d.period)} pay`, l.due ? money(l.due) : "—")] : []),
         ])).join(""))}</section>`,
 
-      team: () => html`<section class="card mb-4"><div class="card-head"><div><h2>Your team in ${monthName(d.period)}</h2><div class="sub">Sales only. Pay is private to each person.</div></div></div>
-        <div class="card-body flush" id="team"></div></section>`,
 
       documents: () => html`<section class="card"><div class="card-head"><div><h2>My documents</h2><div class="sub">JPG, PNG, WebP or PDF, up to 3 MB each</div></div></div>
         <div class="card-body" id="docs"><div class="sk" style="height:140px"></div></div></section>`,
@@ -243,28 +240,10 @@ export default {
           }).toString(),
           group("", d.history.map((r) => row(monthName(r.period), money(r.net_pay), { sub: `Gross ${n0(r.gross_earnings)} · Taken off ${n0(r.total_deductions)}`, vsub: `Paid ${n0(r.disbursed_amount)}`, cls: r.net_pay < 0 ? "neg" : "", href: `/api/me/payslip/${r.period}` }))));
       }
-      if (tab === "team") {
-        const t = d.team, label = (l) => (l === "supervisor" ? "Supervisor" : l === "group_manager" ? "Group manager" : "Distributor / Guy");
-        $("#team").innerHTML = t.length ? both(
-          dataTable({
-            rows: t, sortable: false, footer: true,
-            cols: [
-              { key: "name", label: "Name", render: (r) => html`<b>${r.name}</b> <span class="faint">${r.employee_id}</span>`, total: () => "Team total" },
-              { key: "staff_level", label: "Position", render: (r) => label(r.staff_level) },
-              { key: "reports_to", label: "Reports to", render: (r) => r.reports_to || "—" },
-              { key: "days", label: "Days", align: "r", total: (x) => x.reduce((s, r) => s + r.days, 0) },
-              { key: "business", label: "Sales", align: "r", render: (r) => money(r.business), total: (x) => money(x.reduce((s, r) => s + r.business, 0)) },
-              { key: "target", label: "Target", align: "r", render: (r) => money(r.target) },
-              { key: "att", label: "Of target", align: "r", sort: false, render: (r) => (r.target ? pct(r.business / r.target, 0) : "—") },
-            ],
-          }).toString(),
-          group("", [...t.map((r) => row(r.name, money(r.business), { sub: `${label(r.staff_level)} · ${r.days} day${r.days === 1 ? "" : "s"}`, vsub: r.target ? `${pct(r.business / r.target, 0)} of target` : "", cls: r.target && r.business >= r.target ? "pos" : "" })),
-            row("Team total", money(t.reduce((s, r) => s + r.business, 0)), { strong: true })])) : emptyState("Nobody reports to you yet", "", "users").toString();
-      }
       if (tab === "documents") drawDocs().catch((e) => toast(e.message, "err"));
     };
     $$("#tabs button", el).forEach((b) => (b.onclick = () => { if (tab !== b.dataset.t) buzz(6); tab = b.dataset.t; show(); }));
-    if (!panes[tab] || (tab === "team" && !hasTeam) || (tab === "loans" && !d.loans.length)) tab = "month";
+    if (!panes[tab] || (tab === "loans" && !d.loans.length)) tab = "month";
     show(!ctx.refresh);
 
     $("#refresh").onclick = (e) => busy(e.currentTarget, async () => { await this.render({ ...ctx, refresh: true }); toast("Up to date"); });

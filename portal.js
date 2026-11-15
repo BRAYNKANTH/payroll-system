@@ -1,4 +1,4 @@
-// Staff portal: what a distributor, supervisor or group manager may see about themselves.
+// Staff portal: what a distributor or supervisor may see about themselves.
 // Every query here is keyed on the signed-in user's own employee_id; nothing takes an id from the request.
 const { getSettings, httpError } = require("./db");
 const engine = require("./engine");
@@ -15,23 +15,6 @@ async function me(db, user) {
     LEFT JOIN staff u ON u.employee_id = s.upline_id WHERE s.employee_id = ?`, user.employee_id);
   if (!s) throw httpError(404, "Employee not found");
   return s;
-}
-
-// Everyone below this person in the chain (their team), with the month's business.
-async function team(db, id, period) {
-  const rows = await db.all(`
-    WITH RECURSIVE d AS (
-      SELECT employee_id, name, staff_level, upline_id, target, status, 1 AS depth FROM staff WHERE upline_id = ?
-      UNION ALL
-      SELECT s.employee_id, s.name, s.staff_level, s.upline_id, s.target, s.status, d.depth + 1
-      FROM staff s JOIN d ON s.upline_id = d.employee_id WHERE d.depth < 6)
-    SELECT d.employee_id, d.name, d.staff_level, d.target, d.status, d.depth, u.name AS reports_to,
-      COALESCE(SUM(l.business_amount), 0) AS business, COUNT(l.id) AS days
-    FROM d LEFT JOIN staff u ON u.employee_id = d.upline_id
-    LEFT JOIN daily_log l ON l.employee_id = d.employee_id AND l.date >= ? AND l.date < ?
-    GROUP BY d.employee_id, d.name, d.staff_level, d.target, d.status, d.depth, u.name
-    ORDER BY d.depth, d.employee_id`, id, ...monthBounds(period));
-  return rows.filter((r) => r.status === "active" || r.business > 0);
 }
 
 async function summary(db, user, period) {
@@ -82,7 +65,6 @@ async function summary(db, user, period) {
     },
     official, estimate, history, security_held: Number(security.held) || 0,
     loans: await loans.mine(db, s.employee_id, period),
-    team: TEAM_LEVELS.has(s.staff_level) ? await team(db, s.employee_id, period) : null,
   };
 }
 

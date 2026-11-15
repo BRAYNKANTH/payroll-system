@@ -3,7 +3,7 @@ import { state } from "../app.js";
 import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago } from "../ui.js";
 
 const ROLES = [
-  ["staff", "Staff portal", "A distributor, supervisor or group manager who signs in to see their own sales, pay and payslips"],
+  ["staff", "Staff portal", "A distributor or supervisor who signs in to see their own sales, pay and payslips"],
   ["admin", "Admin", "Everything, including finalizing months, users and settings"],
   ["accountant", "Accountant", "Run payroll, approve exceptions, manage staff and hubs, export files"],
   ["manager", "Hub manager", "Enter sheets and register the team of their own hub"],
@@ -48,7 +48,7 @@ export default {
           <div class="field full" id="emp-wrap" hidden><label for="emp-sel">Employee</label>
             <select class="input" id="emp-sel" name="employee_id"><option value="">Choose the person this login is for</option>
               ${free.map((s) => html`<option value="${s.employee_id}">${s.name} · ${s.employee_id} · ${s.hub}`)}</select>
-            <span class="hint">Only active distributors, supervisors and group managers without a login are listed. The login gets that person's hub.</span></div>`}
+            <span class="hint">Only active distributors and supervisors without a login are listed. The login gets that person's hub.</span></div>`}
           <div class="field" id="hub-wrap" ${u?.role === "staff" ? "hidden" : ""}><label>Hub access</label><select class="input" name="hub"><option value="">All hubs</option>
             ${state.hubs.map((h) => html`<option value="${h.code}" ${u?.hub === h.code ? "selected" : ""}>${h.name} only</option>`)}</select>
             <span class="hint">Required for a hub manager. Limits a clerk to one hub's staff.</span></div>

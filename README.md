@@ -1,8 +1,9 @@
 # Payroll
 
-Payroll and hub accounts for a multi-branch retail business with two kinds of staff: guys/supervisors
-(paid monthly with commission) and managers (running weekly profit-share account). Every figure in a pay
-period is calculated from the daily, weekly, stock and allowance sheets. Nobody types a final salary.
+Payroll and hub accounts for a multi-branch retail business. Per branch: a coacher, a promoting manager, a manager (who also sells)
+and the sellers, distributors and supervisors, who are one level and differ only in target and rates. Sellers are paid monthly with
+commission; a manager keeps a weekly account; the promoting manager and coacher earn a salary plus a share of sales. Every figure in a
+pay period is calculated from the daily, weekly, stock and allowance sheets. Nobody types a final salary.
 
 Runs on Postgres: **Neon** in production, and PGlite (embedded Postgres, no install) on your own computer.
 Needs Node 22+.
@@ -43,8 +44,8 @@ The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` 
 
 **Demo sign-ins** (demo database only): `admin / admin123`, `accounts / accounts123`,
 `manager1`, `manager2`, `manager3` (all `manager123`, each limited to one Jaffna branch), `clerk / clerk123`
-(Jaffna 01 only), `viewer / viewer123`, and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `meena` (group manager GM01), all `staff123`. The demo has three branches, each with a manager, a group manager,
-supervisors and distributors, four finalized months and the current month open.
+(Jaffna 01 only), `viewer / viewer123`, and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `nila` (supervisor S02), all `staff123`. The demo has three branches, each with a coacher, a promoting manager, a manager,
+supervisors and distributors, four finalized months and the current month open. Jaffna 03 is small, so its manager is "retaining".
 
 ## What's in it
 
@@ -72,7 +73,7 @@ supervisors and distributors, four finalized months and the current month open.
 | Role | Can |
 |---|---|
 | Viewer | See everything, change nothing |
-| Staff portal | A distributor, supervisor or group manager signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
+| Staff portal | A distributor or supervisor signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
 | Clerk | Enter daily / weekly / stock / allowance sheets (limited to one hub if set) |
 | Accountant | + manage staff and hubs, give advances and loans, calculate payroll, approve / reject, export files |
 | Admin | + finalize months, manage users, change settings |
@@ -97,12 +98,14 @@ supervisors and distributors, four finalized months and the current month open.
 | Guy food allowance (tiered) | `food_per_day × days logged`, only once `food_min_days` are worked (0 = always) |
 | Guy deductions | `Σ settle_up_minus + stock shortfall value + Σ personal_minus + security` |
 | Guy balance | `payable = opening + net`; positive is paid to the bank, negative carries forward |
-| Manager weekly | `business × profit% − rent − hub_fee − security_cost − personal_draw` |
-| Manager closing | `opening + Σ weekly − business × 15% − Σ net pay of their guys` |
-| Promoting manager | Works under a manager. Fixed `basic_pay` (Rs 30,000 by default), paid to the bank. No weekly account of their own: the guys below them belong to the manager above |
-| Manager team share (`team_commission_rate`, 20% by default for new managers) | Replaces the weekly profit share: that % of the month's sales of everyone below them (through promoting managers, supervisors and distributors), taken from the daily sheets and added to the running account. Rent, hub fee, security and draws still come from the weekly sheet. Leave it blank to keep the weekly profit share |
+| Who pays what | Of every sale the company pays the seller 25% and the seller's manager 20%: at most 45% to workers. What a seller earns above 25% (the extra 5% on sales over target, and food) comes out of the manager's 20%, not the company's |
+| Seller's extras charged to the manager | `(commission_rate − base_commission_rate) × business over target` plus the food allowance, per seller whose payroll manager he is (`manager_extra` in each seller's detail) |
+| Manager weekly | `business × profit% − rent − hub_fee − security_cost − personal_draw`. Business is the manager's own sales plus his team's for the week (the weekly sheet fills it from the daily sheets). Profit % is 20% when it reaches the manager's weekly target (`staff.target`, default Rs 100,000), else 15% |
+| Manager month | `Σ weekly commission + own sales × 25% + basic salary − rent − hub fee − security − draws − team's extras`. Only the basic salary goes to the bank; the rest is a running account |
+| Retaining manager | When the month's sales (his own + his team's, from the daily sheets) are below Rs 250,000 he is "retaining" for that month: basic salary + 10% of those sales replaces the weekly commission. A tag worked out each month, not a position |
+| Promoting manager and coacher | Basic salary (Rs 29,000 and Rs 30,000) + 0.55% (1% of the company's 55%) of the sales of everyone below them, managers' own sales included. Paid to the bank; no weekly account. One coacher per branch |
 | Stock shortfall | `max(0, opening + issued − sold − counted) × unit_price` |
-| Advance / loan instalment | `min(instalment, what is left)`, taken only from pay left after the other deductions, so it never makes a balance negative; anything not taken stays on the loan for next month. No interest. For distributors, supervisors and group managers only |
+| Advance / loan instalment | `min(instalment, what is left)`, taken only from pay left after the other deductions, so it never makes a balance negative; anything not taken stays on the loan for next month. No interest. For distributors and supervisors only |
 | Security rule | none, fixed amount, % of gross, % of basic or % of business (`pct_business:1`), with an optional lifetime cap |
 
 Flags that need approval: net pay moved by more than 20%; a negative deduction; deductions greater than

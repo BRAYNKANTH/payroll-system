@@ -93,7 +93,7 @@ async function create(db, body, user, scopeHub) {
   if (!["advance", "loan"].includes(kind)) throw httpError(400, "Choose advance or loan");
   const s = await db.get("SELECT employee_id, role, status FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
   if (!s) throw httpError(400, "Choose an employee");
-  if (s.role !== "guy") throw httpError(400, "Advances and loans are for distributors, supervisors and group managers. A manager's account already has a personal draw.");
+  if (s.role !== "guy") throw httpError(400, "Advances and loans are for distributors and supervisors. A manager's account already has a personal draw.");
   if (s.status !== "active") throw httpError(400, "That employee is inactive");
   await assertScope(db, s.employee_id, scopeHub);
 
