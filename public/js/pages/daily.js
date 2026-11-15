@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
-import { $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount } from "../ui.js";
+import { exportButtons, $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount } from "../ui.js";
 import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons } from "./shared.js";
 import { isPhone } from "../phone.js";
 import { announce, badge } from "../ui.js";
@@ -47,7 +47,8 @@ export default {
         <div class="actions">
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button></div>
           ${editable ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}
-          <button class="btn" id="export">${icon("download")} <span class="lbl-sm">Export</span></button>
+          <button class="btn" id="export">${icon("download")} <span class="lbl-sm">CSV</span></button>
+          ${exportButtons("daily", { period: state.period, hub: scopeHub() })}
         </div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}

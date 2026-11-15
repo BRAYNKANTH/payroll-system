@@ -385,6 +385,31 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
 export const emptyState = (title, text = "", ico = "sheet", action = "") =>
   raw(`<div class="empty"><div class="ico">${icon(ico)}</div><h4>${esc(title)}</h4>${text ? `<p style="margin:0 0 14px">${esc(text)}</p>` : ""}${action}</div>`);
 
+// ---- Excel and PDF
+// A page puts exportButtons("daily", { period, hub }) in its header; the click handler below downloads /api/export/daily.xlsx (or .pdf).
+export const exportButtons = (report, params = {}) => html`<span class="row" style="gap:8px;flex-wrap:nowrap">
+  <button type="button" class="btn" data-export="${report}:xlsx" data-params="${JSON.stringify(params)}">${icon("download")} <span class="lbl-sm">Excel</span></button>
+  <button type="button" class="btn" data-export="${report}:pdf" data-params="${JSON.stringify(params)}">${icon("file")} <span class="lbl-sm">PDF</span></button></span>`;
+export async function downloadReport(report, format, params = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")).toString();
+  const res = await fetch(`/api/export/${report}.${format}${query ? "?" + query : ""}`, { credentials: "same-origin" });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "The download failed");
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") || "")?.[1] || `${report}.${format}`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(await res.blob());
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-export]");
+  if (!b) return;
+  const [report, format] = b.dataset.export.split(":");
+  let params = {};
+  try { params = JSON.parse(b.dataset.params || "{}"); } catch { /* none */ }
+  busy(b, () => downloadReport(report, format, params));
+});
+
 // ---- CSV
 export function downloadCsv(filename, header, rows) {
   const cell = (v) => {

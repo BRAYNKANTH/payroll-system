@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal, levelLabel } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal, levelLabel } from "../ui.js";
 import { openBreakdown } from "./breakdown.js";
 import { isPhone, compactSteps } from "../phone.js";
 
@@ -36,6 +36,7 @@ export default {
       <div class="page-head">
         <div><h1>Payroll — ${monthName(p)}</h1><p>Every figure is calculated from the sheets. Opening balances come from last month's closing balances.</p></div>
         <div class="actions">
+          ${calculated ? html`${exportButtons("register", { period: p })}<a class="btn" href="/api/payroll/${p}/payslips.pdf" download>${icon("file")} <span class="lbl-sm">Payslips PDF</span></a>` : ""}
           ${badge(data.status)}
           ${can("run_payroll") && !finalized ? html`<button class="btn ${calculated ? "" : "primary"}" id="run">${icon("refresh")} ${calculated ? "Recalculate" : "Calculate payroll"}</button>` : ""}
           ${can("finalize") && !finalized && calculated ? html`<button class="btn primary" id="finalize" ${pending + rejected ? "disabled" : ""}>${icon("lock")} Finalize month</button>` : ""}

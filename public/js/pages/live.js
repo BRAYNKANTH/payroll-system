@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
-import { $, $$, html, icon, money, badge, toast, busy, dataTable, emptyState, pct, monthName, dateLabel, dateTime, levelLabel } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, badge, toast, busy, dataTable, emptyState, pct, monthName, dateLabel, dateTime, levelLabel } from "../ui.js";
 
 let tab = "feed";
 
@@ -16,7 +16,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Live sales</h1><p>Every sale as it is entered, and how far each person is from their target.<span id="pay-note"></span></p></div>
-        <div class="actions"><button class="btn" id="refresh">${icon("refresh")} Refresh</button><button class="btn primary" id="confirm-all" hidden>${icon("check")} Confirm all</button></div>
+        <div class="actions">${exportButtons("live", { period: state.period, hub: scopeHub() })}<button class="btn" id="refresh">${icon("refresh")} Refresh</button><button class="btn primary" id="confirm-all" hidden>${icon("check")} Confirm all</button></div>
       </div>
       <div class="tabs" id="tabs">${[["feed", "Sales feed"], ["people", "By person"]].map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
       <div id="pane"><div class="loading-screen"><div class="spinner"></div></div></div>`;

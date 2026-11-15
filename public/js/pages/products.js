@@ -1,6 +1,6 @@
 import { get, post, put } from "../api.js";
 import { state } from "../app.js";
-import { $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, pct, parseAmount } from "../ui.js";
+import { exportButtons, $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, pct, parseAmount } from "../ui.js";
 
 // Of every sale the workers get a share (seller + manager, 45% at first); the company keeps the rest, and the purchase price comes out of that.
 const shares = () => ({ seller: Number(state.settings.product_seller_share ?? 0.25), manager: Number(state.settings.product_manager_share ?? 0.2) });
@@ -24,7 +24,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Products</h1><p>What the company sells. Of every sale the workers get ${workers} (${pct(s.seller, 0)} to the seller, ${pct(s.manager, 0)} to his manager). The company keeps the rest, and the purchase price comes out of that.</p></div>
-        <div class="actions"><button class="btn primary" id="add">${icon("plus")} Add product</button></div>
+        <div class="actions">${exportButtons("products")}<button class="btn primary" id="add">${icon("plus")} Add product</button></div>
       </div>
       <div class="card"><div class="card-body flush" id="list"></div></div>`;
 

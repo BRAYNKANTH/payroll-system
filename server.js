@@ -11,6 +11,7 @@ const svc = require("./service");
 const loans = require("./loans");
 const products = require("./products");
 const sales = require("./sales");
+const exporter = require("./export");
 const people = require("./people");
 const auth = require("./auth");
 const reports = require("./reports");
@@ -217,6 +218,14 @@ function createHandler(dbReady) {
     ["POST", /^\/api\/payroll\/(\d{4}-\d{2})\/finalize$/, "finalize", ({ m, user }) => svc.finalizePeriod(database, m[1], user.username)],
     ["POST", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)\/(approve|reject)$/, "review", ({ m, user, body }) =>
       svc.review(database, m[1], m[2], user.username, m[3] === "approve" ? "approved" : "rejected", body.note)],
+    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?\.pdf$/, "view_pay", async ({ m, user }) => {
+      const f = await exporter.payslipsPdf(database, m[1], m[2], user.hub);
+      return { download: f.data, type: f.type, filename: f.filename };
+    }],
+    ["GET", /^\/api\/export\/([a-z-]+)\.(xlsx|pdf)$/, "read", async ({ m, user, q }) => {
+      const f = await exporter.make(database, m[1], m[2], { can: (p) => auth.can(user, p), hub: user.hub || q.get("hub") || undefined, period: q.get("period") || undefined, query: q });
+      return { download: f.data, type: f.type, filename: f.filename };
+    }],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?$/, "view_pay", async ({ m, user }) =>
       ({ html: await reports.payslipHtml(database, m[1], m[2], user.hub) })],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/register$/, "view_pay", async ({ m }) => ({ html: await reports.registerHtml(database, m[1]) })],

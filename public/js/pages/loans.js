@@ -1,7 +1,7 @@
 // Advances and loans: who has one, how much is left, and what comes off pay this month.
 import { get, post, put, del, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
-import { $, html, icon, money, toast, busy, confirmDialog, drawer, dataTable, badge, emptyState, monthName, shortMonth, dateLabel, fromCents } from "../ui.js";
+import { exportButtons, $, html, icon, money, toast, busy, confirmDialog, drawer, dataTable, badge, emptyState, monthName, shortMonth, dateLabel, fromCents } from "../ui.js";
 
 const shift = (period, n) => {
   const [y, m] = period.split("-").map(Number);
@@ -46,7 +46,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Advances & loans</h1><p>Money given to staff and taken back from their pay. An advance comes back in one month; a loan comes back in monthly instalments.</p></div>
-        <div class="actions">${editable ? html`<button class="btn primary" id="add">${icon("plus")} Give advance or loan</button>` : ""}</div>
+        <div class="actions">${exportButtons("loans", { hub: scopeHub() })}${editable ? html`<button class="btn primary" id="add">${icon("plus")} Give advance or loan</button>` : ""}</div>
       </div>
       <div class="grid kpis mb-4">
         <div class="card kpi"><div class="label">Still to be paid back</div><div class="value">${whole(live.reduce((t, l) => t + l.outstanding, 0))}</div><div class="foot">${live.length} active</div></div>

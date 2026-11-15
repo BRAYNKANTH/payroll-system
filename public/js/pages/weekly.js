@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
-import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, dateLabel, raw } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, dateLabel, raw } from "../ui.js";
 import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
 
@@ -47,6 +47,7 @@ export default {
       <div class="page-head">
         <div><h1>Weekly sheet</h1><p>One row per manager per week.${can("view_pay") ? " Weekly balance = business × profit % − rent − hub fee − security − personal draw." : ""}
           Business starts as the manager's own sales plus his team's from the daily sheets. Profit is ${+(rule.high * 100).toFixed(2)}% when that reaches the manager's weekly target, otherwise ${+(rule.low * 100).toFixed(2)}%. You can change any figure.</p></div>
+        <div class="actions">${exportButtons("weekly", { period: state.period, hub: scopeHub() })}</div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
       <div class="card mb-4">

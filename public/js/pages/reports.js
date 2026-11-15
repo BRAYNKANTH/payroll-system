@@ -1,9 +1,11 @@
 import { get, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
-import { $, $$, html, icon, money, pct, badge, dataTable, downloadCsv, monthName, fromCents, shortMonth, emptyState } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, pct, badge, dataTable, downloadCsv, monthName, fromCents, shortMonth, emptyState } from "../ui.js";
 import { barChart, lineChart, PALETTE } from "../charts.js";
 
 let tab = "hubs";
+// Which export belongs to each tab (Excel and PDF come from the server, see export.js).
+const REPORT_KEY = { hubs: "hub-summary", commission: "commission", stock: "stock", hubstock: "branch-stock", balances: "balances", periods: "months", profit: "product-profit" };
 // The commission, balances and month-history tabs are pay, so only those who may see pay get them.
 const PAY_TABS = new Set(["commission", "balances", "periods"]);
 const tabsFor = () => [...TABS.filter(([k]) => can("view_pay") || !PAY_TABS.has(k)), ...(can("manage_products") ? [["profit", "Product profit"]] : [])];
@@ -21,7 +23,8 @@ export default {
         <div><h1>Reports</h1><p>${monthName(p)} — switch the month in the top bar.</p></div>
         <div class="actions">
           ${can("view_pay") ? html`<a class="btn" href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Payroll register</a>` : ""}
-          <button class="btn primary" id="csv">${icon("download")} Export CSV</button>
+          <span class="row" id="xbtns" style="gap:8px"></span>
+          <button class="btn" id="csv">${icon("download")} CSV</button>
         </div>
       </div>
       <div class="tabs" id="tabs">${tabsFor().map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
@@ -164,6 +167,7 @@ export default {
     };
     const show = async () => {
       $$("#tabs button", el).forEach((b) => b.classList.toggle("on", b.dataset.t === tab));
+      $("#xbtns").innerHTML = exportButtons(REPORT_KEY[tab], { period: p, hub: scopeHub() }).toString();
       pane.innerHTML = `<div class="loading-screen"><div class="spinner"></div></div>`;
       await views[tab]();
     };

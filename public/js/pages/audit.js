@@ -1,6 +1,6 @@
 import { get, qs } from "../api.js";
 import { can } from "../app.js";
-import { $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
+import { exportButtons, $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
 
 const MONEY = new Set(["business_amount", "settled_amount", "settle_up_minus", "personal_minus", "business_total", "rent", "hub_fee", "security_cost",
   "personal_draw", "unit_price", "shortfall_value", "amount", "basic_pay", "target", "food_per_day"]);
@@ -39,7 +39,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Audit trail</h1><p>Every change to an entry after it was first saved: who, when, and the old and new values. This log cannot be edited.</p></div>
-        <div class="actions"><button class="btn" id="csv">${icon("download")} Export</button></div>
+        <div class="actions"><span id="xaudit"></span><button class="btn" id="csv">${icon("download")} CSV</button></div>
       </div>
       <div class="card">
         <div class="card-head"><form class="row" id="af">
@@ -55,6 +55,7 @@ export default {
     let rows = [];
     const load = async () => {
       rows = await get("/api/audit" + qs({ ...f, limit: 1000 }));
+      $("#xaudit").innerHTML = exportButtons("audit", f).toString(); // Excel and PDF follow the filters on screen
       $("#list").innerHTML = dataTable({
         rows, sortable: false, empty: "No changes match these filters",
         cols: [
