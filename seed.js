@@ -34,6 +34,7 @@ if ((await d.get("SELECT COUNT(*) AS n FROM hubs WHERE code IN ('J1','J2','J3')"
   return d.close();
 }
 const auth = require("./auth");
+const products = require("./products");
 const add = (kind, row, user = "admin") => svc.createEntry(d, kind, row, user);
 
 // Demo sign-ins, one per role (demo database only — change or remove before real use)
@@ -73,6 +74,9 @@ const HUBS = [
   ["J3", "Jaffna 03", "Hospital Road, Jaffna", "M03", 0.1, 0],
 ];
 for (const [code, name, location] of HUBS) await add("hubs", { code, name, location, phone: "021 722 3317" });
+// The catalogue: selling price and the price the company pays to buy each product. The stock counts below sell these two.
+await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "admin");
+await products.create(d, { name: "Vim", list_price: 500, cost_price: 190 }, "admin");
 for (const [username, full_name, role, hub, password] of DEMO_USERS.slice(1)) {
   if (await d.get("SELECT 1 AS x FROM users WHERE lower(username) = lower(?)", username)) continue; // keep an existing account as it is
   await auth.createUser(d, adminUser, { username, full_name, role, hub, password });

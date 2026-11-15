@@ -39,6 +39,8 @@ const ENTITIES = {
       phone: { type: "text" },
       nic: { type: "text" },
       join_date: { type: "date" },
+      leave_date: { type: "date" },   // set by "mark as left" (people.js); cleared when re-hired
+      leave_reason: { type: "text" },
       staff_level: { type: "enum", values: ["distributor", "supervisor", "manager", "promoting_manager", "coacher"] },
       opening_balance: { type: "money" }, // balance brought forward when payroll starts; negative = money owed
       upline_id: { type: "text" },
@@ -690,6 +692,8 @@ async function updateSettings(db, body, user) {
     manager_commission_low: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_commission_low must be 0–1"); return String(n); },
     manager_rent_default: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_rent_default must be ≥ 0"); return String(Math.round(n * 100)); },
     manager_hub_fee_default: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_hub_fee_default must be ≥ 0"); return String(Math.round(n * 100)); },
+    product_seller_share: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "product_seller_share must be 0–1"); return String(n); },
+    product_manager_share: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "product_manager_share must be 0–1"); return String(n); },
     manager_retain_threshold: (v) => { const n = Number(v); if (!(n >= 0)) throw httpError(400, "manager_retain_threshold must be ≥ 0"); return String(Math.round(n * 100)); },
     manager_retain_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "manager_retain_rate must be 0–1"); return String(n); },
     senior_commission_rate: (v) => { const n = Number(v); if (!(n >= 0 && n <= 1)) throw httpError(400, "senior_commission_rate must be 0–1"); return String(n); },
@@ -780,8 +784,9 @@ async function dashboard(db, period, hub) {
   const activeGuys = staff.filter((s) => s.role === "guy" && s.status === "active");
   const completeness = activeGuys.map((s) => {
     const logged = new Set((dailyBy.get(s.employee_id)?.dates || "").split(",").filter(Boolean));
-    const missing = expected.filter((d) => !logged.has(d));
-    return { employee_id: s.employee_id, name: s.name, hub: s.hub, expected: expected.length, logged: expected.length - missing.length, missing };
+    const days = expected.filter((d) => (!s.join_date || d >= s.join_date) && (!s.leave_date || d <= s.leave_date)); // not before they joined or after they left
+    const missing = days.filter((d) => !logged.has(d));
+    return { employee_id: s.employee_id, name: s.name, hub: s.hub, expected: days.length, logged: days.length - missing.length, missing };
   });
 
   const byHub = hubs.map((h) => {

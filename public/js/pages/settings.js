@@ -51,6 +51,9 @@ export default {
           <div class="form-section">Basic salary by position (Rs / month)</div>
           ${LEVELS.filter(([k]) => isManagerLevel(k)).map(([k, l]) => html`<div class="field"><label>${l}</label>
             <input class="input" inputmode="decimal" data-l="${k}" data-f="basic_pay" value="${pd[k]?.basic_pay || ""}"><span class="hint">Pre-filled when you add a ${l.toLowerCase()}</span></div>`)}
+          <div class="form-section">Share of each sale paid to workers (used for product profit)</div>
+          <div class="field"><label>Seller (%)</label><input class="input" name="product_seller_share" inputmode="decimal" value="${+(s.product_seller_share * 100).toFixed(4)}"></div>
+          <div class="field"><label>His manager (%)</label><input class="input" name="product_manager_share" inputmode="decimal" value="${+(s.product_manager_share * 100).toFixed(4)}"><span class="hint">Seller and manager together are the most the workers get from a sale: 45% at first.</span></div>
           <div class="form-section">Retaining managers and the people above managers</div>
           <div class="field"><label>A manager is "retaining" when the month's sales (his own plus his team's) are below (Rs)</label><input class="input" name="manager_retain_threshold" inputmode="decimal" value="${s.manager_retain_threshold / 100}"></div>
           <div class="field"><label>A retaining manager earns this % of those sales (plus his basic salary)</label><input class="input" name="manager_retain_rate" inputmode="decimal" value="${+(s.manager_retain_rate * 100).toFixed(4)}"></div>
@@ -118,6 +121,8 @@ export default {
           manager_retain_rate: Number(f.get("manager_retain_rate")) / 100,
           manager_own_sales_rate: Number(f.get("manager_own_sales_rate")) / 100,
           senior_commission_rate: Number(f.get("senior_commission_rate")) / 100,
+          product_seller_share: Number(f.get("product_seller_share")) / 100,
+          product_manager_share: Number(f.get("product_manager_share")) / 100,
         });
         state.settings = saved;
         toast("Settings saved");

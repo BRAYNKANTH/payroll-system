@@ -29,6 +29,9 @@ const DEFAULT_SETTINGS = {
   senior_commission_rate: "0.0055",
   // A manager also sells: the seller's commission on his own sales (the 20% team share is on top).
   manager_own_sales_rate: "0.25",
+  // Of every sale the company pays workers at most 45%: this much to the seller and this much to his manager. Used for product profit.
+  product_seller_share: "0.25",
+  product_manager_share: "0.20",
 };
 
 // Timestamps are stored as ISO-8601 UTC text so they compare and serialise exactly like before.
@@ -142,6 +145,9 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS opening_balance bigint NOT NULL DEFAU
 -- Chain of command: distributor and supervisor (same level) -> manager -> promoting manager -> coacher. upline_id is who this person reports to.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS staff_level text NOT NULL DEFAULT 'distributor' CHECK (staff_level IN ('distributor','supervisor','group_manager','manager'));
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS upline_id text REFERENCES staff(employee_id);
+-- People leave and rejoin: when they left and why (status becomes inactive). Cleared again when they are re-hired.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS leave_date text;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS leave_reason text;
 UPDATE staff SET staff_level = 'manager' WHERE role = 'manager' AND staff_level = 'distributor';
 -- A staff-portal login belongs to one employee (a distributor or supervisor) and only ever sees that person's own figures.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id text REFERENCES staff(employee_id);
@@ -258,6 +264,20 @@ CREATE TABLE IF NOT EXISTS allowances (
 -- Advances and loans given to a guy / supervisor. An advance is a loan paid back in one go.
 -- amount is what was handed over; already_repaid is anything paid back before the system took over (an old Excel loan).
 -- loan_repayments is written only by the payroll run: one row per loan per month, and it locks when the month is finalized.
+-- What the company sells. cost_price is the purchase price; list_price is the selling price. Money in cents.
+CREATE TABLE IF NOT EXISTS products (
+  id         bigserial PRIMARY KEY,
+  name       text NOT NULL CHECK (length(trim(name)) > 0),
+  list_price bigint NOT NULL CHECK (list_price > 0),
+  cost_price bigint NOT NULL CHECK (cost_price >= 0),
+  status     text NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
+  created_by text NOT NULL,
+  created_at text NOT NULL DEFAULT ${NOW},
+  updated_by text,
+  updated_at text
+);
+CREATE UNIQUE INDEX IF NOT EXISTS products_name_lower ON products (lower(name));
+
 CREATE TABLE IF NOT EXISTS loans (
   id             bigserial PRIMARY KEY,
   employee_id    text NOT NULL REFERENCES staff(employee_id),
@@ -393,6 +413,7 @@ const AUDITED = {
   hub_stock:   { key: "id", period: "period" },
   allowances:  { key: "id", period: "period" },
   loans:       { key: "id", period: null },
+  products:    { key: "id", period: null },
 };
 
 function triggerSql() {

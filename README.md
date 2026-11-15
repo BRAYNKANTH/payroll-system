@@ -62,7 +62,9 @@ supervisors and distributors, four finalized months and the current month open. 
 | Advances & loans | Give an advance (back in one month) or a loan (monthly instalments). The payroll run takes each instalment from pay; balances come from finalized months |
 | Payslips | Per person or all, printable |
 | Employees | Directory, add/edit, profile with pay history chart, team, change log |
-| Hubs | Branches with live figures |
+| Hubs | Branches with live figures, and each branch's coach |
+| Products | Admin and accountant: each product's selling price and purchase price, with the workers' 45% and the profit per unit shown live as the prices are typed. Reports gets a Product profit tab for the month |
+| Leavers and joiners | Mark as left (last day, reason, and who takes over the people reporting to them, who must hold the same position in the same hub), Re-hire, and a coacher can be added for a branch. Days before someone joined or after they left are not counted as missing |
 | Reports | Hub summary, commission, stock shortfall, branch stock, balances, month history (CSV export) |
 | Audit trail | Every change after first entry: who, when, old → new; filters and export |
 | Users & roles | Admin, accountant, hub manager (one hub; registers their own team), clerk (optionally one hub), viewer |
@@ -104,6 +106,7 @@ supervisors and distributors, four finalized months and the current month open. 
 | Manager month | `Σ weekly commission + own sales × 25% + basic salary − rent − hub fee − security − draws − team's extras`. Only the basic salary goes to the bank; the rest is a running account |
 | Retaining manager | When the month's sales (his own + his team's, from the daily sheets) are below Rs 250,000 he is "retaining" for that month: basic salary + 10% of those sales replaces the weekly commission. A tag worked out each month, not a position |
 | Promoting manager and coacher | Basic salary (Rs 29,000 and Rs 30,000) + 0.55% (1% of the company's 55%) of the sales of everyone below them, managers' own sales included. Paid to the bank; no weekly account. One coacher per branch |
+| Product profit | `selling price − workers' share (seller 25% + manager 20%) − purchase price`, per unit. Monthly: units sold × those figures, from the stock counts, matched to the Products list by name |
 | Stock shortfall | `max(0, opening + issued − sold − counted) × unit_price` |
 | Advance / loan instalment | `min(instalment, what is left)`, taken only from pay left after the other deductions, so it never makes a balance negative; anything not taken stays on the loan for next month. No interest. For distributors and supervisors only |
 | Security rule | none, fixed amount, % of gross, % of basic or % of business (`pct_business:1`), with an optional lifetime cap |

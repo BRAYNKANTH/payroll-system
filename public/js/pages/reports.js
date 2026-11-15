@@ -4,6 +4,7 @@ import { $, $$, html, icon, money, pct, badge, dataTable, downloadCsv, monthName
 import { barChart, lineChart, PALETTE } from "../charts.js";
 
 let tab = "hubs";
+const tabsFor = () => (can("manage_products") ? [...TABS, ["profit", "Product profit"]] : TABS);
 const TABS = [["hubs", "Hub summary"], ["commission", "Commission"], ["stock", "Stock shortfall"], ["hubstock", "Branch stock"], ["balances", "Balances"], ["periods", "Month history"]];
 
 export default {
@@ -19,7 +20,7 @@ export default {
           <button class="btn primary" id="csv">${icon("download")} Export CSV</button>
         </div>
       </div>
-      <div class="tabs" id="tabs">${TABS.map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
+      <div class="tabs" id="tabs">${tabsFor().map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
       <div id="pane"><div class="loading-screen"><div class="spinner"></div></div></div>`;
 
     let exporter = () => {};
@@ -62,6 +63,24 @@ export default {
         })}</div></div>`.toString() : html`<div class="card">${emptyState("No payroll calculated for this month", "", "chart")}</div>`.toString();
         exporter = () => downloadCsv(`commission-${p}.csv`, ["employee_id", "name", "hub", "business", "target", "over_target", "rate", "commission"],
           rows.map((r) => [r.employee_id, r.name, r.hub, fromCents(r.business), fromCents(r.target), fromCents(r.over_target), r.rate, fromCents(r.commission)]));
+      },
+      async profit() {
+        const d = await get("/api/reports/product-profit" + qs({ period: p }));
+        pane.innerHTML = d.rows.length ? html`<div class="alert info mb-4">${icon("info")}<div>What was sold this month (from the stock counts, sold × unit price), less the workers' ${pct(d.workers_rate, 0)} and the purchase prices in <a href="/products" data-link>Products</a>.
+            ${d.totals.unmatched ? html`<b>${d.totals.unmatched} product${d.totals.unmatched > 1 ? "s are" : " is"} not in the Products list</b>, so no profit can be shown for ${d.totals.unmatched > 1 ? "them" : "it"}.` : ""}</div></div>
+          <div class="card"><div class="card-body flush">${dataTable({
+            rows: d.rows, footer: true, empty: "Nothing sold",
+            cols: [
+              { key: "product", label: "Product", render: (r) => html`<b>${r.product}</b> ${r.matched ? "" : html`<span class="badge amber plain">not in Products</span>`}`, total: () => "Total" },
+              { key: "qty", label: "Units sold", align: "r", total: (x) => x.reduce((t, r) => t + r.qty, 0) },
+              { key: "revenue", label: "Sales", align: "r", render: (r) => money(r.revenue), total: (x) => money(x.reduce((t, r) => t + r.revenue, 0)) },
+              { key: "workers", label: `Workers ${pct(d.workers_rate, 0)}`, align: "r", render: (r) => money(r.workers), total: (x) => money(x.reduce((t, r) => t + r.workers, 0)) },
+              { key: "cost", label: "Purchase cost", align: "r", render: (r) => (r.matched ? money(r.cost) : "—"), total: (x) => money(x.reduce((t, r) => t + (r.cost || 0), 0)) },
+              { key: "profit", label: "Company profit", align: "r", render: (r) => (r.matched ? html`<b class="${r.profit < 0 ? "neg" : ""}">${money(r.profit)}</b>` : "—"), total: (x) => money(x.reduce((t, r) => t + (r.profit || 0), 0)) },
+            ],
+          })}</div></div>`.toString() : html`<div class="card">${emptyState("Nothing sold this month", "Enter the stock counts (with units sold) to see the profit.", "box")}</div>`.toString();
+        exporter = () => downloadCsv(`product-profit-${p}.csv`, ["product", "units_sold", "sales", "workers_share", "purchase_cost", "company_profit"],
+          d.rows.map((r) => [r.product, r.qty, fromCents(r.revenue), fromCents(r.workers), r.matched ? fromCents(r.cost) : "", r.matched ? fromCents(r.profit) : ""]));
       },
       async stock() {
         const rows = await get("/api/reports/stock" + qs({ period: p }));

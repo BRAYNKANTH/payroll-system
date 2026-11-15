@@ -26,7 +26,8 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Join date</label><input class="input" type="date" name="join_date" value="${e.join_date || ""}"></div>
       <div class="form-section">Role and place</div>
       <div class="field"><label for="ef-level">Position</label><select class="input" id="ef-level" name="staff_level">
-        ${LEVELS.filter(([v]) => !(scopeHub() && isManagerLevel(v))).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select></div>
+        ${LEVELS.filter(([v]) => !(scopeHub() && isManagerLevel(v))).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select>
+        <span class="hint" id="ef-level-hint" hidden></span></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Reports to</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Who sits directly above this person in the chain</span></div>
       <div class="field"><label>Hub</label><select class="input" name="hub" ${scopeHub() ? "disabled" : ""}>${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
@@ -79,6 +80,11 @@ export async function employeeForm(existing, onSaved) {
     const guy = !isManagerLevel(f.staff_level.value);
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
     const lvl = f.staff_level.value;
+    // A branch has one coacher: when adding another, say who is there now and how to hand over.
+    const hint = $("#ef-level-hint", f);
+    const coach = lvl === "coacher" && !existing ? staff.find((x) => x.staff_level === "coacher" && x.status === "active" && x.hub === f.hub.value) : null;
+    hint.hidden = !coach;
+    hint.textContent = coach ? `This branch already has a coacher (${coach.name}). If ${coach.name} is leaving, add the new coacher, then open ${coach.name}'s profile, choose Mark as left and pick the new coacher to take over.` : "";
     $$("[data-target]", f).forEach((x) => (x.hidden = lvl !== "manager" && !guy));
     $("#target-lbl", f).textContent = lvl === "manager" ? "Weekly target (Rs): sales of the manager and the team in a week" : "Monthly target (Rs)";
     $("#basic-hint", f).hidden = guy;

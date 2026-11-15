@@ -40,6 +40,8 @@ const NAV = [
   { path: "/audit", label: "Audit trail", icon: "history", page: "audit" },
   { group: "My account", perm: "self" },
   { path: "/me", label: "My page", icon: "users", page: "portal", perm: "self" },
+  { group: "Catalogue", perm: "manage_products" },
+  { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { group: "Administration", perm: "manage_users" },
   { path: "/users", label: "Users & roles", icon: "key", page: "users", perm: "manage_users" },
   { path: "/settings", label: "Settings", icon: "settings", page: "settings", perm: "settings" },

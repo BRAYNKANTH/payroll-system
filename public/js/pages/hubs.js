@@ -19,7 +19,8 @@ export default {
 
     $("#cards").innerHTML = hubs.length ? hubs.map((h) => {
       const people = staff.filter((s) => s.hub === h.code && s.status === "active");
-      const mgrs = people.filter((s) => s.role === "manager");
+      const mgrs = people.filter((s) => s.staff_level === "manager");
+      const coach = people.find((s) => s.staff_level === "coacher");
       const st = stats[h.code] || {};
       return html`<div class="card">
         <div class="card-head"><div class="row" style="gap:12px"><div class="kpi" style="padding:0"><span class="icon blue" style="width:40px;height:40px">${icon("store")}</span></div>
@@ -32,7 +33,7 @@ export default {
           </div>
           <div class="row between"><div class="row" style="gap:4px">${people.slice(0, 6).map((p) => html`<div class="avatar" title="${p.name}" style="width:28px;height:28px;font-size:11px">${initials(p.name)}</div>`)}
             ${people.length > 6 ? html`<span class="faint">+${people.length - 6}</span>` : ""}</div>
-            <span class="muted" style="font-size:12.5px">${people.length} staff · ${mgrs.map((m) => m.name).join(", ") || "no manager"}</span></div>
+            <span class="muted" style="font-size:12.5px">${people.length} staff · coach ${coach ? coach.name : "none yet"} · ${mgrs.map((m) => m.name).join(", ") || "no manager"}</span></div>
           ${h.phone ? html`<div class="faint" style="font-size:12px;margin-top:10px">${h.phone}</div>` : ""}
         </div>
         ${can("manage_hubs") ? html`<div style="padding:0 18px 16px"><button class="btn sm" data-edit="${h.code}">${icon("edit")} Edit</button></div>` : ""}

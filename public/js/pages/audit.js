@@ -29,7 +29,7 @@ export function auditDiff(a) {
 }
 
 const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["hub_stock", "Branch stock"], ["allowances", "Allowances"], ["loans", "Advances & loans"],
-  ["staff", "Employees"], ["staff_documents", "Documents"], ["hubs", "Hubs"], ["pay_period_summary", "Approvals"], ["periods", "Periods"], ["users", "Users"], ["settings", "Settings"]];
+  ["staff", "Employees"], ["products", "Products"], ["staff_documents", "Documents"], ["hubs", "Hubs"], ["pay_period_summary", "Approvals"], ["periods", "Periods"], ["users", "Users"], ["settings", "Settings"]];
 let f = { table: "", user: "", from: "", to: "", key: "" };
 
 export default {

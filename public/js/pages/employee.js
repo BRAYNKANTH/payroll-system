@@ -1,6 +1,6 @@
 import { get, post, del } from "../api.js";
 import { can, navigate, state } from "../app.js";
-import { toast, busy, confirmDialog } from "../ui.js";
+import { toast, busy, confirmDialog, drawer } from "../ui.js";
 import { $, $$, html, icon, money, badge, dataTable, emptyState, initials, roleLabel, levelLabel, pct, dateTime, monthName, shortMonth } from "../ui.js";
 import { lineChart, PALETTE } from "../charts.js";
 import { employeeForm } from "./employees.js";
@@ -8,6 +8,53 @@ import { breakdownDrawer } from "./breakdown.js";
 import { auditDiff } from "./audit.js";
 
 let tab = "overview";
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+// Mark someone as left. Anyone who reports to them moves to a replacement who holds the same position.
+async function leaveDrawer(p, done) {
+  const s = p.staff;
+  const reports = [...p.direct_reports, ...p.team].filter((r, i, all) => r.status === "active" && all.findIndex((x) => x.employee_id === r.employee_id) === i);
+  const staff = reports.length ? await get("/api/staff") : [];
+  const options = staff.filter((x) => x.status === "active" && x.employee_id !== s.employee_id && x.staff_level === s.staff_level && x.hub === s.hub);
+  const d = drawer({
+    title: `${s.name} has left`,
+    body: html`<form id="lf" class="form-grid" autocomplete="off">
+      <div class="field"><label for="lf-date">Last day</label><input class="input" id="lf-date" type="date" name="leave_date" value="${today()}" required></div>
+      <div class="field"><label for="lf-why">Reason</label><input class="input" id="lf-why" name="reason" list="lf-reasons" placeholder="e.g. Resigned"><datalist id="lf-reasons"><option value="Resigned"><option value="Dismissed"><option value="Retired"><option value="Moved away"></datalist></div>
+      ${reports.length ? html`<div class="field full"><label for="lf-repl">Who takes over?</label>
+        <select class="input" id="lf-repl" name="replacement_id"><option value="">Choose a ${levelLabel(s.staff_level).toLowerCase()}</option>${options.map((x) => html`<option value="${x.employee_id}">${x.name} · ${x.employee_id}</option>`)}</select>
+        <span class="hint">${reports.length} ${reports.length === 1 ? "person reports" : "people report"} to ${s.name} (${reports.slice(0, 4).map((r) => r.name).join(", ")}${reports.length > 4 ? "…" : ""}). They move to the person you choose.${options.length ? "" : " There is nobody else at this position in this hub yet: add the new " + levelLabel(s.staff_level).toLowerCase() + " first."}</span></div>` : ""}
+      <div class="full alert info">${icon("info")}<div>${s.name} stays in the system with their history, as inactive. Pay for entries already made is still calculated. If they come back later you can re-hire them.</div></div>
+    </form>`.toString(),
+    foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="lf-save">Mark as left</button>`,
+  });
+  $("#lf-save", d.panel).onclick = (e) => busy(e.currentTarget, async () => {
+    const v = Object.fromEntries(new FormData($("#lf", d.panel)));
+    const out = await post(`/api/staff/${encodeURIComponent(s.employee_id)}/leave`, v);
+    toast(out.moved ? `${s.name} has left; ${out.moved} moved to ${out.replacement}` : `${s.name} has left`);
+    d.close();
+    done();
+  });
+}
+
+function rehireDrawer(p, done) {
+  const s = p.staff;
+  const d = drawer({
+    title: `Re-hire ${s.name}`,
+    body: html`<form id="rf" class="form-grid" autocomplete="off">
+      <div class="field"><label for="rf-date">Joins again on</label><input class="input" id="rf-date" type="date" name="join_date" value="${today()}" required></div>
+      <div class="full alert info">${icon("info")}<div>${s.name} becomes active again with the same position and pay setup${s.leave_date ? ` (they left on ${s.leave_date})` : ""}. Edit their record first if any of that has changed.</div></div>
+    </form>`.toString(),
+    foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="rf-save">Re-hire</button>`,
+  });
+  $("#rf-save", d.panel).onclick = (e) => busy(e.currentTarget, async () => {
+    await post(`/api/staff/${encodeURIComponent(s.employee_id)}/rehire`, Object.fromEntries(new FormData($("#rf", d.panel))));
+    toast(`${s.name} is active again`);
+    d.close();
+    done();
+  });
+}
 
 // Scans kept with the record. The first three are the ones the company asks every person for.
 const DOC_TYPES = [["nic", "ID / NIC"], ["bank_book", "Bank book front page"], ["ol_results", "O/L results sheet"], ["other", "Other"]];
@@ -44,7 +91,8 @@ export default {
             <div><div class="faint text-sm">Balance carried</div><div class="num stat-lg ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
             ${s.role === "guy" ? html`<div><div class="faint text-sm">Security held</div><div class="num stat-lg">Rs ${money(p.security_held)}</div></div>` : ""}
           </div>
-          ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<button class="btn" id="edit">${icon("edit")} Edit</button>` : ""}
+          ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<div class="row" style="gap:8px"><button class="btn" id="edit">${icon("edit")} Edit</button>
+            ${s.status === "active" ? html`<button class="btn" id="leave">${icon("logout")} Mark as left</button>` : html`<button class="btn primary" id="rehire">${icon("refresh")} Re-hire</button>`}</div>` : ""}
         </div>
       </div>
 
@@ -59,7 +107,7 @@ export default {
           <dt>Position</dt><dd>${levelLabel(s.staff_level)}</dd>${s.role === "guy" || s.upline_id ? html`<dt>Reports to</dt><dd>${s.upline_id ? html`<a href="/employees/${encodeURIComponent(s.upline_id)}" data-link>${s.upline_name}</a>` : "—"}</dd>
           ${s.manager_id && s.manager_id !== s.upline_id ? html`<dt>Payroll manager</dt><dd><a href="/employees/${encodeURIComponent(s.manager_id)}" data-link>${s.manager_name}</a></dd>` : ""}` : ""}
           ${p.direct_reports.length ? html`<dt>Direct reports</dt><dd>${p.direct_reports.map((r) => html`<div><a href="/employees/${encodeURIComponent(r.employee_id)}" data-link>${r.name}</a> <span class="faint">${levelLabel(r.staff_level)}</span></div>`)}</dd>` : ""}
-          <dt>Phone</dt><dd>${s.phone || "—"}</dd><dt>NIC</dt><dd>${s.nic || "—"}</dd><dt>Joined</dt><dd>${s.join_date || "—"}</dd>
+          <dt>Phone</dt><dd>${s.phone || "—"}</dd><dt>NIC</dt><dd>${s.nic || "—"}</dd><dt>Joined</dt><dd>${s.join_date || "—"}</dd>${s.leave_date ? html`<dt>Left</dt><dd>${s.leave_date}${s.leave_reason ? html` <span class="faint">· ${s.leave_reason}</span>` : ""}</dd>` : ""}
           <dt>Added by</dt><dd>${s.created_by} · ${dateTime(s.created_at)}</dd></dl></div></div>
         <div class="stack">
           ${s.role === "guy" ? html`<div class="card"><div class="card-head"><h2>Pay setup</h2></div><div class="card-body"><dl class="kv">
@@ -149,6 +197,8 @@ export default {
     if (!panes[tab]) tab = "overview";
     show();
     $("#edit")?.addEventListener("click", () => employeeForm(s, () => this.render(ctx)));
+    $("#leave")?.addEventListener("click", () => leaveDrawer(p, () => this.render(ctx)));
+    $("#rehire")?.addEventListener("click", () => rehireDrawer(p, () => this.render(ctx)));
     document.title = `${s.name} · Payroll`;
     const title = $("#page-title"); // the redesigned header has no #page-title, only breadcrumbs
     if (title) title.textContent = s.name;
