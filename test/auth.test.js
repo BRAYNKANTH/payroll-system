@@ -29,14 +29,14 @@ test("setup creates the first admin only once; bad credentials are refused", asy
 
 test("repeated failed sign-ins lock the username", async () => {
   const { d, admin } = await setup();
-  await auth.createUser(d, admin, { username: "lockme", full_name: "L", role: "clerk", password: PW.lock });
+  await auth.createUser(d, admin, { username: "lockme", full_name: "L", role: "manager", hub: "COL", password: PW.lock });
   for (let i = 0; i < 5; i++) await assert.rejects(() => auth.login(d, "lockme", "wrong-9999"), /Incorrect/);
   await assert.rejects(() => auth.login(d, "lockme", PW.lock), /Too many/);
 });
 
 test("password hashes never reach the audit log", async () => {
   const { d, admin } = await setup();
-  await auth.createUser(d, admin, { username: "anu", full_name: "Anu", role: "clerk", password: PW.clerk });
+  await auth.createUser(d, admin, { username: "anu", full_name: "Anu", role: "manager", hub: "COL", password: PW.clerk });
   await auth.updateUser(d, admin, "anu", { password: "changed-pass-2" });
   const log = await svc.auditSearch(d, { table: "users", key: "anu" });
   assert.equal(log.length, 2, "the new user and the password change");
@@ -47,15 +47,14 @@ test("password hashes never reach the audit log", async () => {
 
 test("role permissions", () => {
   assert.ok(auth.can({ role: "admin" }, "finalize"));
-  assert.ok(!auth.can({ role: "accountant" }, "finalize"));
-  assert.ok(auth.can({ role: "accountant" }, "review"));
-  assert.ok(auth.can({ role: "clerk" }, "enter_data"));
-  assert.ok(!auth.can({ role: "clerk" }, "run_payroll"));
-  assert.ok(!auth.can({ role: "viewer" }, "enter_data"));
+  assert.ok(auth.can({ role: "admin" }, "review") && auth.can({ role: "admin" }, "run_payroll") && auth.can({ role: "admin" }, "view_pay"));
+  assert.deepEqual(auth.ROLES, ["manager", "admin", "staff"], "no accountant, clerk or viewer");
+  for (const gone of ["accountant", "clerk", "viewer"]) assert.ok(!auth.can({ role: gone }, "read"), gone);
+  assert.ok(!auth.can({ role: "staff" }, "enter_data"));
   assert.ok(auth.can({ role: "manager" }, "enter_data") && auth.can({ role: "manager" }, "manage_team"));
   assert.ok(!auth.can({ role: "manager" }, "manage_staff") && !auth.can({ role: "manager" }, "run_payroll"));
   assert.doesNotThrow(() => auth.requirePerm({ role: "manager" }, ["manage_staff", "manage_team"]));
-  assert.throws(() => auth.requirePerm({ role: "clerk" }, ["manage_staff", "manage_team"]), /cannot do this/);
+  assert.throws(() => auth.requirePerm({ role: "staff" }, ["manage_staff", "manage_team"]), /cannot do this/);
 });
 
 test("a hub manager must be limited to one hub", async () => {
@@ -78,7 +77,7 @@ test("a hub manager registers staff only in their own hub and never a manager", 
   await assert.rejects(() => svc.createEntry(d, "hubs", { code: "NEW", name: "New" }, "mgr", "COL"), /master data/);
 });
 
-test("hub-restricted clerk can only enter data for their hub", async () => {
+test("a hub-restricted user can only enter data for their hub", async () => {
   const { d } = await setup();
   await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1, settled_amount: 1 }, "clerk", "COL");
   await assert.rejects(() => svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G2", business_amount: 1, settled_amount: 1 }, "clerk", "COL"), /hub COL/);
@@ -135,7 +134,7 @@ test("dashboard summarises a period, optionally per hub", async () => {
 
 test("HTTP: sign-in required, roles enforced, forged requests refused, backup", async () => {
   const { d, admin } = await setup();
-  await auth.createUser(d, admin, { username: "view", full_name: "V", role: "viewer", password: PW.viewer });
+  await auth.createUser(d, admin, { username: "view", full_name: "V", role: "manager", hub: "COL", password: PW.viewer });
   const srv = createServer(d).listen(0, "127.0.0.1");
   await new Promise((r) => srv.once("listening", r));
   const base = `http://127.0.0.1:${srv.address().port}`;
@@ -153,7 +152,7 @@ test("HTTP: sign-in required, roles enforced, forged requests refused, backup", 
     assert.doesNotMatch(setCookie, /Secure/);
     const sid = setCookie.split(";")[0];
     assert.equal((await call("GET", "/api/staff", null, sid)).status, 200);
-    assert.equal((await call("POST", "/api/daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1, settled_amount: 1 }, sid)).status, 403);
+    assert.equal((await call("POST", "/api/users", { username: "x", full_name: "X", role: "admin", password: PW.viewer }, sid)).status, 403);
     assert.equal((await call("GET", "/api/backup", null, sid)).status, 403);
     assert.equal((await call("POST", "/api/auth/login", { username: "view", password: PW.viewer }, null, false)).status, 403);
     assert.equal((await call("POST", "/api/auth/logout", {}, sid)).status, 200);

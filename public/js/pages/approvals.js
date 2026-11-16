@@ -17,7 +17,7 @@ export default {
       <div class="page-head">
         <div><h1>Approvals</h1><p>Only entries that break a payroll rule land here. Everything else is processed automatically.</p></div>
       </div>
-      ${!can("review") ? html`<div class="alert info mb-4">${icon("info")}<div>You can see the queue, but only accountants and admins can approve or reject.</div></div>` : ""}
+      ${!can("review") ? html`<div class="alert info mb-4">${icon("info")}<div>You can see the queue, but only the admin can approve or reject.</div></div>` : ""}
       <div class="grid two">
         <div class="stack" id="queue"></div>
         <div class="card"><div class="card-head"><div><h2>Recent decisions</h2><div class="sub">From the audit trail</div></div></div>

@@ -3,15 +3,12 @@ const crypto = require("crypto");
 const { withUser, getSettings, httpError, logEvent } = require("./db");
 
 const NOW = "now_iso()";
-const ROLES = ["viewer", "clerk", "manager", "accountant", "admin", "staff"];
-// What each role may do. Higher roles include everything below them, except that a hub manager
-// (manage_team) registers staff only inside their own hub.
+const ROLES = ["manager", "admin", "staff"];
+// What each role may do: the admin (owner and secretary) does everything; a hub manager enters data and
+// registers staff only inside their own hub, and never sees pay; the staff portal sees only its own figures.
 const PERMISSIONS = {
   staff: ["self"], // the staff portal: own figures only, nothing in the office pages
-  viewer: ["read"],
-  clerk: ["read", "enter_data"],
   manager: ["read", "enter_data", "manage_team"],
-  accountant: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay"],
   admin: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings"],
 };
 const can = (user, perm) => !!user && PERMISSIONS[user.role]?.includes(perm);

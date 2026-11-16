@@ -20,7 +20,7 @@ async function setup() {
   await svc.createEntry(d, "daily", { date: "2026-09-02", employee_id: "G1", business_amount: 120000, settled_amount: 110000 }, "owner");
   await svc.runPeriod(d, "2026-09", "owner");
   await auth.createUser(d, admin, { username: "mgr", full_name: "Hub manager", role: "manager", hub: "COL", password: PW });
-  await auth.createUser(d, admin, { username: "clerk", full_name: "Clerk", role: "clerk", password: PW });
+  await auth.createUser(d, admin, { username: "mgr2", full_name: "Second manager", role: "manager", hub: "COL", password: PW });
   return { d, admin };
 }
 async function serve(d) {
@@ -73,10 +73,10 @@ test("sign-ins, failed sign-ins, lockouts, sign-outs and password changes are re
     assert.equal(by("logout", "owner").length, 1);
     assert.ok(!JSON.stringify(await rows(d)).includes("not-the-password-1"), "a typed password is never written down");
     // five wrong tries lock the name, and the lockout is recorded once, not once per attempt
-    for (let i = 0; i < 7; i++) await signIn("clerk", "wrong-password-" + i);
-    const locked = await rows(d, "action = 'login_locked' AND changed_by = 'clerk'");
+    for (let i = 0; i < 7; i++) await signIn("mgr2", "wrong-password-" + i);
+    const locked = await rows(d, "action = 'login_locked' AND changed_by = 'mgr2'");
     assert.equal(locked.length, 1);
-    assert.equal((await rows(d, "action = 'login_failed' AND changed_by = 'clerk'")).length, 5);
+    assert.equal((await rows(d, "action = 'login_failed' AND changed_by = 'mgr2'")).length, 5);
   } finally { srv.close(); }
 });
 
@@ -122,18 +122,15 @@ test("downloads and views are recorded: exports, payroll and payslip views, scan
   } finally { srv.close(); }
 });
 
-test("who sees what in the trail: the admin everything, others no sign-ins or downloads, and a hub user only their own actions", async () => {
+test("who sees what in the trail: the admin everything, a hub manager no sign-ins or downloads and only their own actions, and a hub user only their own actions", async () => {
   const { d } = await setup();
   const { srv, call, json, signIn } = await serve(d);
   try {
-    const boss = await signIn("owner"), mgr = await signIn("mgr"), clerk = await signIn("clerk");
+    const boss = await signIn("owner"), mgr = await signIn("mgr");
     await call("GET", "/api/export/daily.xlsx?period=2026-09", { cookie: boss });
     await call("PUT", "/api/staff/G1", { cookie: mgr, body: { phone: "0770000001" } });
     const all = json(await call("GET", "/api/audit?limit=2000", { cookie: boss }));
     for (const area of ["session", "export", "staff", "daily_log", "users"]) assert.ok(all.some((a) => a.table_name === area), area);
-    const clerkSees = json(await call("GET", "/api/audit?limit=2000", { cookie: clerk }));
-    assert.ok(clerkSees.length > 0);
-    assert.ok(clerkSees.every((a) => !["session", "export", "view", "backup"].includes(a.table_name)), "no sign-ins or downloads for a clerk");
     const mine = json(await call("GET", "/api/audit?limit=2000", { cookie: mgr }));
     assert.ok(mine.length >= 1 && mine.every((a) => a.changed_by === "mgr"), "a hub user sees only what they did themselves");
     assert.ok(!mine.some((a) => a.table_name === "session"));

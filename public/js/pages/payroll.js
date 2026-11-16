@@ -71,7 +71,7 @@ export default {
         </div>
         <div class="card-body flush" id="table"></div>
       </div>` : html`<div class="card">${emptyState("Not calculated yet",
-        can("run_payroll") ? "When the sheets are in, press “Calculate payroll”. You can recalculate as often as you like until the month is finalized." : "An accountant or admin needs to run the payroll for this month.", "play",
+        can("run_payroll") ? "When the sheets are in, press “Calculate payroll”. You can recalculate as often as you like until the month is finalized." : "The admin needs to run the payroll for this month.", "play",
         can("run_payroll") && !finalized ? `<button class="btn primary" id="run2">Calculate payroll</button>` : "")}</div>`}`;
 
     if (isPhone()) compactSteps(el.querySelector(".steps"), { actions: { 0: ["/daily", "Open the daily sheet"], 2: ["/approvals", "Open approvals"] } });

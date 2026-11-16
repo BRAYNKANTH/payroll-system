@@ -42,9 +42,8 @@ full copy from *Settings → Backup* — do this after each month is finalized.
 The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` and run `npm start`
 (it listens on `PORT`).
 
-**Demo sign-ins** (demo database only): `admin / admin123`, `accounts / accounts123`,
-`manager1`, `manager2`, `manager3` (all `manager123`, each limited to one Jaffna branch), `clerk / clerk123`
-(Jaffna 01 only), `viewer / viewer123`, and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `nila` (supervisor S02), all `staff123`. The demo has three branches, each with a coacher, a promoting manager, a manager,
+**Demo sign-ins** (demo database only): `admin / admin123`,
+`manager1`, `manager2`, `manager3` (all `manager123`, each limited to one Jaffna branch), and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `nila` (supervisor S02), all `staff123`. The demo has three branches, each with a coacher, a promoting manager, a manager,
 supervisors and distributors, four finalized months and the current month open. Jaffna 03 is small, so its manager is "retaining".
 
 ## What's in it
@@ -63,31 +62,29 @@ supervisors and distributors, four finalized months and the current month open. 
 | Payslips | Per person or all, printable |
 | Employees | Directory, add/edit, profile with pay history chart, team, change log |
 | Hubs | Branches with live figures, and each branch's coach |
-| Products | Admin and accountant: each product's selling price and purchase price, with the workers' 45% and the profit per unit shown live as the prices are typed. Reports gets a Product profit tab for the month |
-| Who sees pay | Pay is private: the admin and accountant (`view_pay`) are the only roles that see payroll, payslips, approvals, the commission and balances reports, pay on the dashboard, hubs and profiles, the weekly balance, pay terms (basic, rates, food, security, opening balance) and the pay approvals in the audit trail. Managers, clerks and viewers see the sales: each person's daily business, the money handed in, the shortfall (settle-up minus), advances taken, stock, targets and progress. A hub manager can still add and edit their team: a new person gets the position's usual pay terms from Settings, and pay fields sent by a hub manager are ignored. Enforced on the server, not only hidden in the menu |
+| Products | Admin: each product's selling price and purchase price, with the workers' 45% and the profit per unit shown live as the prices are typed. Reports gets a Product profit tab for the month |
+| Who sees pay | Pay is private: the admin (`view_pay`) is the only role that sees payroll, payslips, approvals, the commission and balances reports, pay on the dashboard, hubs and profiles, the weekly balance, pay terms (basic, rates, food, security, opening balance) and the pay approvals in the audit trail. Managers, clerks and viewers see the sales: each person's daily business, the money handed in, the shortfall (settle-up minus), advances taken, stock, targets and progress. A hub manager can still add and edit their team: a new person gets the position's usual pay terms from Settings, and pay fields sent by a hub manager are ignored. Enforced on the server, not only hidden in the menu |
 | Excel and PDF exports | Every report and list downloads as an Excel file (real numbers, a SUM row, a frozen header, filters) and as a PDF (repeated header, page numbers): hub summary, commission, stock shortfall, branch stock, balances, month history, product profit, products, payroll register, daily sheet, live sales, weekly sheet, employees, advances and loans, the audit trail (following its filters), and payslips (one page per person). Built by `export.js` with no extra packages; the same rules apply as on screen: pay reports need `view_pay`, product reports `manage_products`, a hub-limited user gets only their hub. The PDF uses the built-in Helvetica, so non-Latin letters print as "?" there (the Excel file keeps them). The bank file stays a CSV, as banks require |
 | Audit trail | Records who signed in, failed to sign in (never the password), was locked out, signed out or changed a password; who added, changed or deleted anything (the database records it itself, so nothing can bypass it); who uploaded or opened a scanned document; who downloaded a report, the payroll register, payslips, the bank file or a backup; who opened the payroll or a payslip; and who was refused. Every line has the address and the browser. The log is append-only: a database rule refuses any update or delete of it. The admin sees everything; others do not see sign-ins, downloads or views, nor pay approvals without pay rights; a hub user sees only their own actions. Filter by area, action, person, record and dates; export as Excel, PDF or CSV |
-| Live sales | Every sale as it is entered, newest first, with the person's progress to target. The admin and accountant also see the commission on each sale (the higher rate applies to the part over target), the pay earned so far and the net so far; everyone else sees only the sales |
-| Sellers enter their own sales | On the staff portal a distributor or supervisor adds a day (sales, money handed in, advance). It is unconfirmed until a hub manager, clerk or admin confirms it; until then the seller can correct or remove it, and payroll flags it (`UNCONFIRMED_SALES`) so a month cannot be finalized with unchecked sales |
+| Live sales | Every sale as it is entered, newest first, with the person's progress to target. The admin also sees the commission on each sale (the higher rate applies to the part over target), the pay earned so far and the net so far; everyone else sees only the sales |
+| Sellers enter their own sales | On the staff portal a distributor or supervisor adds a day (sales, money handed in, advance). It is unconfirmed until a hub manager or the admin confirms it; until then the seller can correct or remove it, and payroll flags it (`UNCONFIRMED_SALES`) so a month cannot be finalized with unchecked sales |
 | Leavers and joiners | Mark as left (last day, reason, and who takes over the people reporting to them, who must hold the same position in the same hub), Re-hire, and a coacher can be added for a branch. Days before someone joined or after they left are not counted as missing |
 | Reports | Hub summary, commission, stock shortfall, branch stock, balances, month history (CSV export) |
 | Audit trail | Every change after first entry: who, when, old → new; filters and export |
-| Users & roles | Admin, accountant, hub manager (one hub; registers their own team), clerk (optionally one hub), viewer |
+| Users & roles | Three kinds of login: admin, hub manager (one hub; registers their own team) and staff portal |
 | Settings | Company, rule thresholds, closed days, session length |
 
 ## Roles
 
 | Role | Can |
 |---|---|
-| Viewer | See everything, change nothing |
 | Staff portal | A distributor or supervisor signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
-| Clerk | Enter daily / weekly / stock / allowance sheets (limited to one hub if set) |
-| Accountant | + manage staff and hubs, give advances and loans, calculate payroll, approve / reject, export files |
-| Admin | + finalize months, manage users, change settings |
+| Hub manager | Enters and confirms the sheets of their own hub, registers their own team, sees sales, money handed in and advances, never pay. Coachers and promoting managers use this login too |
+| Admin | The owner and the secretary: everything, including payroll, approvals, finalizing months, products, users and settings |
 
 ## Monthly workflow
 
-1. Clerks fill in the daily and weekly sheets, stock counts and allowances.
+1. The hub managers and the admin fill in the daily and weekly sheets, stock counts and allowances.
 2. **Payroll run → Calculate.** Recalculate as often as you like. Entries without flags are auto-approved.
 3. Approve or reject flagged entries in **Approvals**. A rejection needs a reason; fix the data and recalculate.
 4. **Finalize** (admin). Recalculates once more, locks every entry for the month (enforced by database

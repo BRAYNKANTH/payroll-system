@@ -37,15 +37,12 @@ const auth = require("./auth");
 const products = require("./products");
 const add = (kind, row, user = "admin") => svc.createEntry(d, kind, row, user);
 
-// Demo sign-ins, one per role (demo database only — change or remove before real use)
+// Demo sign-ins (demo database only — change or remove before real use)
 const DEMO_USERS = [
   ["admin", "Owner Admin", "admin", null, "admin123"],
-  ["accounts", "Dilani Accounts", "accountant", null, "accounts123"],
   ["manager1", "Arun Selvam (Jaffna 01 manager)", "manager", "J1", "manager123"],
   ["manager2", "Ravi Shankar (Jaffna 02 manager)", "manager", "J2", "manager123"],
   ["manager3", "Selvi Anand (Jaffna 03 manager)", "manager", "J3", "manager123"],
-  ["clerk", "Anu Clerk", "clerk", "J1", "clerk123"],
-  ["viewer", "Board Viewer", "viewer", null, "viewer123"],
 ];
 // A hosted database is reachable from the internet, so it never gets the well-known demo passwords.
 if (remote) for (const u of DEMO_USERS) u[4] = "Pw" + crypto.randomBytes(6).toString("base64url") + "7";
@@ -134,11 +131,11 @@ async function month(period, { short = {}, growth = 1, draws = {}, stockShort = 
       daily.push({ date, employee_id: id, business_amount: business, settled_amount: settled - gap, personal_minus: rnd() < 0.08 ? 1000 : 0 });
     }
   }
-  await svc.bulkUpsert(d, "daily", daily, "clerk");
+  await svc.bulkUpsert(d, "daily", daily, "manager1");
   await svc.bulkUpsert(d, "stock", sellers.filter((t) => t[3] === "distributor" || t[3] === "supervisor").flatMap(([id]) => [
     { period, employee_id: id, product: "Shine", opening_stock: 40, issued: 60, sold: 85, counted_stock: 15 - (stockShort[id] || 0) - (rnd() < 0.2 ? 1 : 0), unit_price: 850 },
     { period, employee_id: id, product: "Vim", opening_stock: 20, issued: 30, sold: 38, counted_stock: 12, unit_price: 500 },
-  ]), "clerk");
+  ]), "manager1");
   const weekly = [];
   for (let day = 1; day <= days; day++) {
     if (new Date(y, m - 1, day).getDay() !== 1) continue;
@@ -154,12 +151,12 @@ async function month(period, { short = {}, growth = 1, draws = {}, stockShort = 
         personal_draw: draws[mgr] || (business < 100000 ? Math.round((2000 + rnd() * 3000) / 100) * 100 : Math.round((8000 + rnd() * 12000) / 100) * 100) });
     }
   }
-  await svc.bulkUpsert(d, "weekly", weekly, "accounts");
-  await svc.createEntry(d, "allowances", { period, employee_id: "D01", description: "Transport", amount: 3000 }, "accounts");
+  await svc.bulkUpsert(d, "weekly", weekly, "admin");
+  await svc.createEntry(d, "allowances", { period, employee_id: "D01", description: "Transport", amount: 3000 }, "admin");
 }
 
 async function closeMonth(period) {
-  await svc.runPeriod(d, period, "accounts");
+  await svc.runPeriod(d, period, "admin");
   for (const r of (await svc.getPeriod(d, period)).rows.filter((x) => x.status === "pending_review")) {
     await svc.review(d, period, r.employee_id, "admin", "approved", "Checked against the hub's cash book");
   }
@@ -171,8 +168,8 @@ const now = new Date();
 const ym = (offset) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString().slice(0, 7);
 const growth = [0.9, 0.95, 1.0, 1.04];
 // A loan that started three months ago (Rs 10,000 still to come) and an advance for the open month, so the loans page has something to show.
-await loans.create(d, { employee_id: "D01", kind: "loan", amount: 40000, instalment: 10000, start_period: ym(-3), issued_on: ym(-3) + "-02", note: "School fees" }, "accounts");
-await loans.create(d, { employee_id: "D03", kind: "advance", amount: 5000, start_period: ym(0), issued_on: ym(0) + "-04", note: "Medical" }, "accounts");
+await loans.create(d, { employee_id: "D01", kind: "loan", amount: 40000, instalment: 10000, start_period: ym(-3), issued_on: ym(-3) + "-02", note: "School fees" }, "admin");
+await loans.create(d, { employee_id: "D03", kind: "advance", amount: 5000, start_period: ym(0), issued_on: ym(0) + "-04", note: "Medical" }, "admin");
 for (let i = 0; i < 4; i++) {
   await month(ym(i - 4), { growth: growth[i], short: { D02: 1500 } });
   await closeMonth(ym(i - 4));
@@ -182,12 +179,12 @@ for (let i = 0; i < 4; i++) {
 const open = ym(0);
 await month(open, { growth: 1.06, short: { D02: 1500, D04: 9000 }, draws: { M02: 45000 }, stockShort: { D07: 9 } });
 const row = (await svc.listEntries(d, "daily", { period: open, employee_id: "D01" }))[0];
-await svc.updateEntry(d, "daily", row.id, { settled_amount: row.settled_amount / 100 - 200, notes: "Recount: Rs 200 short" }, "accounts");
-await svc.updateEntry(d, "staff", "D07", { bank_account_no: "3000999888" }, "accounts");
+await svc.updateEntry(d, "daily", row.id, { settled_amount: row.settled_amount / 100 - 200, notes: "Recount: Rs 200 short" }, "admin");
+await svc.updateEntry(d, "staff", "D07", { bank_account_no: "3000999888" }, "admin");
 // Pavan's last two days were entered by Pavan himself on the staff portal and are waiting for the office to confirm them.
 await d.run(`UPDATE daily_log SET source = 'portal', created_by = 'pavan' WHERE id IN
   (SELECT id FROM daily_log WHERE employee_id = 'D01' AND date >= ? AND date < ? ORDER BY date DESC LIMIT 2)`, open + "-01", svc.shiftPeriod(open, 1) + "-01");
-await svc.runPeriod(d, open, "accounts");
+await svc.runPeriod(d, open, "admin");
 
 console.log(`Seeded ${remote ? "the Postgres database from DATABASE_URL" : target}`);
 console.log(remote ? "Sign-ins (random passwords — save them now, they are not shown again):" : "Demo sign-ins:");

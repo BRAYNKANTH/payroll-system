@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "payroll-demo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "demo"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "payroll-loans-check",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--no-warnings",
+        "server.js",
+        "C:/Users/TD311~1.BRA/AppData/Local/Temp/claude/bbf0a07a3dd41d64/c8ca5d24-adc4-41ec-862d-0c311803809c/scratchpad/pm-demo"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "payroll-new",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--no-warnings",
+        "server.js",
+        "C:/Users/TD311~1.BRA/AppData/Local/Temp/claude/bbf0a07a3dd41d64/43a044b2-52de-407b-bde0-80a9b79ac575/scratchpad/demo3",
+        "8092"
+      ],
+      "port": 8092
+    }
+  ]
+}

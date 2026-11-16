@@ -76,11 +76,11 @@ CREATE TABLE IF NOT EXISTS hubs (
   updated_at text
 );
 
--- Application users. Roles: admin > accountant > clerk > viewer. hub restricts a clerk to one hub.
+-- Application users. Roles: admin, manager (hub manager, limited to one hub) and staff (portal).
 CREATE TABLE IF NOT EXISTS users (
   username      text PRIMARY KEY,
   full_name     text NOT NULL,
-  role          text NOT NULL CHECK (role IN ('admin','accountant','manager','clerk','viewer')),
+  role          text NOT NULL CHECK (role IN ('admin','manager')),
   hub           text REFERENCES hubs(code),
   password_hash text NOT NULL,
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled')),
@@ -142,8 +142,10 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAUL
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS team_commission_rate double precision NOT NULL DEFAULT 0;
 
 -- Existing databases were created before the hub-manager role: widen the role check (the name is Postgres's default).
+-- The accountant, clerk and viewer roles no longer exist: their logins are removed (the admin does that work), then the check is narrowed.
+DELETE FROM users WHERE role IN ('accountant','clerk','viewer');
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','accountant','manager','clerk','viewer','staff'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','manager','staff'));
 
 -- Balance brought forward from the old spreadsheets. Only used until the person has a first calculated month.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS opening_balance bigint NOT NULL DEFAULT 0;

@@ -15,9 +15,9 @@ async function setup() {
 }
 const add = (d, id, level, extra = {}) => svc.createEntry(d, "staff", { employee_id: id, name: id, hub: "H1", staff_level: level, ...extra }, "admin");
 
-test("only the admin and the accountant may manage products", () => {
-  assert.ok(auth.can({ role: "admin" }, "manage_products") && auth.can({ role: "accountant" }, "manage_products"));
-  for (const role of ["manager", "clerk", "viewer", "staff"]) assert.ok(!auth.can({ role }, "manage_products"), role);
+test("only the admin may manage products", () => {
+  assert.ok(auth.can({ role: "admin" }, "manage_products"));
+  for (const role of ["manager", "staff"]) assert.ok(!auth.can({ role }, "manage_products"), role);
 });
 
 test("a product shows the workers' 45% and the profit left after the purchase price", async () => {

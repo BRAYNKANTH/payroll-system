@@ -46,7 +46,7 @@ test("a staff login is tied to one distributor or supervisor, and takes their hu
 
   // the portal login cannot become an office role, and an office user cannot become a portal login
   await assert.rejects(() => auth.updateUser(d, ADMIN, "user-d1", { role: "admin" }), /cannot be changed/);
-  await auth.createUser(d, ADMIN, { username: "clerk-one", full_name: "C", role: "clerk", password: "clerk12345" });
+  await auth.createUser(d, ADMIN, { username: "clerk-one", full_name: "C", role: "admin", password: "clerk12345" });
   await assert.rejects(() => auth.updateUser(d, ADMIN, "clerk-one", { role: "staff" }), /cannot be changed/);
   // a hub typed for a portal login is ignored
   assert.equal((await auth.updateUser(d, ADMIN, "user-d1", { hub: "H2" })).hub, "H1");

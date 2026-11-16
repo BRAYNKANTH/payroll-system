@@ -1,11 +1,11 @@
 // Sales entered by the sellers themselves, and the live view of them.
 //
 // A distributor or supervisor adds their own day on the staff portal (sales, cash handed in, advance). Such a row is marked
-// source = 'portal' and stays "unconfirmed" until the office (a hub manager, clerk or admin) confirms it. Until then the seller can still
+// source = 'portal' and stays "unconfirmed" until the office (a hub manager or the admin) confirms it. Until then the seller can still
 // correct or remove it; afterwards only the office can change it. An unconfirmed day is counted in pay but raises a payroll flag, so a
 // month cannot be finalized with sales nobody has checked.
 //
-// The live view (admin and accountant see the pay columns, everyone else sees only the sales) works out, for every entry, what that day
+// The live view (only the admin sees the pay columns, everyone else sees only the sales) works out, for every entry, what that day
 // earned under the person's own pay rules, how far the month is from the target, and what has been earned so far.
 const { withUser, getSettings, httpError } = require("./db");
 const engine = require("./engine");

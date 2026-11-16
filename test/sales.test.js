@@ -25,9 +25,9 @@ const login = (d, employee, username) => auth.createUser(d, ADMIN, { username, f
 const day = (n = 0) => { const t = new Date(sales.today() + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() - n); return t.toISOString().slice(0, 10); };
 const period = () => sales.today().slice(0, 7);
 
-test("only the admin and the accountant may see pay in the live view", () => {
-  assert.ok(auth.can({ role: "admin" }, "view_pay") && auth.can({ role: "accountant" }, "view_pay"));
-  for (const role of ["manager", "clerk", "viewer", "staff"]) assert.ok(!auth.can({ role }, "view_pay"), role);
+test("only the admin may see pay in the live view", () => {
+  assert.ok(auth.can({ role: "admin" }, "view_pay"));
+  for (const role of ["manager", "staff"]) assert.ok(!auth.can({ role }, "view_pay"), role);
 });
 
 test("a seller enters their own day; it is unconfirmed, and they can correct or remove it until the office confirms it", async () => {

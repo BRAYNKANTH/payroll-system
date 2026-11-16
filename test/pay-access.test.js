@@ -1,4 +1,4 @@
-// Pay is private to those who may see it (admin and accountant). Managers, clerks and viewers see the sales, the shortfalls and the money
+// Pay is private to those who may see it (the admin). Hub managers see the sales, the shortfalls and the money
 // handed in, but never what anyone earns.
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -20,13 +20,13 @@ async function setup() {
   await svc.createEntry(d, "daily", { date: "2026-09-02", employee_id: "G1", business_amount: 120000, settled_amount: 110000, personal_minus: 2000 }, "owner");
   await svc.runPeriod(d, "2026-09", "owner");
   await d.run("INSERT INTO audit_log (table_name, row_key, action, changed_by) VALUES ('pay_period_summary', 'G1@2026-09', 'approve', 'owner')");
-  for (const [username, role, hub] of [["acct", "accountant", null], ["mgr", "manager", "COL"], ["clerk", "clerk", null], ["view", "viewer", null]]) {
+  for (const [username, role, hub] of [["mgr", "manager", "COL"]]) {
     await auth.createUser(d, admin, { username, full_name: username, role, hub, password: PW });
   }
   return d;
 }
 
-test("pay pages and routes refuse a manager, a clerk and a viewer; the admin and accountant get them", async () => {
+test("pay pages and routes refuse a hub manager; the admin gets them", async () => {
   const d = await setup();
   const srv = createServer(d).listen(0, "127.0.0.1");
   await new Promise((r) => srv.once("listening", r));
@@ -39,11 +39,11 @@ test("pay pages and routes refuse a manager, a clerk and a viewer; the admin and
     const PAY_ROUTES = ["/api/payroll/2026-09", "/api/payroll/2026-09/G1", "/api/payroll/2026-09/payslips", "/api/payroll/2026-09/payslips/G1", "/api/payroll/2026-09/register",
       "/api/review-queue", "/api/reports/commission?period=2026-09", "/api/reports/balances"];
     const SALES_ROUTES = ["/api/daily?period=2026-09", "/api/live?period=2026-09", "/api/staff", "/api/hubs", "/api/loans", "/api/reports/stock?period=2026-09", "/api/stock?period=2026-09", "/api/weekly?period=2026-09"];
-    for (const who of ["acct", "owner"]) {
+    for (const who of ["owner"]) {
       const c = await signIn(who);
       for (const p of PAY_ROUTES) assert.equal((await get(p, c)).status, 200, `${who} ${p}`);
     }
-    for (const who of ["mgr", "clerk", "view"]) {
+    for (const who of ["mgr"]) {
       const c = await signIn(who);
       for (const p of PAY_ROUTES) assert.equal((await get(p, c)).status, 403, `${who} ${p}`);
       for (const p of SALES_ROUTES) assert.equal((await get(p, c)).status, 200, `${who} ${p}`);

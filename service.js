@@ -204,7 +204,7 @@ async function listEntries(db, kind, { period, employee_id, hub, from, to } = {}
   return db.all(`SELECT * FROM ${e.table} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${order}`, ...args);
 }
 
-// A hub-scoped user (e.g. a branch clerk) may only touch entries for staff of their own hub.
+// A hub-scoped user (e.g. a hub manager) may only touch entries for staff of their own hub.
 async function assertScope(db, kind, row, scopeHub) {
   if (!scopeHub) return;
   if (kind === "hubs") throw httpError(403, "Hub-restricted users cannot change master data");
