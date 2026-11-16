@@ -105,7 +105,7 @@ for (const [i, [id, name, hub, position, upline]] of TEAM.entries()) {
   });
 }
 // Staff-portal logins: a distributor and two supervisors can sign in and see their own figures.
-const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"]]
+const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"], ["coacher1", "Jegan Muthiah", "C01"], ["promo1", "Hari Prasath", "PM01"], ["mgrme1", "Arun Selvam", "M01"]]
   .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
 for (const [username, full_name, employee_id, password] of PORTAL_USERS) {
   await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id, password });

@@ -53,6 +53,8 @@ const EXTRA_ROUTES = [
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
 const isStaff = () => state.user?.role === "staff";
+// "My page" shows for the staff portal, and for a hub manager whose login is linked to their own employee record.
+const navShown = (n) => (isStaff() ? n.perm === "self" : n.perm === "self" ? !!state.user?.employee_id : !n.perm || can(n.perm));
 const roleText = (r) => (r === "staff" ? "Staff portal" : r);
 const groupOf = (path) => {
   let g = "";
@@ -137,7 +139,7 @@ function shell() {
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
       <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
       <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
-      <nav class="nav" id="nav" aria-label="Sections">${NAV.filter((n) => (isStaff() ? n.perm === "self" : !n.perm || can(n.perm))).map((n) => n.group
+      <nav class="nav" id="nav" aria-label="Sections">${NAV.filter(navShown).map((n) => n.group
         ? `<div class="nav-group" aria-hidden="true">${esc(n.group)}</div>`
         : `<a href="${n.path}" data-link data-nav="${n.path}" title="${esc(n.label)}">${icon(n.icon)}<span>${esc(n.label)}</span>${n.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
       </nav>
@@ -456,7 +458,7 @@ export async function boot() {
 
 // Once the first screen is up, fetch the code of the other pages in the background so the next tap has nothing to download.
 function warmPages() {
-  const names = [...new Set(NAV.filter((n) => n.page && (isStaff() ? n.perm === "self" : !n.perm || can(n.perm))).map((n) => n.page)), "employee"];
+  const names = [...new Set(NAV.filter((n) => n.page && navShown(n)).map((n) => n.page)), "employee"];
   const run = () => names.forEach((n) => loadPage(n).catch(() => {}));
   if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 3000 }); else setTimeout(run, 1500);
 }

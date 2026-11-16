@@ -8,7 +8,7 @@ const ROLES = ["manager", "admin", "staff"];
 // registers staff only inside their own hub, and never sees pay; the staff portal sees only its own figures.
 const PERMISSIONS = {
   staff: ["self"], // the staff portal: own figures only, nothing in the office pages
-  manager: ["read", "enter_data", "manage_team"],
+  manager: ["read", "enter_data", "manage_team", "self"], // "self": My page, when the login is linked to an employee record
   admin: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings"],
 };
 const can = (user, perm) => !!user && PERMISSIONS[user.role]?.includes(perm);
@@ -129,11 +129,18 @@ async function createUser(db, actor, body) {
     // The portal login is tied to one sales person and takes that person's hub.
     const s = await db.get("SELECT employee_id, hub, role, status FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
     if (!s) throw httpError(400, "Choose the employee this login is for");
-    if (s.role !== "guy") throw httpError(400, "The staff portal is for distributors and supervisors");
     if (s.status !== "active") throw httpError(400, "That employee is inactive");
     if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
     employeeId = s.employee_id;
     hub = s.hub;
+  } else if (body.role === "manager" && body.employee_id) {
+    // A hub manager login may also be linked to the person's own employee record (a manager, promoting manager or coacher), which adds "My page".
+    const s = await db.get("SELECT employee_id, hub, status FROM staff WHERE employee_id = ?", String(body.employee_id));
+    if (!s) throw httpError(400, "Unknown employee");
+    if (s.status !== "active") throw httpError(400, "That employee is inactive");
+    if (s.hub !== hub) throw httpError(400, "The employee belongs to a different hub than the one chosen");
+    if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
+    employeeId = s.employee_id;
   }
   await withUser(db, actor.username, (t) =>
     t.run(`INSERT INTO users (username, full_name, role, hub, employee_id, password_hash, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,

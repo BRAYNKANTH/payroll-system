@@ -1,9 +1,10 @@
 import { get, post, put } from "../api.js";
 import { state } from "../app.js";
-import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago } from "../ui.js";
+import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago, LEVELS } from "../ui.js";
+const LV = Object.fromEntries(LEVELS);
 
 const ROLES = [
-  ["staff", "Staff portal", "A distributor or supervisor who signs in to see their own sales, pay and payslips"],
+  ["staff", "Staff portal", "Any employee (distributor, supervisor, manager, promoting manager or coacher) who signs in to see their own sales, pay and payslips. Seniors also see the sales of their team"],
   ["admin", "Admin", "Everything, including finalizing months, users and settings"],
   ["manager", "Hub manager", "Enter sheets, confirm sales and register the team of their own hub. Sees sales, the money handed in and advances, never pay"],
 ];
@@ -15,7 +16,7 @@ export default {
     const { el } = ctx;
     const [users, allStaff] = await Promise.all([get("/api/users"), get("/api/staff")]);
     const linked = new Set(users.map((x) => x.employee_id).filter(Boolean));
-    const free = allStaff.filter((s) => s.role === "guy" && s.status === "active" && !linked.has(s.employee_id));
+    const free = allStaff.filter((s) => s.status === "active" && !linked.has(s.employee_id));
     const byId = Object.fromEntries(allStaff.map((s) => [s.employee_id, s]));
     el.innerHTML = html`
       <div class="page-head">
@@ -42,10 +43,10 @@ export default {
                 <input type="radio" name="role" value="${k}" ${(u?.role || "manager") === k ? "checked" : ""} ${self ? "disabled" : ""} style="margin-top:3px">
                 <span><b style="color:var(--text)">${l}</b><br><span class="faint" style="font-weight:400">${desc}</span></span></label>`)}</div>
             ${self ? html`<span class="hint">You can't change your own role.</span>` : ""}</div>
-          <div class="field full" id="emp-wrap" hidden><label for="emp-sel">Employee</label>
+          <div class="field full" id="emp-wrap" hidden><label for="emp-sel" id="emp-lbl">Employee</label>
             <select class="input" id="emp-sel" name="employee_id"><option value="">Choose the person this login is for</option>
-              ${free.map((s) => html`<option value="${s.employee_id}">${s.name} · ${s.employee_id} · ${s.hub}`)}</select>
-            <span class="hint">Only active distributors and supervisors without a login are listed. The login gets that person's hub.</span></div>`}
+              ${free.map((s) => html`<option value="${s.employee_id}">${s.name} · ${LV[s.staff_level] || s.staff_level} · ${s.employee_id} · ${s.hub}`)}</select>
+            <span class="hint">Every active employee without a login is listed: distributors, supervisors, managers, promoting managers and coachers. For a staff portal the login gets that person's hub. For a hub manager, link a coacher, promoting manager or manager so they also get My page; their hub must be the one chosen below.</span></div>`}
           <div class="field" id="hub-wrap" ${u?.role === "staff" ? "hidden" : ""}><label>Hub access</label><select class="input" name="hub"><option value="">All hubs</option>
             ${state.hubs.map((h) => html`<option value="${h.code}" ${u?.hub === h.code ? "selected" : ""}>${h.name} only</option>`)}</select>
             <span class="hint">Required for a hub manager: they see only that hub.</span></div>
@@ -58,7 +59,7 @@ export default {
       const syncRole = () => {
         const r = $("#uf", d.panel).querySelector("input[name=role]:checked")?.value;
         const ew = $("#emp-wrap", d.panel);
-        if (ew) ew.hidden = r !== "staff";
+        if (ew) { ew.hidden = !(r === "staff" || (r === "manager" && !u)); const o = ew.querySelector("option"); if (o) o.textContent = r === "manager" ? "Not linked (no My page)" : "Choose the person this login is for"; $("#emp-lbl", d.panel).textContent = r === "manager" ? "Employee record (optional)" : "Employee"; }
         const hw = $("#hub-wrap", d.panel);
         if (hw) hw.hidden = r === "staff" || u?.role === "staff";
       };
@@ -72,7 +73,7 @@ export default {
           if (!self) { body.role = v.role; body.status = v.status; }
           if (v.password) body.password = v.password;
           await put(`/api/users/${encodeURIComponent(u.username)}`, body);
-        } else await post("/api/users", v);
+        } else { if (!v.employee_id) delete v.employee_id; await post("/api/users", v); }
         toast("User saved"); d.close(); this.render(ctx);
       });
     };

@@ -1,4 +1,4 @@
-// Staff portal: what a distributor or supervisor may see about themselves.
+// Staff portal: what any employee (distributor, supervisor, manager, promoting manager or coacher) may see about themselves.
 // Every query here is keyed on the signed-in user's own employee_id; nothing takes an id from the request.
 const { getSettings, httpError } = require("./db");
 const engine = require("./engine");
@@ -25,6 +25,26 @@ async function summary(db, user, period) {
   const allowances = await db.all("SELECT description, amount FROM allowances WHERE employee_id = ? AND period = ? ORDER BY id", s.employee_id, period);
   const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k] || 0), 0);
   const business = sum(daily, "business_amount");
+  const senior = s.staff_level === "promoting_manager" || s.staff_level === "coacher"; // paid a salary plus a share of the sales below them
+  const isManager = s.staff_level === "manager";
+  const settings = await getSettings(db);
+
+  // Everyone below this person in the chain, with their sales this month (sales only, never anyone's pay).
+  let team = null;
+  if (s.role === "manager") {
+    const people = await db.all("SELECT employee_id, name, staff_level, upline_id, target, status FROM staff WHERE hub = ? AND status = 'active'", s.hub);
+    const kids = new Map();
+    for (const p of people) { if (!kids.has(p.upline_id)) kids.set(p.upline_id, []); kids.get(p.upline_id).push(p); }
+    const below = [];
+    const walk = (id, depth) => { for (const k of kids.get(id) || []) { if (depth < 8) { below.push({ ...k, depth }); walk(k.employee_id, depth + 1); } } };
+    walk(s.employee_id, 1);
+    const rows = below.length ? await db.all(`SELECT employee_id, COUNT(*) AS days, COALESCE(SUM(business_amount), 0) AS business, COALESCE(SUM(settle_up_minus), 0) AS short
+      FROM daily_log WHERE date >= ? AND date < ? GROUP BY employee_id`, ...monthBounds(period)) : [];
+    const byId = new Map(rows.map((r) => [r.employee_id, r]));
+    team = below.map((p) => ({ employee_id: p.employee_id, name: p.name, level_name: svc.LEVEL_NAME[p.staff_level] || p.staff_level, depth: p.depth, target: Number(p.target) || 0,
+      days: Number(byId.get(p.employee_id)?.days) || 0, business: Number(byId.get(p.employee_id)?.business) || 0, short: Number(byId.get(p.employee_id)?.short) || 0 }));
+  }
+  const belowSales = team ? team.reduce((t, p) => t + p.business, 0) : 0;
 
   // Final figures exist only once the month is finalized. Before that, show an estimate from the same rules,
   // clearly marked as not final.
@@ -33,6 +53,11 @@ async function summary(db, user, period) {
     const r = await db.get("SELECT * FROM pay_period_summary WHERE employee_id = ? AND period = ?", s.employee_id, period);
     if (r) official = { gross: r.gross_earnings, deductions: r.total_deductions, net: r.net_pay, paid: r.disbursed_amount, opening: r.opening_balance,
       closing: r.closing_balance, ...(({ earnings, deductions }) => ({ earnings, deduction_lines: deductions }))(JSON.parse(r.detail)) };
+  } else if (senior) {
+    const r = engine.computeSenior({ staff: s, belowSales, rate: Number(settings.senior_commission_rate) || 0, openingBalance: 0 });
+    estimate = { gross: r.gross_earnings, deductions: 0, net: r.net_pay, opening: 0, closing: 0, earnings: r.detail.earnings, deduction_lines: [] };
+  } else if (isManager) {
+    estimate = null; // a manager's pay comes from the weekly account, which the office completes
   } else if (daily.length || stock.length || allowances.length) {
     const prev = await db.get("SELECT closing_balance FROM pay_period_summary WHERE employee_id = ? AND period < ? ORDER BY period DESC LIMIT 1", s.employee_id, period);
     const held = await db.get(`SELECT COALESCE(SUM(security_held), 0) AS held FROM pay_period_summary WHERE employee_id = ? AND period < ?`, s.employee_id, period);
@@ -51,7 +76,7 @@ async function summary(db, user, period) {
     period, finalized,
     company: (await getSettings(db)).company_name,
     me: {
-      employee_id: s.employee_id, name: s.name, staff_level: s.staff_level, level_name: svc.LEVEL_NAME[s.staff_level] || "Distributor", hub: s.hub, hub_name: s.hub_name,
+      employee_id: s.employee_id, name: s.name, staff_level: s.staff_level, senior, is_manager: isManager, sells: s.role === "guy" || isManager, level_name: svc.LEVEL_NAME[s.staff_level] || "Distributor", hub: s.hub, hub_name: s.hub_name,
       reports_to: s.upline_name || null, phone: s.phone, nic: s.nic, join_date: s.join_date,
       bank_name: s.bank_name, bank_last4: s.bank_account_no ? s.bank_account_no.slice(-4) : null,
       pay: { pay_scheme: s.pay_scheme, target: s.target, basic_pay: s.basic_pay, commission_rate: s.commission_rate, base_commission_rate: s.base_commission_rate,
@@ -62,6 +87,7 @@ async function summary(db, user, period) {
       settle_up: sum(daily, "settle_up_minus"), personal: sum(daily, "personal_minus"),
       daily, stock: stock.map((k) => ({ product: k.product, shortfall_qty: k.shortfall_qty, unit_price: k.unit_price, shortfall_value: k.shortfall_value })), allowances,
     },
+    team, below_sales: belowSales, senior_rate: Number(settings.senior_commission_rate) || 0,
     official, estimate, history, security_held: Number(security.held) || 0,
     loans: await loans.mine(db, s.employee_id, period),
   };

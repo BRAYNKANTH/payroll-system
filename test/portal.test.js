@@ -28,7 +28,7 @@ async function setup() {
 }
 const login = (d, employee, username) => auth.createUser(d, ADMIN, { username, full_name: `Name ${employee}`, role: "staff", employee_id: employee, password: "portal1234" });
 
-test("a staff login is tied to one distributor or supervisor, and takes their hub", async () => {
+test("a staff login is tied to one employee, and takes their hub", async () => {
   const d = await setup();
   const u = await login(d, "D1", "user-d1");
   assert.deepEqual([u.role, u.employee_id, u.hub], ["staff", "D1", "H1"]);
@@ -38,7 +38,7 @@ test("a staff login is tied to one distributor or supervisor, and takes their hu
   assert.throws(() => auth.requirePerm(u, "read"), /cannot do this/);
 
   await assert.rejects(() => login(d, "D1", "user-d1b"), /already has a login/);
-  await assert.rejects(() => login(d, "M1", "user-m1"), /distributors and supervisors/);
+  assert.equal((await login(d, "M1", "user-m1")).role, "staff", "a manager can have a portal login too");
   await assert.rejects(() => login(d, "NOBODY", "user-nobody"), /Choose the employee/);
   await svc.updateEntry(d, "staff", "D2", { status: "inactive" }, "admin");
   await assert.rejects(() => login(d, "D2", "user-d2"), /inactive/);

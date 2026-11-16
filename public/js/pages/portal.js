@@ -1,4 +1,4 @@
-// Staff portal: one page for a distributor, supervisor or group manager, showing only their own figures.
+// Staff portal: one page for any employee (distributor, supervisor, manager, promoting manager or coacher), showing only their own figures and their team's sales.
 import { get, post, del } from "../api.js";
 import { state } from "../app.js";
 import { $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime } from "../ui.js";
@@ -19,9 +19,11 @@ const readBase64 = (file) => new Promise((ok, fail) => {
 const buzz = (ms = 8) => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } }; // a light tap on phones that allow it
 
 // The person's own pay rules in plain words.
-function payRules(p) {
+function payRules(p, me, rate) {
   const rs = (c) => `Rs ${money(c)}`;
   const lines = [];
+  if (me?.senior) return [`A fixed salary of <b>${rs(p.basic_pay)}</b> every month, paid to your bank.`, `Plus <b>${pct(rate, 2)}</b> of the sales of everyone below you, worked out by the office when the month closes.`];
+  if (me?.is_manager) return [`Your pay is worked out from your weekly account: the weekly commission on your own and your team's sales, your own sales commission, and the deductions for rent, hub fee, security and the company return. The office completes it each week.`, `Only your basic salary of <b>${rs(p.basic_pay)}</b> is paid to your bank each month; the rest runs as your account with the company.`];
   if (p.pay_scheme === "tiered") {
     lines.push(`If your sales in the month go over <b>${rs(p.target)}</b>: a fixed basic pay of <b>${rs(p.basic_pay)}</b> plus <b>${pct(p.commission_rate, 0)}</b> of the sales above the target.`);
     lines.push(`If your sales are <b>${rs(p.target)}</b> or less: <b>${pct(p.base_commission_rate, 0)}</b> of all your sales, and no basic pay.`);
@@ -112,7 +114,8 @@ export default {
           <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""}</p></div>
         <div class="actions"><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
-      <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""], ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
+      <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""],
+        ...(d.team ? [["team", "My team", "Team", "users", d.team.length]] : []), ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
         ...(d.loans.length ? [["loans", "Advances & loans", "Loans", "coins", d.loans.filter((l) => l.state !== "paid").length]] : []),
         ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
         .map(([k, long, short, ic, n]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}"><span class="tab-ic">${icon(ic)}</span><span class="tab-lb"><span class="lg">${long}</span><span class="sm">${short}</span></span>${n !== "" ? html`<span class="cnt">(${n})</span>` : ""}</button>`)}</div>
@@ -124,16 +127,21 @@ export default {
           <div class="h-top"><span>${monthName(d.period)}</span><span class="h-chip">${final ? "Final" : pay ? "Not final" : "Open"}</span></div>
           <div class="h-label">${final ? "Net pay" : "Estimated take-home so far"}</div>
           <div class="h-amount ${pay && pay.net < 0 ? "negative" : ""}">${pay ? raw(`<small>Rs</small>${money(pay.net)}`) : "—"}</div>
-          <div class="h-foot">${final ? `Paid to your bank: Rs ${money(d.official.paid)}` : pay ? "Changes as more days are entered" : "Your pay appears when your sales are entered"}</div>
+          <div class="h-foot">${final ? `Paid to your bank: Rs ${money(d.official.paid)}` : pay ? "Changes as more days are entered" : me.is_manager ? "Your pay is worked out from your weekly account and shown here once the month is closed" : "Your pay appears when your sales are entered"}</div>
           ${m.target ? html`<div class="h-bar" role="progressbar" aria-label="Progress to target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(attain, 1) * 100)}"><span style="width:${Math.min(100, attain * 100)}%"></span></div>
           <div class="h-foot">Sales Rs ${n0(m.business)} of Rs ${n0(m.target)} target · ${pct(attain, 0)}</div>` : ""}
         </section>
-        <div class="stats">${raw([
+        <div class="stats">${raw((me.senior ? [
+          stat("Team sales so far", `<small>Rs</small>${n0(d.below_sales)}`, `${d.team.filter((p) => p.business).length} of ${d.team.length} people have sales`, "chart", "blue"),
+          stat("People below you", String(d.team.length), "managers, supervisors and distributors", "users", ""),
+          stat("Your salary", `<small>Rs</small>${n0(me.pay.basic_pay)}`, "paid to your bank each month", "wallet", "green"),
+          stat("Your share rate", pct(d.senior_rate, 2), "of the sales below you", "trend", "amber"),
+        ] : [
           stat("Sales so far", `<small>Rs</small>${n0(m.business)}`, `${m.days} day${m.days === 1 ? "" : "s"} worked`, "chart", "blue"),
           m.over_target > 0 || attain >= 1 ? stat("Over target by", `<small>Rs</small>${n0(m.over_target)}`, "Target passed", "trend", "green") : stat("Still to go", `<small>Rs</small>${n0(m.to_go)}`, "to reach your target", "trend", "amber"),
           stat("Taken off so far", `<small>Rs</small>${n0(m.settle_up + m.personal)}`, `Short Rs ${n0(m.settle_up)} · advances Rs ${n0(m.personal)}`, "coins", "amber"),
           stat("Security held", `<small>Rs</small>${n0(d.security_held)}`, "in total, from closed months", "shield", ""),
-        ].join(""))}</div>
+        ]).join(""))}</div>
 
         ${pay ? html`<section class="card mb-4 glist"><div class="card-head"><div><h2>${final ? `Your pay for ${monthName(d.period)}` : "Estimate so far"}</h2>
             <div class="sub">${final ? "Final. The month is closed." : "Worked out with your pay rules from the days entered up to now"}</div></div>
@@ -144,7 +152,7 @@ export default {
           ${final ? "" : html`<div class="card-foot muted">The office calculates the final figure at the end of the month and may check some entries first. Your payslip appears here after the month is closed.</div>`}
         </section>` : html`<div class="card mb-4">${emptyState("No sales entered yet this month", "When your daily sales are entered, your progress and an estimate of your pay appear here.", "chart")}</div>`}
 
-        <section class="card mb-4" id="addsale"><div class="card-head"><div><h2>Add your sales</h2><div class="sub">Enter a day's sales and the money you handed in. Your hub manager confirms it. Until then you can correct or remove it.</div></div></div>
+        ${me.sells ? html`<section class="card mb-4" id="addsale"><div class="card-head"><div><h2>Add your sales</h2><div class="sub">Enter a day's sales and the money you handed in. Your hub manager confirms it. Until then you can correct or remove it.</div></div></div>
           <form id="sf" class="card-body form-grid" autocomplete="off">
             <div class="field"><label for="sf-date">Day</label><input class="input" id="sf-date" type="date" name="date" value="${slToday()}" min="${slToday(-7)}" max="${slToday()}" required></div>
             <div class="field"><label for="sf-biz">Sales (Rs)</label><input class="input" id="sf-biz" name="business_amount" inputmode="decimal" required></div>
@@ -152,12 +160,16 @@ export default {
             <div class="field"><label for="sf-adv">Advance taken (Rs)</label><input class="input" id="sf-adv" name="personal_minus" inputmode="decimal" placeholder="0"></div>
             <div class="field full"><label for="sf-note">Note</label><input class="input" id="sf-note" name="notes" maxlength="200" placeholder="Optional"></div>
             <div class="full"><button class="btn primary" id="sf-save" type="submit">${icon("check")} Save sales</button> <span class="muted">Saving the same day again replaces it.</span></div>
-          </form></section>
+          </form></section>` : ""}
 
-        <section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>
+        ${me.senior ? "" : html`<section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>`}
         ${m.stock.length ? html`<section class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></section>` : ""}
         ${m.allowances.length ? html`<section class="card mb-4"><div class="card-head"><h2>Allowances this month</h2></div><div class="card-body flush" id="allow"></div></section>` : ""}
-        <details class="card fold"><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>`,
+        <details class="card fold"><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay, me, d.senior_rate).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>`,
+
+      team: () => html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">${monthName(d.period)}: sales of everyone below you. Sales only, never anyone's pay.</div></div></div>
+        <div class="card-body flush" id="team"></div></section>
+        <p class="muted" style="margin-top:12px">Total sales below you: <b class="num">Rs ${money(d.below_sales)}</b>.</p>`,
 
       payslips: () => d.history.length ? html`<section class="card"><div class="card-body flush" id="hist"></div></section>
         <p class="muted" style="margin-top:12px">Security held back so far: <b class="num">Rs ${money(d.security_held)}</b>.</p>`
@@ -217,7 +229,8 @@ export default {
       if (animate) { pane.classList.remove("pane-in"); void pane.offsetWidth; pane.classList.add("pane-in"); }
       $$("#tabs button", el).forEach((b) => b.classList.toggle("on", b.dataset.t === tab));
       if (tab === "month") {
-        $("#days").innerHTML = m.daily.length ? both(
+        const daysEl = $("#days");
+        if (daysEl) daysEl.innerHTML = m.daily.length ? both(
           dataTable({
             rows: m.daily, sortable: false, footer: true,
             cols: [
@@ -237,7 +250,7 @@ export default {
         if (m.stock.length && $("#stock")) $("#stock").innerHTML = group("", m.stock.map((r) => row(r.product, r.shortfall_value ? money(r.shortfall_value) : "—", { sub: `${r.shortfall_qty} missing × ${money(r.unit_price)}`, cls: r.shortfall_value ? "neg" : "" })));
         if (m.allowances.length && $("#allow")) $("#allow").innerHTML = group("", m.allowances.map((r) => row(r.description, money(r.amount))));
         // Adding a day, and removing one that the office has not confirmed yet.
-        $("#sf").onsubmit = (ev) => {
+        if ($("#sf")) $("#sf").onsubmit = (ev) => {
           ev.preventDefault();
           busy($("#sf-save"), async () => {
             await post("/api/me/sales", Object.fromEntries(new FormData(ev.target)));
@@ -251,6 +264,22 @@ export default {
           toast("Removed");
           await this.render({ ...ctx, refresh: true });
         })));
+      }
+      if (tab === "team" && d.team) {
+        $("#team").innerHTML = d.team.length ? both(
+          dataTable({
+            rows: d.team, sortable: false, footer: true,
+            cols: [
+              { key: "name", label: "Name", render: (r) => html`<span style="padding-left:${(r.depth - 1) * 14}px"><b>${r.name}</b> <span class="faint">${r.employee_id}</span></span>`, total: () => "Total" },
+              { key: "level_name", label: "Position" },
+              { key: "days", label: "Days", align: "r", total: (x) => x.reduce((t, r) => t + r.days, 0) },
+              { key: "business", label: "Sales", align: "r", render: (r) => money(r.business), total: () => money(d.below_sales) },
+              { key: "short", label: "Short", align: "r", render: (r) => (r.short ? html`<span class="neg">${money(r.short)}</span>` : "—"), total: (x) => money(x.reduce((t, r) => t + r.short, 0)) },
+              { key: "target", label: "Of target", align: "r", render: (r) => (r.target ? pct(r.business / r.target, 0) : "—"), total: () => "" },
+            ],
+          }).toString(),
+          group("", [...d.team.map((r) => row(r.name, money(r.business), { sub: `${r.level_name} · ${r.days} day${r.days === 1 ? "" : "s"}${r.target ? ` · ${pct(r.business / r.target, 0)} of target` : ""}`, vsub: r.short ? `Short ${money(r.short)}` : "" })),
+            row("Total below you", money(d.below_sales), { strong: true })])) : emptyState("No one reports to you yet", "People who report to you appear here with their sales.", "users").toString();
       }
       if (tab === "payslips" && d.history.length) {
         $("#hist").innerHTML = both(

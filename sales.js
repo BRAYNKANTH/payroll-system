@@ -35,8 +35,8 @@ function rupees(name, raw, { required = true } = {}) {
 
 async function myself(db, user) {
   if (!user?.employee_id) throw httpError(403, "This login is not linked to an employee");
-  const s = await db.get("SELECT employee_id, name, role, status, hub FROM staff WHERE employee_id = ?", user.employee_id);
-  if (!s || s.role !== "guy") throw httpError(403, "Only distributors and supervisors can enter sales here");
+  const s = await db.get("SELECT employee_id, name, role, staff_level, status, hub FROM staff WHERE employee_id = ?", user.employee_id);
+  if (!s || (s.role !== "guy" && s.staff_level !== "manager")) throw httpError(403, "Only distributors, supervisors and managers can enter sales here");
   if (s.status !== "active") throw httpError(403, "Your account is no longer active");
   return s;
 }
