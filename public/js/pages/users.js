@@ -63,7 +63,14 @@ export default {
         const hw = $("#hub-wrap", d.panel);
         if (hw) hw.hidden = r === "staff" || u?.role === "staff";
       };
-      $("#uf", d.panel).addEventListener("change", (ev) => { if (ev.target.name === "role") syncRole(); });
+      $("#uf", d.panel).addEventListener("change", (ev) => {
+        if (ev.target.name === "role") syncRole();
+        if (ev.target.name === "employee_id" && !u) { // the mobile number becomes the username, unless one was already typed
+          const f = $("#uf", d.panel), s = byId[ev.target.value], digits = String(s?.phone || "").replace(/\D/g, "");
+          if (s && digits && !f.username.value) f.username.value = digits;
+          if (s && !f.full_name.value) f.full_name.value = s.name;
+        }
+      });
       syncRole();
       $("#uf-save", d.panel).onclick = (e) => busy(e.currentTarget, async () => {
         const v = Object.fromEntries(new FormData($("#uf", d.panel)));

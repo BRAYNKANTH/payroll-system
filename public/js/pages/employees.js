@@ -59,6 +59,10 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Branch code</label><input class="input" name="branch_code" value="${e.branch_code || ""}" placeholder="e.g. 001"></div>
       <div class="field"><label>Account number</label><input class="input mono" name="bank_account_no" value="${e.bank_account_no || ""}" inputmode="numeric"></div>
       ${existing ? html`<div class="full alert info">${icon("shield")}<div>Changing the account number flags this employee's next payment for review. Another user must approve it before it is paid.</div></div>` : ""}
+      ${!existing && can("manage_users") ? html`<div class="form-section">Sign-in</div>
+      <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ef-login" name="make_login" checked> Create a sign-in so this person can open their own page</label></div>
+      <div class="field" data-login><label>Username (mobile number)</label><input class="input" id="ef-user" name="login_username" autocomplete="off" inputmode="tel"><span class="hint">Filled from the phone number above</span></div>
+      <div class="field" data-login><label>Password</label><input class="input" type="password" name="login_password" autocomplete="new-password"><span class="hint">At least 8 characters with letters and numbers</span></div>` : ""}
     </form>`.toString(),
     foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="ef-save">${existing ? "Save changes" : "Add employee"}</button>`,
   });
@@ -118,13 +122,22 @@ export async function employeeForm(existing, onSaved) {
   if (!existing) applyDefaults();
   f.addEventListener("change", (ev) => { if (ev.target === f.staff_level) { fillUpline(); if (!existing) applyDefaults(); } sync(); });
   sync();
+  // The sign-in username follows the mobile number until it is edited by hand.
+  const lu = f.login_username;
+  if (lu) {
+    const digits = () => String(f.phone.value || "").replace(/\D/g, "");
+    let touched = false;
+    lu.addEventListener("input", () => { touched = true; });
+    f.phone.addEventListener("input", () => { if (!touched) lu.value = digits(); });
+    f.make_login.addEventListener("change", () => f.querySelectorAll("[data-login]").forEach((x) => { x.hidden = !f.make_login.checked; }));
+  }
 
   // On a phone the long form is shown one step at a time, then a summary to check before saving.
   if (isPhone()) {
     const sel = (name) => f[name].selectedOptions?.[0]?.textContent.trim() || "";
     stepForm({
       form: f, foot: d.panel.querySelector(".drawer-foot"), noun: "employee form", finishLabel: existing ? "Save changes" : "Add employee",
-      titles: { Identity: "Who is this?", "Role and place": "Role and place", "Pay setup": "How are they paid?", "Food and security": "Food and security", "Starting balance": "Starting balance", "Bank details": "Bank details" },
+      titles: { Identity: "Who is this?", "Role and place": "Role and place", "Pay setup": "How are they paid?", "Food and security": "Food and security", "Starting balance": "Starting balance", "Bank details": "Bank details", "Sign-in": "Sign-in (optional)" },
       onFinish: () => $("#ef-save", d.panel).click(),
       review: () => {
         const guy = !isManagerLevel(f.staff_level.value);
@@ -133,7 +146,8 @@ export async function employeeForm(existing, onSaved) {
           ["Hub", sel("hub")], ["Phone", f.phone.value], ["Status", sel("status")],
           ...(guy ? [["Target", f.target.value ? `Rs ${f.target.value}` : ""], ["Basic pay", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""]] : [["Basic salary", f.basic_pay.value ? `Rs ${f.basic_pay.value}` : ""], ...(f.staff_level.value === "manager" ? [["Weekly target", f.target.value ? `Rs ${f.target.value}` : ""]] : [])]),
           ["Balance brought forward", f.opening_balance.value ? `Rs ${f.opening_balance.value}` : "None"],
-          ["Bank", [f.bank_name.value, last4 ? `…${last4}` : ""].filter(Boolean).join(" ")]];
+          ["Bank", [f.bank_name.value, last4 ? `…${last4}` : ""].filter(Boolean).join(" ")],
+          ...(f.login_username && f.make_login.checked ? [["Sign-in username", f.login_username.value]] : [])];
       },
     });
   }
@@ -153,8 +167,13 @@ export async function employeeForm(existing, onSaved) {
       opening_balance: v.opening_balance || 0,
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };
+    const login = !existing && v.make_login ? { username: (v.login_username || "").trim(), password: v.login_password || "" } : null;
+    if (login && (!login.username || !login.password)) throw new Error("Enter the username (mobile number) and a password for the sign-in, or untick the sign-in box");
     const saved = existing ? await put(`/api/staff/${encodeURIComponent(existing.employee_id)}`, body) : await post("/api/staff", { ...body, employee_id: v.employee_id });
-    toast(existing ? "Employee updated" : `${saved.name} added`);
+    if (login) {
+      try { await post("/api/users", { username: login.username, full_name: saved.name, role: "staff", employee_id: saved.employee_id, password: login.password }); toast(`${saved.name} added with sign-in ${login.username}`); }
+      catch (err) { toast(`${saved.name} was added, but the sign-in failed: ${err.message}. Create it in Users & roles.`); }
+    } else toast(existing ? "Employee updated" : `${saved.name} added`);
     d.close();
     onSaved?.(saved);
   });
