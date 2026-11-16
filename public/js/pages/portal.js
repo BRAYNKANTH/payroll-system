@@ -112,7 +112,7 @@ export default {
       <div class="page-head">
         <div><h1>Hello, ${me.name.split(" ")[0]}</h1>
           <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""}</p></div>
-        <div class="actions"><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
+        <div class="actions"><a class="btn" href="/api/me/report.pdf?period=${d.period}" target="_blank" rel="noopener">${icon("file")} <span class="lbl-sm">My report (PDF)</span></a><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""],
         ...(d.team ? [["team", "My team", "Team", "users", d.team.length]] : []), ["payslips", "Payslips", "Payslips", "wallet", d.history.length],

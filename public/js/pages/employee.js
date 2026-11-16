@@ -91,6 +91,7 @@ export default {
             <div><div class="faint text-sm">Balance carried</div><div class="num stat-lg ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
             ${s.role === "guy" ? html`<div><div class="faint text-sm">Security held</div><div class="num stat-lg">Rs ${money(p.security_held ?? 0)}</div></div>` : ""}
           </div>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener">${icon("file")} PDF report (${monthName(state.period)})</a></div>
           ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<div class="row" style="gap:8px"><button class="btn" id="edit">${icon("edit")} Edit</button>
             ${s.status === "active" ? html`<button class="btn" id="leave">${icon("logout")} Mark as left</button>` : html`<button class="btn primary" id="rehire">${icon("refresh")} Re-hire</button>`}</div>` : ""}
         </div>

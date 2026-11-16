@@ -377,4 +377,79 @@ async function payslipsPdf(db, period, employeeId, hub) {
     type: TYPES.pdf, filename: `payslip-${employeeId ? employeeId + "-" : ""}${period}.pdf` };
 }
 
-module.exports = { make, payslipsPdf, renderXlsx, renderPdf, REPORTS };
+// One person's report for a month, as a PDF: who they are, their sales day by day, their team (for a senior), and their salary calculation.
+// `canPay` false (a hub manager) leaves out everything about pay. `d` is the portal summary for that person.
+function personReportPdf(d, { canPay, company = "" }) {
+  const W = 595.28, H = 841.89, M = 46, BOTTOM = 56;
+  const pdf = new Pdf();
+  const m = d.me, mo = d.month;
+  let y = 0;
+  const page = () => { pdf.page(W, H); y = H - M; };
+  const need = (h) => { if (y - h < BOTTOM) page(); };
+  const row = (label, value, bold) => { need(14); pdf.text(M + 4, y - 9, fit(label, W - M * 2 - 140, 9, bold), 9, bold); const t = String(value); pdf.text(W - M - tw(t, 9, bold), y - 9, t, 9, bold); y -= 13; };
+  const head = (t) => { need(34); y -= 8; pdf.text(M, y - 9, t, 10.5, true); y -= 14; pdf.line(M, y, W - M, y, 0.7); y -= 3; };
+  const rs = (c) => "Rs " + fmtMoney(c);
+  page();
+  pdf.text(M, y - 14, `${company}${company ? " - " : ""}Personal report ${monthLabel(d.period)}`, 14, true); y -= 24;
+  if (!d.finalized) { pdf.text(M, y - 9, "This month is not finalized yet - figures can still change.", 8.5, true, 0.5); y -= 14; }
+  pdf.text(M, y - 10, `${m.name} (${m.employee_id})`, 12, true); y -= 17;
+  pdf.text(M, y - 9, [m.level_name, m.hub_name || m.hub, m.reports_to ? `reports to ${m.reports_to}` : "", m.phone, m.join_date ? `joined ${m.join_date}` : ""].filter(Boolean).join("  -  "), 8.5, false, 0.35); y -= 14;
+
+  head("Month at a glance");
+  if (m.sells || mo.days) {
+    row("Sales", rs(mo.business), true);
+    row("Days with sales", String(mo.days));
+    if (Number(mo.target) > 0) row(m.is_manager ? "Weekly target" : "Monthly target", rs(mo.target));
+    if (Number(mo.target) > 0 && !m.is_manager) row(mo.to_go > 0 ? "Still to reach the target" : "Above the target", rs(mo.to_go > 0 ? mo.to_go : mo.over_target));
+    if (mo.settle_up) row("Cash short at settle-up", rs(mo.settle_up));
+    if (mo.personal) row("Advances taken", rs(mo.personal));
+  }
+  if (d.team) { row("People below", String(d.team.length)); row("Their sales this month", rs(d.below_sales)); }
+
+  if (canPay) {
+    const pay = d.official || d.estimate;
+    head(`Salary calculation${pay ? (d.official ? " (final)" : " (estimate - not final)") : ""}`);
+    if (pay) {
+      for (const l of (pay.earnings || []).filter((x) => x.amount !== 0 || /Basic/.test(x.label))) row(l.label, fmtMoney(l.amount));
+      row("Gross earnings", rs(pay.gross), true);
+      const ded = (pay.deduction_lines || []).filter((x) => x.amount !== 0);
+      if (ded.length) { y -= 3; for (const l of ded) row(l.label, "-" + fmtMoney(l.amount)); row("Total deductions", "-" + rs(pay.deductions), true); }
+      y -= 3; row("Net pay", rs(pay.net), true);
+      if (pay.closing || pay.opening) row("Balance carried (opening / closing)", `${fmtMoney(pay.opening)} / ${fmtMoney(pay.closing)}`);
+    } else row(m.is_manager ? "A manager's pay comes from the weekly account and is worked out by the office." : "No sales or entries this month, so there is nothing to calculate yet.", "");
+  }
+
+  if (mo.daily.length) {
+    head("Day by day");
+    const cols = [[M + 4, "Date", false], [M + 110, "Sales", true], [M + 200, "Cash handed in", true], [M + 300, "Advance", true], [M + 385, "Status", false]];
+    const header = () => { cols.forEach(([x, t, r]) => pdf.text(r ? x + 70 - tw(t, 8, true) : x, y - 9, t, 8, true, 0.3)); y -= 13; };
+    header();
+    for (const r of mo.daily) {
+      if (y - 14 < BOTTOM) { page(); header(); }
+      const vals = [r.date, fmtMoney(r.business_amount), fmtMoney(r.settled_amount), Number(r.personal_minus) ? fmtMoney(r.personal_minus) : "-", r.source === "portal" ? (r.confirmed ? "entered, confirmed" : "entered, to confirm") : "office"];
+      cols.forEach(([x, , right], i) => pdf.text(right ? x + 70 - tw(vals[i], 8.5) : x, y - 9, vals[i], 8.5));
+      y -= 12.5;
+    }
+    need(16); pdf.line(M, y - 1, W - M, y - 1, 0.3); y -= 3; row("Total sales", rs(mo.business), true);
+  }
+
+  if (d.team && d.team.length) {
+    head("Team (sales only)");
+    const tcols = [[M + 4, "Name", false], [M + 200, "Position", false], [M + 340, "Days", true], [M + 400, "Sales", true]];
+    const header = () => { tcols.forEach(([x, t, r]) => pdf.text(r ? x + (t === "Days" ? 30 : 90) - tw(t, 8, true) : x, y - 9, t, 8, true, 0.3)); y -= 13; };
+    header();
+    for (const t of d.team) {
+      if (y - 14 < BOTTOM) { page(); header(); }
+      pdf.text(M + 4 + (t.depth - 1) * 8, y - 9, fit(t.name, 190 - (t.depth - 1) * 8, 8.5), 8.5);
+      pdf.text(M + 200, y - 9, fit(t.level_name, 130, 8.5), 8.5);
+      const dd = String(t.days), ss = fmtMoney(t.business);
+      pdf.text(M + 340 + 30 - tw(dd, 8.5), y - 9, dd, 8.5); pdf.text(M + 400 + 90 - tw(ss, 8.5), y - 9, ss, 8.5);
+      y -= 12.5;
+    }
+  }
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  return { data: pdf.build((p, n, of) => p.text(M, 22, `${company}  -  ${m.name}  -  ${d.period}  -  generated ${stamp}  -  page ${n} of ${of}`, 7, false, 0.4)),
+    type: TYPES.pdf, filename: `report-${m.employee_id}-${d.period}.pdf` };
+}
+
+module.exports = { make, payslipsPdf, personReportPdf, renderXlsx, renderPdf, REPORTS };

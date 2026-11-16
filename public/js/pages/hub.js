@@ -67,6 +67,7 @@ export default {
         { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
         { key: "upline_id", label: "Reports to", render: (s) => (up(s) && byId[up(s)] ? byId[up(s)].name : html`<span class="faint">—</span>`) },
         { key: "sales", label: "Sales this month", render: (s) => html`<span class="num">${compact(sales[s.employee_id]?.business || 0)}</span>` },
+        { key: "report", label: "Report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
         { key: "status", label: "Status", render: (s) => badge(s.status) },
       ],
     }).toString();

@@ -18,7 +18,18 @@ async function me(db, user) {
 
 async function summary(db, user, period) {
   svc.assertPeriod(period);
-  const s = await me(db, user);
+  return build(db, await me(db, user), period);
+}
+// The same figures for any employee, for the office (a hub-limited user only reaches their own hub). Used by the person report.
+async function forEmployee(db, employeeId, period, hub) {
+  svc.assertPeriod(period);
+  const s = await db.get(`SELECT s.*, h.name AS hub_name, u.name AS upline_name FROM staff s JOIN hubs h ON h.code = s.hub
+    LEFT JOIN staff u ON u.employee_id = s.upline_id WHERE s.employee_id = ?`, String(employeeId));
+  if (!s) throw httpError(404, "Employee not found");
+  if (hub && s.hub !== hub) throw httpError(403, "Outside your hub");
+  return build(db, s, period);
+}
+async function build(db, s, period) {
   const finalized = await svc.isFinalized(db, period);
   const daily = await db.all("SELECT id, date, business_amount, settled_amount, settle_up_minus, personal_minus, notes, source, (confirmed_by IS NOT NULL OR source <> 'portal') AS confirmed FROM daily_log WHERE employee_id = ? AND date >= ? AND date < ? ORDER BY date", s.employee_id, ...monthBounds(period));
   const stock = await db.all("SELECT * FROM stock_recon WHERE employee_id = ? AND period = ? ORDER BY product", s.employee_id, period);
@@ -110,4 +121,4 @@ async function getDocument(db, user, id) {
   return d;
 }
 
-module.exports = { summary, payslip, listDocuments, addDocument, getDocument };
+module.exports = { summary, forEmployee, payslip, listDocuments, addDocument, getDocument };
