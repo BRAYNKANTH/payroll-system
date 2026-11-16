@@ -49,6 +49,7 @@ const NAV = [
 ];
 const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
+  { re: /^\/hubs\/([\w-]+)$/, page: "hub", nav: "/hubs" },
   { re: /^\/account$/, page: "account", nav: null },
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
@@ -458,7 +459,7 @@ export async function boot() {
 
 // Once the first screen is up, fetch the code of the other pages in the background so the next tap has nothing to download.
 function warmPages() {
-  const names = [...new Set(NAV.filter((n) => n.page && navShown(n)).map((n) => n.page)), "employee"];
+  const names = [...new Set(NAV.filter((n) => n.page && navShown(n)).map((n) => n.page)), "employee", "hub"];
   const run = () => names.forEach((n) => loadPage(n).catch(() => {}));
   if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 3000 }); else setTimeout(run, 1500);
 }

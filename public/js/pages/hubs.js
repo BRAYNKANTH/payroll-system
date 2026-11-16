@@ -24,7 +24,7 @@ export default {
       const st = stats[h.code] || {};
       return html`<div class="card">
         <div class="card-head"><div class="row" style="gap:12px"><div class="kpi" style="padding:0"><span class="icon blue" style="width:40px;height:40px">${icon("store")}</span></div>
-          <div><h2>${h.name}</h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
+          <div><h2><a href="/hubs/${h.code}" data-link style="color:inherit">${h.name}</a></h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
         <div class="card-body">
           <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
             <div><div class="faint" style="font-size:11.5px">Business</div><b class="num">${compact(st.hub_business || 0)}</b></div>
@@ -36,7 +36,7 @@ export default {
             <span class="muted" style="font-size:12.5px">${people.length} staff · coach ${coach ? coach.name : "none yet"} · ${mgrs.map((m) => m.name).join(", ") || "no manager"}</span></div>
           ${h.phone ? html`<div class="faint" style="font-size:12px;margin-top:10px">${h.phone}</div>` : ""}
         </div>
-        ${can("manage_hubs") ? html`<div style="padding:0 18px 16px"><button class="btn sm" data-edit="${h.code}">${icon("edit")} Edit</button></div>` : ""}
+        <div style="padding:0 18px 16px" class="row"><a class="btn sm primary" href="/hubs/${h.code}" data-link>${icon("users")} Open hierarchy &amp; members</a>${can("manage_hubs") ? html` <button class="btn sm" data-edit="${h.code}">${icon("edit")} Edit</button>` : ""}</div>
       </div>`;
     }).join("") : html`<div class="card" style="grid-column:1/-1">${emptyState("No hubs yet", "Create your first hub (branch) to start adding employees.", "store")}</div>`.toString();
 
