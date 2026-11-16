@@ -54,8 +54,9 @@ test("edits after submission are audited with user and old value", async () => {
   await svc.updateEntry(d, "daily", entry.id, { settled_amount: 900 }, "supervisor");
   await svc.deleteEntry(d, "daily", entry.id, "manager");
   const log = await svc.auditLog(d, { table: "daily_log", key: entry.id });
-  assert.equal(log.length, 2);
-  const [del, upd] = log;
+  assert.equal(log.length, 3, "the addition is in the trail too");
+  const [del, upd, made] = log;
+  assert.deepEqual([made.action, made.changed_by, JSON.parse(made.new_value).business_amount], ["create", "clerk", 100000]);
   assert.equal(upd.changed_by, "supervisor");
   assert.equal(JSON.parse(upd.old_value).settled_amount, 100000);
   assert.equal(JSON.parse(upd.new_value).settled_amount, 90000);

@@ -287,10 +287,11 @@ const REPORTS = {
       columns: [C("Day"), C("Person"), C("Hub"), C("Sale", "money", true), C("Handed in", "money", true), C("Month so far", "money"), C("Of target", "pct"), ...(canPay ? [C("Commission on this sale", "money", true), C("Earned so far", "money")] : []), C("Status")],
       rows: d.feed.map((f) => [f.date, `${f.name} (${f.employee_id})`, f.hub, f.business, f.settled, f.month_business, f.target_pct, ...(canPay ? [f.pay ? f.pay.commission : "", f.pay ? f.pay.gross_so_far : ""] : []), f.confirmed ? "Confirmed" : "Waiting for confirmation"]) };
   },
-  audit: async ({ db, canPay, q }) => ({ title: "Audit trail", subtitle: "Changes after first entry: who, when, old and new values",
-    columns: [C("When"), C("Who"), C("Area"), C("Record"), C("Action"), C("Old value"), C("New value")],
-    rows: (await svc.auditSearch(db, { table: q.get("table") || undefined, key: q.get("key") || undefined, user: q.get("user") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined, limit: 2000, noPay: !canPay }))
-      .map((a) => [a.changed_at, a.changed_by, a.table_name, a.row_key, a.action, (a.old_value || "").slice(0, 300), (a.new_value || "").slice(0, 300)]) }),
+  audit: async ({ db, canPay, canUsers, hub, username, q }) => ({ title: "Audit trail", subtitle: "Who signed in, changed, added, uploaded, downloaded or opened what, and when",
+    columns: [C("When"), C("Who"), C("Area"), C("Record"), C("Action"), C("Old value"), C("New value"), C("From (address)"), C("Browser")],
+    rows: (await svc.auditSearch(db, { table: q.get("table") || undefined, key: q.get("key") || undefined, user: hub ? username : q.get("user") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined,
+      action: q.get("action") || undefined, limit: 2000, noPay: !canPay, noAccess: !canUsers }))
+      .map((a) => [a.changed_at, a.changed_by, a.table_name, a.row_key, a.action, (a.old_value || "").slice(0, 300), (a.new_value || "").slice(0, 300), a.ip || "", (a.agent || "").slice(0, 80)]) }),
   loans: async ({ db, hub }) => {
     const names = await staffNames(db);
     return { title: "Advances and loans", subtitle: "What was given, paid back and is still owed",
@@ -318,13 +319,13 @@ const TYPES = {
 };
 
 // Builds one report as a file. `can(perm)` says what the signed-in person may do; a hub-limited user only ever gets their own hub.
-async function make(db, name, format, { can, hub, period, query }) {
+async function make(db, name, format, { can, hub, period, query, username }) {
   const build = REPORTS[name];
   if (!build || !TYPES[format]) throw httpError(404, "Unknown report");
   const canPay = can("view_pay");
   const per = period || new Date().toISOString().slice(0, 7);
   svc.assertPeriod(per);
-  const model = await build({ db, period: per, hub, canPay, q: query || new URLSearchParams() });
+  const model = await build({ db, period: per, hub, canPay, canUsers: can("manage_users"), username, q: query || new URLSearchParams() });
   if (model.pay && !canPay) throw httpError(403, "Your role cannot see pay");
   if (model.perm && !can(model.perm)) throw httpError(403, "Your role cannot see this report");
   const company = (await getSettings(db)).company_name || "";

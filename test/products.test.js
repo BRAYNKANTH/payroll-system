@@ -49,7 +49,7 @@ test("product rules: a name, a selling price above 0, one product per name, and 
   await assert.rejects(() => products.update(d, p.id, { name: "VIM", status: "weird" }, "admin"), /Invalid status/);
   await assert.rejects(() => products.update(d, 999, { name: "x" }, "admin"), /not found/);
   await products.update(d, p.id, { cost_price: 250, status: "inactive" }, "accounts");
-  const log = await svc.auditSearch(d, { table: "products" });
+  const log = (await svc.auditSearch(d, { table: "products" })).filter((l) => l.action === "update");
   assert.equal(log.length, 1);
   assert.equal(log[0].changed_by, "accounts");
   assert.equal(JSON.parse(log[0].old_value).cost_price, 20000);

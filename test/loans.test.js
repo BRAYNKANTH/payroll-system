@@ -160,7 +160,7 @@ test("changes to a loan are in the audit trail", async () => {
   const d = await setup();
   const l = await give(d, {});
   await loans.update(d, l.id, { instalment: 5000 }, "accounts");
-  const log = await svc.auditLog(d, { table: "loans", key: l.id });
+  const log = (await svc.auditLog(d, { table: "loans", key: l.id })).filter((x) => x.action === "update");
   assert.equal(log.length, 1);
   assert.equal(JSON.parse(log[0].old_value).instalment, 1000000);
   assert.equal(JSON.parse(log[0].new_value).instalment, 500000);

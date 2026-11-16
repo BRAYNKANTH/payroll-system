@@ -151,7 +151,7 @@ function createHandler(dbReady) {
       for (const t of BACKUP_TABLES) {
         out.tables[t] = (await database.all(`SELECT * FROM ${t}`)).map((r) => (t === "users" ? { ...r, password_hash: undefined } : r));
       }
-      await database.run(`INSERT INTO audit_log (table_name, row_key, action, changed_by) VALUES ('backup', ?, 'download', ?)`, out.exported_at, user.username);
+      await db.logEvent(database, { user: user.username, table: "backup", key: out.exported_at, action: "download" });
       return { download: JSON.stringify(out), filename: `payroll-backup-${out.exported_at.slice(0, 10)}.json`, type: "application/json; charset=utf-8" };
     }],
 
@@ -199,8 +199,10 @@ function createHandler(dbReady) {
       const d = await svc.dashboard(database, q.get("period"), user.hub || q.get("hub") || undefined);
       return auth.can(user, "view_pay") ? d : hidePay(d);
     }],
+    // The audit trail: the admin sees everything; others do not see pay approvals or sign-ins and downloads, and a hub user only their own actions.
     ["GET", /^\/api\/audit$/, "read", ({ user, q }) => svc.auditSearch(database, {
-      table: q.get("table"), key: q.get("key"), user: q.get("user"), from: q.get("from"), to: q.get("to"), limit: q.get("limit"), noPay: !auth.can(user, "view_pay") })],
+      table: q.get("table"), key: q.get("key"), user: user.hub ? user.username : q.get("user"), from: q.get("from"), to: q.get("to"), action: q.get("action"), limit: q.get("limit"),
+      noPay: !auth.can(user, "view_pay"), noAccess: !auth.can(user, "manage_users") })],
     ["GET", /^\/api\/periods$/, "read", async ({ user }) => {
       const rows = await svc.listPeriods(database);
       return auth.can(user, "view_pay") ? rows : rows.map(({ to_bank, net_pay, ...rest }) => rest);
@@ -223,7 +225,7 @@ function createHandler(dbReady) {
       return { download: f.data, type: f.type, filename: f.filename };
     }],
     ["GET", /^\/api\/export\/([a-z-]+)\.(xlsx|pdf)$/, "read", async ({ m, user, q }) => {
-      const f = await exporter.make(database, m[1], m[2], { can: (p) => auth.can(user, p), hub: user.hub || q.get("hub") || undefined, period: q.get("period") || undefined, query: q });
+      const f = await exporter.make(database, m[1], m[2], { can: (p) => auth.can(user, p), hub: user.hub || q.get("hub") || undefined, period: q.get("period") || undefined, query: q, username: user.username });
       return { download: f.data, type: f.type, filename: f.filename };
     }],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?$/, "view_pay", async ({ m, user }) =>
@@ -233,15 +235,23 @@ function createHandler(dbReady) {
       ({ csv: await reports.registerCsv(database, m[1]), filename: `payroll-register-${m[1]}.csv` })],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/bank-file$/, "export", async ({ m, user }) => {
       const f = await reports.bankFile(database, m[1]);
-      await database.run(`INSERT INTO audit_log (table_name, row_key, action, changed_by) VALUES ('periods', ?, 'bank_file_download', ?)`, m[1], user.username);
+      await db.logEvent(database, { user: user.username, table: "periods", key: m[1], action: "bank_file_download" });
       return { csv: f.body, filename: f.filename };
     }],
     // One person's full working. Listed last so it never shadows /register, /payslips or /bank-file.
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, "view_pay", ({ m, user }) => svc.getPeriodRow(database, m[1], m[2], user.hub)],
   ];
 
-  return async function handler(req, res) {
+  // Every request runs with its address and browser, so each audit row (including those the database writes itself) can say where it came from.
+  return function handler(req, res) {
+    const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+    const ctx = { ip: (forwarded || req.socket?.remoteAddress || "").replace(/^::ffff:/, "").slice(0, 64), agent: String(req.headers["user-agent"] || "").slice(0, 220) };
+    return db.requestContext.run(ctx, () => handle(req, res));
+  };
+
+  async function handle(req, res) {
     const url = new URL(req.url, "http://localhost");
+    let who = null;
     try {
       if (!url.pathname.startsWith("/api/")) {
         if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method not allowed", "text/plain");
@@ -254,10 +264,12 @@ function createHandler(dbReady) {
       // Custom header forces a CORS preflight, so other sites cannot forge state-changing requests.
       if (method !== "GET" && req.headers["x-requested-with"] !== "fetch") throw svc.httpError(403, "Missing request header");
       const user = await auth.userFromToken(database, cookie(req, "sid"));
+      who = user?.username || null;
       if (perm === "auth" && !user) throw svc.httpError(401, "Please sign in");
       if (perm && perm !== "auth") auth.requirePerm(user, perm);
       const body = method === "GET" ? {} : await readJson(req);
       const out = await fn({ req, res, user, body, m: re.exec(url.pathname), q: url.searchParams });
+      await recordUse(database, method, url, user);
       if (out && out.html) return send(res, 200, out.html, "text/html; charset=utf-8", { "Content-Security-Policy": REPORT_CSP });
       if (out && out.csv !== undefined) {
         return send(res, 200, "﻿" + out.csv, "text/csv; charset=utf-8", { "Content-Disposition": `attachment; filename="${out.filename}"` });
@@ -274,9 +286,37 @@ function createHandler(dbReady) {
     } catch (err) {
       const status = err.status || 500;
       if (status === 500) console.error(err);
+      // Someone signed in asked for something their role does not allow: worth knowing, once in a while.
+      if (status === 403 && who && database) {
+        await db.logEvent(database, { user: who, table: "session", key: who, action: "denied", detail: { path: url.pathname, method: req.method }, dedupeMinutes: 5 }).catch(() => {});
+      }
       send(res, status, { error: status === 500 ? "Something went wrong — please try again" : err.message });
     }
-  };
+  }
+}
+
+// Reading is use too: who exported a report, opened someone's payslip or the payroll, or looked at a scanned document. A change is already in
+// the trail through the database; this adds what a change cannot show. A failure to write the line never blocks the request.
+const USE = [
+  [/^\/api\/export\/([a-z-]+)\.(xlsx|pdf)$/, (m, q) => ({ table: "export", action: "export", key: `${m[1]}.${m[2]}`, detail: { period: q.get("period") || undefined, hub: q.get("hub") || undefined } })],
+  [/^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?\.pdf$/, (m) => ({ table: "export", action: "export", key: `payslips.pdf ${m[1]}${m[2] ? " " + m[2] : ""}` })],
+  [/^\/api\/payroll\/(\d{4}-\d{2})\/register(\.csv)?$/, (m) => ({ table: "export", action: m[2] ? "export" : "view", key: `register${m[2] || ""} ${m[1]}`, detail: { period: m[1] } })],
+  [/^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?$/, (m) => ({ table: "view", action: "view", key: `payslips ${m[1]}${m[2] ? " " + m[2] : ""}`, dedupeMinutes: 10 })],
+  [/^\/api\/payroll\/(\d{4}-\d{2})$/, (m) => ({ table: "view", action: "view", key: `payroll ${m[1]}`, dedupeMinutes: 10 })],
+  [/^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, (m) => (m[2] === "register" || m[2] === "payslips" || m[2] === "bank-file" ? null : { table: "view", action: "view", key: `payroll ${m[1]} ${m[2]}`, dedupeMinutes: 10 })],
+  [/^\/api\/reports\/(commission|balances)$/, (m) => ({ table: "view", action: "view", key: `report ${m[1]}`, dedupeMinutes: 10 })],
+  [/^\/api\/(?:me\/)?documents\/(\d+)$/, (m) => ({ table: "staff_documents", action: "view", key: `document ${m[1]}`, dedupeMinutes: 10 })],
+];
+async function recordUse(database, method, url, user) {
+  if (method !== "GET" || !user) return;
+  for (const [re, make] of USE) {
+    const m = re.exec(url.pathname);
+    if (!m) continue;
+    const e = make(m, url.searchParams);
+    if (!e) return;
+    try { await db.logEvent(database, { user: user.username, ...e }); } catch (err) { console.error("audit:", err.message); }
+    return;
+  }
 }
 
 const createServer = (database) => http.createServer(createHandler(database));

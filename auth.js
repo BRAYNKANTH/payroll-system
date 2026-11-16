@@ -1,6 +1,6 @@
 // Users, password hashing, sessions and role permissions.
 const crypto = require("crypto");
-const { withUser, getSettings, httpError } = require("./db");
+const { withUser, getSettings, httpError, logEvent } = require("./db");
 
 const NOW = "now_iso()";
 const ROLES = ["viewer", "clerk", "manager", "accountant", "admin", "staff"];
@@ -70,13 +70,19 @@ const LOCK_MINUTES = 5;
 async function login(db, username, password) {
   const key = String(username || "").toLowerCase();
   const f = await db.get(`SELECT count, last_at > now() - make_interval(mins => ?) AS recent FROM login_failures WHERE username = ?`, LOCK_MINUTES, key);
-  if (f && f.recent && f.count >= LOCK_FAILS) throw httpError(429, `Too many failed attempts. Try again in ${LOCK_MINUTES} minutes.`);
+  if (f && f.recent && f.count >= LOCK_FAILS) {
+    await logEvent(db, { user: key || "unknown", table: "session", key: key || "unknown", action: "login_locked", detail: { reason: "too many failed attempts" }, dedupeMinutes: LOCK_MINUTES });
+    throw httpError(429, `Too many failed attempts. Try again in ${LOCK_MINUTES} minutes.`);
+  }
   const user = await findUser(db, username);
   const ok = user && user.status === "active" && verifyPassword(password, user.password_hash);
   if (!ok) {
     await db.run(`INSERT INTO login_failures (username, count, last_at) VALUES (?, 1, now())
       ON CONFLICT (username) DO UPDATE SET count = CASE WHEN login_failures.last_at > now() - make_interval(mins => ?)
         THEN login_failures.count + 1 ELSE 1 END, last_at = now()`, key, LOCK_MINUTES);
+    // Never the password, only who tried and why it failed.
+    await logEvent(db, { user: key || "unknown", table: "session", key: key || "unknown", action: "login_failed",
+      detail: { reason: !user ? "unknown username" : user.status !== "active" ? "account disabled" : "wrong password" } });
     throw httpError(401, "Incorrect username or password");
   }
   const token = crypto.randomBytes(32).toString("hex");
@@ -90,6 +96,7 @@ async function login(db, username, password) {
     // Session bookkeeping only; the audit trigger ignores last_login_at.
     await t.run(`UPDATE users SET last_login_at = ${NOW} WHERE username = ?`, user.username);
   });
+  await logEvent(db, { user: user.username, table: "session", key: user.username, action: "login", detail: { role: user.role } });
   return { token, maxAge: hours * 3600, user: publicUser({ ...user, last_login_at: new Date().toISOString() }) };
 }
 
@@ -101,7 +108,10 @@ async function userFromToken(db, token) {
   return row ? publicUser(row) : null;
 }
 async function logout(db, token) {
-  if (token) await db.run("DELETE FROM sessions WHERE token_hash = ?", sha256(token));
+  if (!token) return;
+  const s = await db.get("SELECT username FROM sessions WHERE token_hash = ?", sha256(token));
+  await db.run("DELETE FROM sessions WHERE token_hash = ?", sha256(token));
+  if (s) await logEvent(db, { user: s.username, table: "session", key: s.username, action: "logout" });
 }
 
 // ---- user management (admin)
@@ -169,6 +179,7 @@ async function changeOwnPassword(db, actor, { current_password, new_password }) 
   await withUser(db, actor.username, (t) =>
     t.run(`UPDATE users SET password_hash = ?, updated_by = ?, updated_at = ${NOW} WHERE username = ?`,
       hashPassword(new_password), actor.username, u.username));
+  await logEvent(db, { user: actor.username, table: "session", key: actor.username, action: "password_change", detail: { by: "the user themself" } });
   return { ok: true };
 }
 

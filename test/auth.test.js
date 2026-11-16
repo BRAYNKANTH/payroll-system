@@ -39,10 +39,10 @@ test("password hashes never reach the audit log", async () => {
   await auth.createUser(d, admin, { username: "anu", full_name: "Anu", role: "clerk", password: PW.clerk });
   await auth.updateUser(d, admin, "anu", { password: "changed-pass-2" });
   const log = await svc.auditSearch(d, { table: "users", key: "anu" });
-  assert.equal(log.length, 1);
-  assert.ok(!/scrypt/.test(log[0].old_value + log[0].new_value));
-  await auth.login(d, "anu", "changed-pass-2"); // login timestamp alone is not audited
-  assert.equal((await svc.auditSearch(d, { table: "users", key: "anu" })).length, 1);
+  assert.equal(log.length, 2, "the new user and the password change");
+  assert.ok(log.every((l) => !/scrypt/.test((l.old_value || "") + (l.new_value || ""))));
+  await auth.login(d, "anu", "changed-pass-2"); // the login timestamp is not a change to the user record
+  assert.equal((await svc.auditSearch(d, { table: "users", key: "anu" })).length, 2);
 });
 
 test("role permissions", () => {

@@ -4,6 +4,7 @@
 const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
+const { AsyncLocalStorage } = require("async_hooks");
 
 const DEFAULT_SETTINGS = {
   company_return_rate: "0.15",         // managers: company_return = total_business * rate
@@ -57,6 +58,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
   new_value  text
 );
 CREATE INDEX IF NOT EXISTS audit_log_row ON audit_log (table_name, row_key);
+-- Where an action came from: the address and the browser. Filled in from the request (see requestContext) when the row is written.
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS ip text DEFAULT nullif(current_setting('app.ip', true), '');
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS agent text DEFAULT nullif(current_setting('app.agent', true), '');
+CREATE INDEX IF NOT EXISTS audit_log_user ON audit_log (lower(changed_by), id DESC);
+CREATE INDEX IF NOT EXISTS audit_log_area ON audit_log (table_name, id DESC);
 
 CREATE TABLE IF NOT EXISTS hubs (
   code       text PRIMARY KEY,
@@ -358,7 +364,7 @@ CREATE INDEX IF NOT EXISTS staff_upline ON staff (upline_id);
 CREATE INDEX IF NOT EXISTS pps_period ON pay_period_summary (period);
 CREATE INDEX IF NOT EXISTS weekly_mgr_week ON weekly_log (manager_id, week_start);
 
--- ---- audit trail: every UPDATE / DELETE is logged with the app user (set per transaction) and old/new values.
+-- ---- audit trail: every INSERT / UPDATE / DELETE is logged with the app user (set per transaction) and the values.
 -- A password hash is reduced to a short fingerprint so the log shows that it changed without storing it.
 CREATE OR REPLACE FUNCTION audit_snapshot(r jsonb, excl text[]) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $$
 BEGIN
@@ -371,9 +377,15 @@ DECLARE
   keycol text := TG_ARGV[0];
   excl text[] := CASE WHEN TG_NARGS > 1 THEN string_to_array(TG_ARGV[1], ',') ELSE '{}'::text[] END;
   who text := coalesce(nullif(current_setting('app.user', true), ''), 'direct-db-edit');
-  o jsonb := audit_snapshot(to_jsonb(OLD), excl);
+  o jsonb;
   n jsonb;
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO audit_log (table_name, row_key, action, changed_by, old_value, new_value)
+    VALUES (TG_TABLE_NAME, to_jsonb(NEW)->>keycol, 'create', who, NULL, audit_snapshot(to_jsonb(NEW), excl)::text);
+    RETURN NEW;
+  END IF;
+  o := audit_snapshot(to_jsonb(OLD), excl);
   IF TG_OP = 'UPDATE' THEN
     n := audit_snapshot(to_jsonb(NEW), excl);
     IF o IS DISTINCT FROM n THEN
@@ -385,6 +397,12 @@ BEGIN
   INSERT INTO audit_log (table_name, row_key, action, changed_by, old_value, new_value)
   VALUES (TG_TABLE_NAME, to_jsonb(OLD)->>keycol, 'delete', who, o::text, NULL);
   RETURN OLD;
+END $$;
+
+-- ---- the audit trail itself can never be changed or deleted, by the app or by anyone with a database tool.
+CREATE OR REPLACE FUNCTION audit_log_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'The audit trail cannot be changed or deleted';
 END $$;
 
 -- ---- period locks: entries of a finalized month cannot be inserted, changed or deleted.
@@ -425,12 +443,14 @@ function triggerSql() {
   for (const [table, { key, period, exclude }] of Object.entries(AUDITED)) {
     const args = exclude ? `'${key}', '${exclude.join(",")}'` : `'${key}'`;
     sql += `DROP TRIGGER IF EXISTS ${table}_audit ON ${table};
-      CREATE TRIGGER ${table}_audit AFTER UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION audit_trigger(${args});\n`;
+      CREATE TRIGGER ${table}_audit AFTER INSERT OR UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION audit_trigger(${args});\n`;
     if (period) {
       sql += `DROP TRIGGER IF EXISTS ${table}_lock ON ${table};
         CREATE TRIGGER ${table}_lock BEFORE INSERT OR UPDATE OR DELETE ON ${table} FOR EACH ROW EXECUTE FUNCTION period_lock_trigger('${period}');\n`;
     }
   }
+  sql += `DROP TRIGGER IF EXISTS audit_log_guard ON audit_log;
+    CREATE TRIGGER audit_log_guard BEFORE UPDATE OR DELETE ON audit_log FOR EACH ROW EXECUTE FUNCTION audit_log_guard();\n`;
   // Repayments are derived by the payroll run; once a month is final they are what the loan balance is made of.
   sql += `DROP TRIGGER IF EXISTS loan_repayments_lock ON loan_repayments;
     CREATE TRIGGER loan_repayments_lock BEFORE INSERT OR UPDATE OR DELETE ON loan_repayments FOR EACH ROW EXECUTE FUNCTION period_lock_trigger('period');\n`;
@@ -472,7 +492,10 @@ class Database {
     if (this.client) return fn(this);
     return this.driver.transaction(async (client) => {
       const bound = new Database(this.driver, client);
-      if (user) await bound.query("SELECT set_config('app.user', ?, true)", [String(user)]);
+      if (user) {
+        const ctx = requestContext.getStore() || {};
+        await bound.query("SELECT set_config('app.user', ?, true), set_config('app.ip', ?, true), set_config('app.agent', ?, true)", [String(user), ctx.ip || "", ctx.agent || ""]);
+      }
       if (lockKey) await bound.query("SELECT pg_advisory_xact_lock(hashtext(?))", [lockKey]);
       return fn(bound);
     });
@@ -558,6 +581,23 @@ async function open(target = process.env.DATABASE_URL || path.join(__dirname, "d
   return db;
 }
 
+// The address and browser of the request being served, so every audit row can say where it came from.
+// The server runs each request inside requestContext.run({ ip, agent }, ...).
+const requestContext = new AsyncLocalStorage();
+
+// Writes one event to the audit trail on its own (a sign-in, a download, a view). dedupeMinutes > 0 skips it when the same person
+// already has the same event for the same record within that many minutes, so opening a page twice is one line, not two.
+async function logEvent(db, { user, table, key, action, detail = null, dedupeMinutes = 0 }) {
+  const ctx = requestContext.getStore() || {};
+  const who = String(user || "unknown").slice(0, 120) || "unknown";
+  await db.run(`INSERT INTO audit_log (table_name, row_key, action, changed_by, new_value, ip, agent)
+    SELECT ?, ?, ?, ?, ?, ?, ?
+    WHERE NOT EXISTS (SELECT 1 FROM audit_log WHERE ?::int > 0 AND table_name = ? AND row_key = ? AND action = ? AND lower(changed_by) = lower(?)
+      AND changed_at >= to_char((now() - make_interval(mins => ?::int)) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))`,
+    table, String(key ?? "").slice(0, 200), action, who, detail ? JSON.stringify(detail) : null, ctx.ip || null, ctx.agent || null,
+    dedupeMinutes, table, String(key ?? "").slice(0, 200), action, who, dedupeMinutes);
+}
+
 // Run fn in a transaction with the audit user set.
 async function withUser(db, user, fn, opts = {}) {
   if (!user || !String(user).trim()) throw httpError(400, "A user name is required for changes");
@@ -568,4 +608,4 @@ async function getSettings(db) {
   return Object.fromEntries((await db.all("SELECT key, value FROM settings")).map((r) => [r.key, r.value]));
 }
 
-module.exports = { open, withUser, getSettings, DEFAULT_SETTINGS, SCHEMA_VERSION, httpError };
+module.exports = { open, withUser, logEvent, requestContext, getSettings, DEFAULT_SETTINGS, SCHEMA_VERSION, httpError };

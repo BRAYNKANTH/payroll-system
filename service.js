@@ -665,9 +665,14 @@ const PAY_FIELDS = ["basic_pay", "commission_rate", "base_commission_rate", "foo
 const withoutPayFields = (row) => { const o = { ...row }; for (const k of PAY_FIELDS) delete o[k]; return o; };
 
 // noPay leaves out the pay calculations' own history (approvals of a person's pay), for people who may not see pay.
-async function auditSearch(db, { table, key, user, from, to, limit = 300, noPay = false } = {}) {
+// Events about use rather than change: sign-ins, downloads, views. Only the admin sees them.
+const ACCESS_TABLES = ["session", "export", "view", "backup"];
+
+async function auditSearch(db, { table, key, user, from, to, action, limit = 300, noPay = false, noAccess = false } = {}) {
   const where = [];
   const args = [];
+  if (noAccess) { where.push("table_name <> ALL(?::text[])"); args.push(ACCESS_TABLES); }
+  if (action) { where.push("action = ?"); args.push(String(action)); }
   if (noPay) where.push("table_name NOT IN ('pay_period_summary', 'settings')");
   if (table) { where.push("table_name = ?"); args.push(table); }
   if (key) { where.push("row_key = ?"); args.push(String(key)); }
@@ -981,6 +986,6 @@ async function listPeriods(db) {
 module.exports = {
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
   runPeriod, getPeriod, getPeriodRow, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
-  PAY_FIELDS, withoutPayFields, listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
+  PAY_FIELDS, withoutPayFields, ACCESS_TABLES, listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
   dashboard, employeeProfile, balancesReport, stockReport, commissionReport, reviewQueue, listPeriods, shiftPeriod,
 };
