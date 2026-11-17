@@ -309,6 +309,19 @@ CREATE TABLE IF NOT EXISTS stock_issues (
 );
 CREATE INDEX IF NOT EXISTS stock_issues_emp ON stock_issues (employee_id, date);
 
+-- Stock the office (the admin) sends to a hub. What a hub holds is everything sent to it minus everything its coacher has given to sellers.
+CREATE TABLE IF NOT EXISTS hub_issues (
+  id         bigserial PRIMARY KEY,
+  date       text NOT NULL ${DATE_CHECK("date")},
+  hub        text NOT NULL REFERENCES hubs(code),
+  product_id bigint NOT NULL REFERENCES products(id),
+  qty        integer NOT NULL CHECK (qty > 0),
+  note       text,
+  created_by text NOT NULL,
+  created_at text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS hub_issues_hub ON hub_issues (hub, date);
+
 -- One row per sale a seller records on their phone: a product, a quantity and the list price at that moment. A day's business total is the sum of these.
 CREATE TABLE IF NOT EXISTS sale_lines (
   id          bigserial PRIMARY KEY,
@@ -472,6 +485,7 @@ const AUDITED = {
   loans:       { key: "id", period: null },
   products:    { key: "id", period: null },
   stock_issues: { key: "id", period: "date" },
+  hub_issues:  { key: "id", period: "date" },
   sale_lines:  { key: "id", period: "date" },
 };
 

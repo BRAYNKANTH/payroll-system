@@ -48,6 +48,10 @@ export default {
         </div>
         <div class="muted">${d.sellers.length} ${d.sellers.length === 1 ? "seller" : "sellers"} · ${givenTotal} ${givenTotal === 1 ? "piece" : "pieces"} given${canGive && without ? ` · ${without} with no stock` : ""}</div>
       </div></div>
+      ${Object.entries(d.pools).map(([h, list]) => html`<section class="card mb-4" aria-label="${hubName(h)} stock"><div class="card-body">
+        <div class="row between" style="gap:12px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:17px">${hubName(h)} stock</b><span class="muted">What the hub holds to give out to sellers</span></div>
+        ${list.length ? html`<div class="mc-chips">${list.map((p) => html`<span class="mc-chip ${p.left > 0 ? "given" : ""}">${p.left} × ${p.product}</span>`)}</div>` : html`<span class="muted">No products yet.</span>`}
+        ${list.length && list.every((p) => p.left === 0) ? html`<p class="muted" style="margin:10px 0 0">The hub has no stock to give out. The office sends stock to the hub first.</p>` : ""}</div></section>`)}
       ${!canGive ? html`<div class="alert info mb-4">${icon("info")}<div>${day > today ? "This day has not happened yet." : "Stock can be changed only for the last 3 days. You can still look at this day."}</div></div>` : ""}
       ${d.sellers.length ? (hubs.length > 1
         ? hubs.map((h) => html`<section class="mb-4" aria-label="${hubName(h)}"><h2 class="section-title" style="margin:0 0 10px">${hubName(h)}</h2>
@@ -66,13 +70,14 @@ export default {
 
     $$("[data-give]", el).forEach((b) => (b.onclick = () => {
       const s = d.sellers.find((x) => x.employee_id === b.dataset.give);
+      const pool = Object.fromEntries((d.pools[s.hub] || []).map((p) => [p.product_id, p.left]));
       const dr = drawer({
         title: `Give stock to ${s.name}`,
         body: html`<div class="give">
           <p class="muted" style="margin-top:0">${label(day)}. Enter how many of each product. Leave the rest at 0.</p>
           <div class="till-search"><span aria-hidden="true">${icon("search")}</span><input id="gq" class="input" type="search" autocomplete="off" placeholder="Search products" aria-label="Search products"></div>
-          <ul class="give-list" role="list">${d.products.map((p) => html`<li data-name="${p.name.toLowerCase()}"><label for="g${p.id}"><b>${p.name}</b><span class="muted">${rs(p.price)} · ${(s.carried.find((c) => c.product_id === p.id)?.qty) ? `${s.carried.find((c) => c.product_id === p.id).qty} carried over` : "none carried over"}</span></label>
-            <input class="input" id="g${p.id}" data-pid="${p.id}" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" maxlength="4" aria-label="Quantity of ${p.name}"></li>`)}</ul>
+          <ul class="give-list" role="list">${d.products.map((p) => html`<li data-name="${p.name.toLowerCase()}"><label for="g${p.id}"><b>${p.name}</b><span class="muted">${rs(p.price)} · ${pool[p.id] || 0} in the hub${(s.carried.find((c) => c.product_id === p.id)?.qty) ? ` · ${s.carried.find((c) => c.product_id === p.id).qty} carried over` : ""}</span></label>
+            <input class="input" id="g${p.id}" data-pid="${p.id}" data-max="${pool[p.id] || 0}" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="${pool[p.id] ? "0" : "None"}" maxlength="4" ${pool[p.id] ? "" : "disabled"} aria-label="Quantity of ${p.name}"></li>`)}</ul>
           ${d.products.length ? "" : html`<p class="muted">There are no products yet. Add them under Products first.</p>`}</div>`.toString(),
         foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="give-save">Give stock</button>`,
       });
@@ -80,6 +85,8 @@ export default {
       $("#give-save", dr.panel).onclick = (e) => busy(e.currentTarget, async () => {
         const lines = $$("[data-pid]", dr.panel).map((i) => ({ product_id: Number(i.dataset.pid), qty: Number(i.value) })).filter((l) => l.qty > 0);
         if (!lines.length) throw new Error("Enter a quantity for at least one product");
+        const over = $$("[data-pid]", dr.panel).find((i) => Number(i.value) > Number(i.dataset.max));
+        if (over) throw new Error(`The hub has only ${over.dataset.max} of ${d.products.find((p) => p.id === Number(over.dataset.pid)).name}. Ask the office to send more stock`);
         await post("/api/stock-issues", { employee_id: s.employee_id, date: day, lines });
         toast(`Stock given to ${s.name}`);
         dr.close();

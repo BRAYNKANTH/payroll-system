@@ -9,7 +9,7 @@ const pos = require("../pos");
 const sales = require("../sales");
 
 const ADMIN = { username: "admin" };
-async function setup() {
+async function setup({ hubStock = true } = {}) {
   const d = await db.open(":memory:");
   await auth.setup(d, { username: "admin", full_name: "Admin", password: "admin12345" });
   await svc.createEntry(d, "hubs", { code: "H1", name: "Hub 1" }, "admin");
@@ -20,6 +20,7 @@ async function setup() {
   await products.create(d, { name: "Vim", list_price: 500, cost_price: 190 }, "admin");
   const shine = (await d.get("SELECT id FROM products WHERE name = 'Shine'")).id;
   const vim = (await d.get("SELECT id FROM products WHERE name = 'Vim'")).id;
+  if (hubStock) for (const hub of ["H1", "H2"]) await pos.giveToHub(d, ADMIN, { hub, lines: [{ product_id: Number(shine), qty: 1000 }, { product_id: Number(vim), qty: 1000 }] });
   const seller = { username: "seller-d1", employee_id: "D1" };
   const hubHead = { username: "head-h1", hub: "H1" };
   return { d, shine: Number(shine), vim: Number(vim), seller, hubHead };
@@ -152,4 +153,58 @@ test("sales and stock changes are written to the audit trail", async () => {
   await pos.sell(d, seller, { product_id: shine, qty: 1 });
   const rows = await d.all("SELECT table_name, action, changed_by FROM audit_log WHERE table_name IN ('stock_issues','sale_lines') ORDER BY id");
   assert.deepEqual(rows.map((r) => [r.table_name, r.action, r.changed_by]), [["stock_issues", "create", "head-h1"], ["sale_lines", "create", "seller-d1"]]);
+});
+
+test("the flow: the office sends stock to a hub, then the coacher can give out only what the hub holds", async () => {
+  const { d, shine, hubHead } = await setup({ hubStock: false });
+  await assert.rejects(() => give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 1 }] }, "H1"), /The hub has no Shine left. Ask the office to send more stock/);
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 10 }], note: "Monday delivery" });
+  await give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 6 }] }, "H1");
+  await assert.rejects(() => give(d, hubHead, { employee_id: "D3", lines: [{ product_id: shine, qty: 6 }] }, "H1"), /only 4 Shine left/);
+  await give(d, hubHead, { employee_id: "D3", lines: [{ product_id: shine, qty: 4 }] }, "H1");
+  await assert.rejects(() => give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 1 }] }, "H1"), /no Shine left/);
+  // one request cannot slip past the limit by splitting a product over two lines
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 5 }] });
+  await assert.rejects(() => give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 3 }, { product_id: shine, qty: 3 }] }, "H1"), /only 5 Shine left/);
+  const supply = await pos.hubSupply(d, { hub: "H1" });
+  const row = supply.hubs[0].stock.find((x) => x.product === "Shine");
+  assert.deepEqual([row.received, row.given, row.left], [15, 10, 5]);
+  assert.equal(supply.hubs[0].recent.length, 2);
+  assert.equal(supply.hubs[0].recent[1].note, "Monday delivery");
+});
+
+test("each hub has its own stock: H1's stock cannot be given to a seller in H2", async () => {
+  const { d, shine } = await setup({ hubStock: false });
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 50 }] });
+  await assert.rejects(() => give(d, ADMIN, { employee_id: "D2", lines: [{ product_id: shine, qty: 1 }] }), /The hub has no Shine left/);
+  await give(d, ADMIN, { employee_id: "D1", lines: [{ product_id: shine, qty: 1 }] });
+  const all = await pos.hubSupply(d, {});
+  assert.deepEqual(all.hubs.map((h) => [h.code, h.stock[0].left]), [["H1", 49], ["H2", 0]]);
+});
+
+test("stock taken back from a seller returns to the hub; stock sent to a hub can be withdrawn only while it is unused", async () => {
+  const { d, shine, hubHead } = await setup({ hubStock: false });
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 10 }] });
+  const mine = await d.get("SELECT id FROM hub_issues WHERE hub = 'H1'");
+  await give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 7 }] }, "H1");
+  await assert.rejects(() => pos.takeFromHub(d, ADMIN, mine.id), /already been given to sellers/);
+  const issue = await d.get("SELECT id FROM stock_issues WHERE employee_id = 'D1'");
+  await pos.takeBack(d, hubHead, issue.id, "H1");
+  assert.equal((await pos.hubSupply(d, { hub: "H1" })).hubs[0].stock[0].left, 10, "the seller's stock went back to the hub");
+  await pos.takeFromHub(d, ADMIN, mine.id);
+  assert.equal((await pos.hubSupply(d, { hub: "H1" })).hubs[0].stock[0].left, 0);
+});
+
+test("the morning screen shows what the hub holds, and the office's input is checked", async () => {
+  const { d, shine, vim } = await setup({ hubStock: false });
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 12 }] });
+  const m = await pos.morning(d, { date: sales.today(), hub: "H1" });
+  assert.deepEqual(m.pools.H1.map((p) => [p.product, p.left]), [["Shine", 12], ["Vim", 0]]);
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "NOPE", lines: [{ product_id: shine, qty: 1 }] }), /Choose a hub/);
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [] }), /at least one product/);
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: vim, qty: 0 }] }), /whole number/);
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", date: sales.addDays(sales.today(), 1), lines: [{ product_id: vim, qty: 1 }] }), /not happened yet/);
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: 9999, qty: 1 }] }), /Choose products/);
+  const rows = await d.all("SELECT table_name, action, changed_by FROM audit_log WHERE table_name = 'hub_issues'");
+  assert.deepEqual(rows.map((r) => [r.table_name, r.action, r.changed_by]), [["hub_issues", "create", "admin"]]);
 });

@@ -154,6 +154,10 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/me\/pos\/sale\/(\d+)$/, "self", ({ user, m }) => pos.undo(database, user, m[1])],
     ["POST", /^\/api\/me\/pos\/day$/, "self", ({ user, body }) => pos.endOfDay(database, user, body)],
     // The office gives each seller their stock for the day.
+    // The office sends stock to a hub (admin); a coacher or stock keeper sees what their own hub holds.
+    ["GET", /^\/api\/hub-stock$/, "stock", ({ user, q }) => pos.hubSupply(database, { hub: user.hub || q.get("hub") || undefined })],
+    ["POST", /^\/api\/hub-stock$/, "manage_products", ({ user, body }) => pos.giveToHub(database, user, body)],
+    ["DELETE", /^\/api\/hub-stock\/(\d+)$/, "manage_products", ({ user, m }) => pos.takeFromHub(database, user, m[1])],
     ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
     ["POST", /^\/api\/stock-issues$/, "stock", ({ user, body }) => pos.give(database, user, body, user.hub)],
     ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "stock", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],

@@ -161,8 +161,14 @@ async function morning(db, { date, hub }) {
   for (const r of before) carried.set(r.employee_id + "|" + key(r.product_id), num(r.n));
   for (const r of soldBefore) carried.set(r.employee_id + "|" + key(r.product_id), (carried.get(r.employee_id + "|" + key(r.product_id)) || 0) - num(r.n));
   const sold = new Map(soldToday.map((r) => [r.employee_id + "|" + key(r.product_id), num(r.n)]));
+  const pools = {};
+  for (const h of [...new Set(people.map((p) => p.hub))]) {
+    const pool = await poolOf(db, h);
+    pools[h] = products.filter((p) => p.status === "active").map((p) => ({ product_id: Number(p.id), product: p.name, left: Math.max(0, pool.get(key(p.id))?.left || 0) }));
+  }
   return {
     date: day,
+    pools,
     products: products.filter((p) => p.status === "active").map((p) => ({ id: Number(p.id), name: p.name, price: num(p.list_price) })),
     sellers: people.map((p) => {
       const mine = given.filter((g) => g.employee_id === p.employee_id).map((g) => ({ id: Number(g.id), product_id: Number(g.product_id), product: pname.get(key(g.product_id)), qty: g.qty }));
@@ -186,12 +192,20 @@ async function give(db, user, body, scopeHub) {
   const note = String(body.note || "").trim().slice(0, 200) || null;
   await withUser(db, user.username, async (t) => {
     if (await svc.isFinalized(t, date.slice(0, 7))) throw httpError(409, "That month is closed");
+    // Stock comes out of what the office sent to the hub: a coacher cannot give more than the hub holds.
+    const want = new Map(), names = new Map();
     for (const l of lines) {
-      const p = await t.get("SELECT id, status FROM products WHERE id = ?", Number(l.product_id));
+      const p = await t.get("SELECT id, name, status FROM products WHERE id = ?", Number(l.product_id));
       if (!p || p.status !== "active") throw httpError(400, "Choose products from the list");
-      await t.run("INSERT INTO stock_issues (date, employee_id, product_id, qty, note, created_by) VALUES (?,?,?,?,?,?)", date, s.employee_id, p.id, qty(l.qty), note, user.username);
+      want.set(key(p.id), (want.get(key(p.id)) || 0) + qty(l.qty)); names.set(key(p.id), p.name);
     }
-  }, { lockKey: "pos:" + s.employee_id });
+    const pool = await poolOf(t, s.hub);
+    for (const [pid, n] of want) {
+      const left = Math.max(0, pool.get(pid)?.left || 0);
+      if (n > left) throw httpError(409, left ? `The hub has only ${left} ${names.get(pid)} left. Ask the office to send more stock` : `The hub has no ${names.get(pid)} left. Ask the office to send more stock`);
+    }
+    for (const l of lines) await t.run("INSERT INTO stock_issues (date, employee_id, product_id, qty, note, created_by) VALUES (?,?,?,?,?,?)", date, s.employee_id, Number(l.product_id), qty(l.qty), note, user.username);
+  }, { lockKey: "hub:" + s.hub });
   return { given: lines.length, employee_id: s.employee_id, date };
 }
 
@@ -210,4 +224,67 @@ async function takeBack(db, user, id, scopeHub) {
   return { deleted: true };
 }
 
-module.exports = { state, sell, undo, endOfDay, morning, give, takeBack, stockOf };
+// What a hub holds, per product: everything the office sent minus everything its coacher gave to sellers.
+async function poolOf(db, hub) {
+  const got = await db.all("SELECT product_id, SUM(qty) AS n FROM hub_issues WHERE hub = ? GROUP BY product_id", hub);
+  const out = await db.all("SELECT i.product_id, SUM(i.qty) AS n FROM stock_issues i JOIN staff s ON s.employee_id = i.employee_id WHERE s.hub = ? GROUP BY i.product_id", hub);
+  const pool = new Map();
+  const slot = (id) => pool.get(key(id)) || pool.set(key(id), { product_id: Number(id), received: 0, given: 0, left: 0 }).get(key(id));
+  for (const r of got) slot(r.product_id).received += num(r.n);
+  for (const r of out) slot(r.product_id).given += num(r.n);
+  for (const x of pool.values()) x.left = x.received - x.given;
+  return pool;
+}
+
+// The office's view: for every hub (or only the signed-in user's hub) the stock it holds and the latest stock sent to it.
+async function hubSupply(db, { hub } = {}) {
+  const hubs = await db.all(`SELECT code, name, status FROM hubs ${hub ? "WHERE code = ?" : ""} ORDER BY code`, ...(hub ? [hub] : []));
+  const products = await db.all("SELECT id, name, list_price, status FROM products WHERE status = 'active' ORDER BY lower(name)");
+  const pname = new Map((await db.all("SELECT id, name FROM products")).map((p) => [key(p.id), p.name]));
+  const out = [];
+  for (const h of hubs) {
+    const pool = await poolOf(db, h.code);
+    const recent = await db.all("SELECT id, date, product_id, qty, note, created_by FROM hub_issues WHERE hub = ? ORDER BY id DESC LIMIT 12", h.code);
+    out.push({ code: h.code, name: h.name, status: h.status,
+      stock: products.map((p) => { const x = pool.get(key(p.id)) || { received: 0, given: 0, left: 0 }; return { product_id: Number(p.id), product: p.name, price: num(p.list_price), received: x.received, given: x.given, left: Math.max(0, x.left) }; }),
+      recent: recent.map((r) => ({ id: Number(r.id), date: r.date, product: pname.get(key(r.product_id)), qty: r.qty, note: r.note, by: r.created_by })) });
+  }
+  return { hubs: out };
+}
+
+// The admin sends stock to a hub. `lines` is a list of { product_id, qty }.
+async function giveToHub(db, user, body) {
+  const hub = await db.get("SELECT code FROM hubs WHERE code = ?", String(body.hub || ""));
+  if (!hub) throw httpError(400, "Choose a hub");
+  const now = sales.today();
+  const date = body.date ? String(body.date) : now;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) throw httpError(400, "date must be YYYY-MM-DD");
+  if (date > now) throw httpError(400, "You cannot send stock for a day that has not happened yet");
+  const lines = Array.isArray(body.lines) ? body.lines : [];
+  if (!lines.length) throw httpError(400, "Add at least one product");
+  const note = String(body.note || "").trim().slice(0, 200) || null;
+  await withUser(db, user.username, async (t) => {
+    if (await svc.isFinalized(t, date.slice(0, 7))) throw httpError(409, "That month is closed");
+    for (const l of lines) {
+      const p = await t.get("SELECT id, status FROM products WHERE id = ?", Number(l.product_id));
+      if (!p || p.status !== "active") throw httpError(400, "Choose products from the list");
+      await t.run("INSERT INTO hub_issues (date, hub, product_id, qty, note, created_by) VALUES (?,?,?,?,?,?)", date, hub.code, p.id, qty(l.qty), note, user.username);
+    }
+  }, { lockKey: "hub:" + hub.code });
+  return { sent: lines.length, hub: hub.code, date };
+}
+
+// Take back stock sent to a hub by mistake. Refused when the coacher has already given some of it to sellers.
+async function takeFromHub(db, user, id) {
+  const row = await db.get("SELECT id, date, hub, product_id, qty FROM hub_issues WHERE id = ?", Number(id));
+  if (!row) throw httpError(404, "That stock line was not found");
+  await withUser(db, user.username, async (t) => {
+    if (await svc.isFinalized(t, row.date.slice(0, 7))) throw httpError(409, "That month is closed");
+    const left = (await poolOf(t, row.hub)).get(key(row.product_id))?.left || 0;
+    if (left < row.qty) throw httpError(409, "Part of this stock has already been given to sellers, so it cannot be taken back");
+    await t.run("DELETE FROM hub_issues WHERE id = ?", row.id);
+  }, { lockKey: "hub:" + row.hub });
+  return { deleted: true };
+}
+
+module.exports = { state, sell, undo, endOfDay, morning, give, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };

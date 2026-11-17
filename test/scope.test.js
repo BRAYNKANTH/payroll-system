@@ -23,6 +23,8 @@ async function setup() {
   await add("C2", "coacher", null, "H2"); await add("M9", "manager", "C2", "H2"); await add("D9", "distributor", "M9", "H2");
   await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "owner");
   const shine = Number((await d.get("SELECT id FROM products WHERE name = 'Shine'")).id);
+  const pos = require("../pos");
+  for (const hub of ["H1", "H2"]) await pos.giveToHub(d, { username: "owner" }, { hub, lines: [{ product_id: shine, qty: 500 }] }); // the office sends stock to each hub
   const login = (username, employee_id, role = "staff") => auth.createUser(d, admin, { username, full_name: username, role, employee_id, password: PW });
   await login("coach", "C1"); await login("man1", "M1"); await login("man2", "M2"); await login("promo", "PM1"); await login("seller", "D1"); await login("coach2", "C2");
   const day = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -172,5 +174,26 @@ test("HTTP: the coacher can confirm days and enter data for the hub, but not for
     assert.equal((await call("coach", "POST", "/api/staff", { employee_id: "X1", name: "X", hub: "H1", staff_level: "distributor", upline_id: "M1" })).status, 200, "a coacher can");
     assert.equal((await call("coach", "POST", "/api/staff", { employee_id: "X2", name: "X", hub: "H2", staff_level: "distributor", upline_id: "M9" })).status, 403, "not in another hub");
     assert.equal(typeof sales.today(), "string");
+  } finally { close(); }
+});
+
+test("HTTP: only the admin sends stock to a hub; a coacher or stock keeper sees their own hub's stock; a manager sees none", async () => {
+  const { d, shine } = await setup();
+  const { call, close } = await http(d);
+  try {
+    const send = (who, hub) => call(who, "POST", "/api/hub-stock", { hub, lines: [{ product_id: shine, qty: 5 }] });
+    assert.equal((await send("coach", "H1")).status, 403, "a coacher gives out stock, they do not create it");
+    assert.equal((await send("man1", "H1")).status, 403);
+    assert.equal((await send("owner", "H1")).status, 200);
+    const mine = (await call("coach", "GET", "/api/hub-stock")).json;
+    assert.deepEqual(mine.hubs.map((h) => h.code), ["H1"], "a coacher sees only their own hub");
+    assert.equal(mine.hubs[0].stock[0].left, 505);
+    assert.deepEqual((await call("owner", "GET", "/api/hub-stock")).json.hubs.map((h) => h.code), ["H1", "H2"]);
+    assert.equal((await call("man1", "GET", "/api/hub-stock")).status, 403, "a plain manager has no stock pages");
+    await svc.updateEntry(d, "staff", "M1", { stock_keeper: true }, "owner");
+    assert.deepEqual((await call("man1", "GET", "/api/hub-stock")).json.hubs.map((h) => h.code), ["H1"], "a stock keeper sees the hub's stock");
+    const id = (await call("owner", "GET", "/api/hub-stock")).json.hubs[0].recent[0].id;
+    assert.equal((await call("coach", "DELETE", `/api/hub-stock/${id}`)).status, 403);
+    assert.equal((await call("owner", "DELETE", `/api/hub-stock/${id}`)).status, 200);
   } finally { close(); }
 });
