@@ -68,7 +68,7 @@ export default {
         (filter === "all" || (filter === "review" ? ["pending_review", "rejected"].includes(r.status) : r.role === filter)) &&
         (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q)));
       $("#table").innerHTML = dataTable({
-        rows, footer: true, empty: "No matching employees",
+        rows, footer: true, pageSize: 25, empty: "No matching employees",
         card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span>
             ${r.flags.length ? html`<span class="mc-flags">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</span>` : ""}</span>
           <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,

@@ -79,7 +79,7 @@ export default {
       rows = await get("/api/audit" + qs({ ...f, limit: 1000 }));
       $("#xaudit").innerHTML = exportButtons("audit", f).toString(); // Excel and PDF follow the filters on screen
       $("#list").innerHTML = dataTable({
-        rows, sortable: false, empty: "No changes match these filters",
+        rows, sortable: false, pageSize: 25, empty: "No changes match these filters",
         cols: [
           { key: "changed_at", label: "When", render: (a) => html`<span style="white-space:nowrap">${dateTime(a.changed_at)}</span>` },
           { key: "changed_by", label: "Who", render: (a) => html`<b>${a.changed_by}</b>` },

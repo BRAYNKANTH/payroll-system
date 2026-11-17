@@ -5,8 +5,8 @@ import { exportButtons, $, $$, html, icon, money, badge, toast, busy, dataTable,
 let tab = "feed";
 
 // A thin bar showing how far a person is towards their target; it turns green once the target is passed.
-const bar = (p) => (p == null ? html`<span class="faint">no target</span>` : html`<div class="row" style="gap:8px;flex-wrap:nowrap;min-width:120px">
-  <div class="progress ${p >= 1 ? "green" : p >= 0.7 ? "" : "amber"}" style="width:70px"><span style="width:${Math.min(100, p * 100)}%"></span></div><span class="num" style="font-size:12px">${pct(p, 0)}</span></div>`);
+const bar = (p) => (p == null ? html`<span class="faint">no target</span>` : html`<div class="row target-bar">
+  <div class="progress ${p >= 1 ? "green" : p >= 0.7 ? "" : "amber"}"><span style="width:${Math.min(100, p * 100)}%"></span></div><span class="num text-sm">${pct(p, 0)}</span></div>`);
 
 export default {
   title: "Live sales",
@@ -40,7 +40,7 @@ export default {
 
       if (tab === "feed") {
         pane.innerHTML = d.feed.length ? html`<div class="card"><div class="card-body flush">${dataTable({
-          rows: d.feed, sortable: false, empty: "No sales entered yet",
+          rows: d.feed, sortable: false, pageSize: 25, empty: "No sales entered yet",
           cols: [
             { key: "date", label: "Day", render: (r) => html`<b>${dateLabel(r.date)}</b><div class="faint text-sm">${r.self_entered ? `entered ${dateTime(r.entered_at)}` : "entered by the office"}</div>` },
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>` },
@@ -60,7 +60,7 @@ export default {
         })}</div></div>`.toString() : html`<div class="card">${emptyState("No sales entered yet", "Sales appear here as soon as they are entered, by the office or by the sellers themselves.", "chart")}</div>`.toString();
       } else {
         pane.innerHTML = d.people.length ? html`<div class="card"><div class="card-body flush">${dataTable({
-          rows: d.people, empty: "Nobody has sales this month",
+          rows: d.people, pageSize: 25, empty: "Nobody has sales this month",
           cols: [
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>` },
             { key: "days", label: "Days", align: "r" },
@@ -74,7 +74,7 @@ export default {
             ] : []),
             { key: "unconfirmed", label: "Waiting", render: (r) => (r.unconfirmed ? badge("amber", `${r.unconfirmed} to confirm`) : html`<span class="faint">—</span>`) },
           ],
-        })}</div></div>${d.can_pay ? html`<p class="muted" style="margin-top:12px">Earned so far is worked out with each person's own pay rules from the days entered up to now. It is an estimate: stock shortfalls, loans and the office's checks are settled when payroll is calculated.</p>` : ""}`.toString()
+        })}</div></div>${d.can_pay ? html`<p class="muted mt-3">Earned so far is worked out with each person's own pay rules from the days entered up to now. It is an estimate: stock shortfalls, loans and the office's checks are settled when payroll is calculated.</p>` : ""}`.toString()
           : html`<div class="card">${emptyState("Nobody has sales this month", "", "chart")}</div>`.toString();
       }
     };

@@ -1158,3 +1158,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .topbar .spacer { display: none; }
   .btn.icon, .btn.sm.icon, .sidebar-close { min-width: 44px; }
 }
+/* Live sales target bar and Approvals queue rows (were inline styles) */
+.target-bar { gap: 8px; flex-wrap: nowrap; min-width: 120px; }
+.target-bar .progress { width: 70px; }
+.queue-item { align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); gap: 14px; }
+.queue-main { flex: 1; min-width: 0; }
