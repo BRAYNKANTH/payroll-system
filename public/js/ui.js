@@ -300,7 +300,7 @@ export function confirmDialog({ title, message, confirmText = "Confirm", danger 
 // cols: [{ key, label, align: 'r'|'c', render(row) -> html/raw, sort(row) -> value | false, total(rows) -> html }]
 // onRow: makes rows clickable for mouse users AND adds a real button per row (rowLabel names it) so the
 // same action works from the keyboard and for screen readers.
-export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100, card, summary }) {
+export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100, card, summary, groupBy, groupLabel }) {
   const id = "t" + Math.random().toString(36).slice(2, 8);
   if (!rows.length) return raw(`<div class="empty"><div class="ico">${icon("sheet")}</div><h4>${esc(empty)}</h4></div>`);
   // On a phone a list of cards is easier to read and tap than a wide table. Each card is one button, so the whole row works as one control.
@@ -312,6 +312,9 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
   }
   if (card && matchMedia("(max-width: 860px)").matches) {
     let shownCards = Math.min(rows.length, pageSize);
+    // With groupBy, a heading is drawn above the first row of each group (rows must already be in group order).
+    const cardsHtml = (from, to) => rows.slice(from, to).map((r, i) => (groupBy && (from + i === 0 || groupBy(rows[from + i - 1]) !== groupBy(r))
+      ? `<li class="m-group"><span>${groupLabel(groupBy(r), rows.filter((x) => groupBy(x) === groupBy(r)))}</span></li>` : "") + cardHtml(r, from + i)).join("");
     const cardHtml = (r, ri) => `<li>${onRow ? `<button type="button" class="m-card" data-i="${ri}">${card(r)}<span class="chev" aria-hidden="true"></span></button>` : `<div class="m-card">${card(r)}</div>`}</li>`;
     const bar = () => (rows.length > shownCards ? `<div class="more-rows"><span class="muted" role="status">Showing ${shownCards} of ${rows.length}</span><button type="button" class="btn" data-more>Show ${Math.min(pageSize, rows.length - shownCards)} more</button></div>` : "");
     queueMicrotask(() => {
@@ -321,7 +324,7 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
       const bind = () => { const b = box.nextElementSibling; if (b?.matches(".more-rows")) b.querySelector("[data-more]").onclick = more; };
       const more = () => {
         const next = Math.min(rows.length, shownCards + pageSize);
-        ul.insertAdjacentHTML("beforeend", rows.slice(shownCards, next).map((r, i) => cardHtml(r, shownCards + i)).join(""));
+        ul.insertAdjacentHTML("beforeend", cardsHtml(shownCards, next));
         shownCards = next;
         if (box.nextElementSibling?.matches(".more-rows")) box.nextElementSibling.remove();
         if (rows.length > shownCards) box.insertAdjacentHTML("afterend", bar());
@@ -330,7 +333,7 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
       bind();
       if (onRow) ul.addEventListener("click", (e) => { const b = e.target.closest("[data-i]"); if (b) onRow(rows[b.dataset.i]); });
     });
-    return raw(`<div class="m-list" id="${id}" role="region" aria-label="${esc(caption || "List")}">${summary ? `<p class="m-summary" role="status">${summary(rows)}</p>` : ""}<ul role="list">${rows.slice(0, shownCards).map(cardHtml).join("")}</ul></div>${bar()}`);
+    return raw(`<div class="m-list" id="${id}" role="region" aria-label="${esc(caption || "List")}">${summary ? `<p class="m-summary" role="status">${summary(rows)}</p>` : ""}<ul role="list">${cardsHtml(0, shownCards)}</ul></div>${bar()}`);
   }
   const sortableCol = (c) => sortable && c.sort !== false && c.label;
   const head = cols.map((c, i) => sortableCol(c)
@@ -340,7 +343,11 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
   const rowHtml = (r, ri) => `<tr data-i="${ri}" class="${onRow ? "clickable" : ""}" ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.align || ""}">${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}${onRow ? `<td class="r row-act"><button type="button" class="btn sm ghost" data-row-open aria-label="${esc(rowLabel(r))}">${esc(rowAction)} ${icon("right")}</button></td>` : ""}</tr>`;
   // A long list draws its first rows at once and the rest on request, so the page appears quickly and stays light.
   let shown = Math.min(rows.length, pageSize);
-  const body = rows.slice(0, shown).map(rowHtml).join("");
+  const span = cols.length + (onRow ? 1 : 0);
+  // With groupBy, a heading row is drawn above the first row of each group (rows must already be in group order).
+  const rowsHtml = (from, to) => rows.slice(from, to).map((r, i) => (groupBy && (from + i === 0 || groupBy(rows[from + i - 1]) !== groupBy(r))
+    ? `<tr class="group-row"><th scope="rowgroup" colspan="${span}">${groupLabel(groupBy(r), rows.filter((x) => groupBy(x) === groupBy(r)))}</th></tr>` : "") + rowHtml(r, from + i)).join("");
+  const body = rowsHtml(0, shown);
   const moreBar = () => (rows.length > shown ? `<div class="more-rows"><span class="muted" role="status">Showing ${shown} of ${rows.length}</span><button type="button" class="btn" data-more>Show ${Math.min(pageSize, rows.length - shown)} more</button></div>` : "");
   const foot = footer ? `<tfoot><tr>${cols.map((c, i) => `<td class="${c.align || ""}">${c.total ? c.total(rows) : i === 0 ? "Total" : ""}</td>`).join("")}${onRow ? "<td></td>" : ""}</tr></tfoot>` : "";
   queueMicrotask(() => {
@@ -350,7 +357,7 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
     const wrap = t.closest(".table-wrap");
     const drawMore = (n) => {
       const next = Math.min(rows.length, shown + n);
-      tb.insertAdjacentHTML("beforeend", rows.slice(shown, next).map((r, i) => rowHtml(r, shown + i)).join(""));
+      tb.insertAdjacentHTML("beforeend", rowsHtml(shown, next));
       shown = next;
       if (wrap.nextElementSibling?.matches(".more-rows")) wrap.nextElementSibling.remove();
       if (rows.length > shown) wrap.insertAdjacentHTML("afterend", moreBar());
@@ -371,10 +378,15 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
         th.setAttribute("aria-sort", dir === 1 ? "ascending" : "descending");
         const val = c.sort || ((r) => r[c.key]);
         if (shown < rows.length) drawMore(rows.length); // sorting has to see every row, not just the ones on screen
-        [...tb.rows].sort((a, b) => {
+        const cmp = (a, b) => {
           const x = val(rows[a.dataset.i]), y = val(rows[b.dataset.i]);
           return (x > y ? 1 : x < y ? -1 : 0) * dir;
-        }).forEach((tr) => tb.append(tr));
+        };
+        if (groupBy) { // sort inside each group and keep the groups in their order
+          const blocks = [];
+          [...tb.children].forEach((tr) => { if (tr.classList.contains("group-row")) blocks.push({ head: tr, trs: [] }); else blocks[blocks.length - 1].trs.push(tr); });
+          blocks.forEach((b) => { tb.append(b.head); b.trs.sort(cmp).forEach((tr) => tb.append(tr)); });
+        } else [...tb.rows].sort(cmp).forEach((tr) => tb.append(tr));
         announce(`Sorted by ${c.label}, ${dir === 1 ? "ascending" : "descending"}`);
       }));
     }

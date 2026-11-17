@@ -3,7 +3,7 @@ import { state, can, scopeHub, navigate } from "../app.js";
 import { isPhone, stepForm } from "../phone.js";
 import { exportButtons, $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
-let filters = { q: "", role: "", status: "active" };
+let filters = { q: "", role: "", status: "active", group: "hub" };
 // The list starts with the columns people look for most. The rest are one tap away in "Columns" and the choice is remembered.
 const COLS_KEY = "emp.hiddenCols";
 const DEFAULT_HIDDEN = ["basic_pay", "target", "commission_rate", "bank_account_no"];
@@ -220,6 +220,7 @@ export default {
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
             <select class="input sm" id="role" aria-label="Filter by position" style="width:auto"><option value="">All positions</option>${LEVELS.map(([v, l]) => html`<option value="${v}" ${filters.role === v ? "selected" : ""}>${l}</option>`)}</select>
             <div class="seg" id="st" role="group" aria-label="Filter by status">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.status === v)}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
+            <div class="seg" id="grp" role="group" aria-label="Group by">${[["hub", "By hub"], ["staff_level", "By position"], ["", "No grouping"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
           </div>
           <details class="colpick"><summary class="btn sm">${icon("sheet")} Columns</summary>
             <div class="colpick-menu" role="group" aria-label="Choose the columns to show">${allCols.filter((c) => c.key !== "name").map((c) => html`<label><input type="checkbox" data-col="${c.key}" ${hiddenCols.includes(c.key) ? "" : "checked"}> ${c.label}</label>`)}</div></details>
@@ -231,8 +232,18 @@ export default {
       const q = filters.q.toLowerCase();
       const rows = staff.filter((s) => (!filters.role || s.staff_level === filters.role) && (!filters.status || s.status === filters.status) &&
         (!q || [s.name, s.employee_id, s.phone || "", s.nic || ""].some((x) => x.toLowerCase().includes(q))));
+      // Position order: coacher, promoting manager, manager, supervisor, distributor (the order of LEVELS, reversed).
+      const rank = (s) => LEVELS.findIndex(([v]) => v === (s.staff_level || (s.role === "manager" ? "manager" : "distributor")));
+      const hubOrder = (c) => { const i = state.hubs.findIndex((h) => h.code === c); return i < 0 ? 999 : i; };
+      // Grouped lists keep the chain order inside each group: coacher first, then promoting manager, manager, supervisors, distributors.
+      if (filters.group === "hub") rows.sort((a, b) => hubOrder(a.hub) - hubOrder(b.hub) || rank(b) - rank(a) || a.name.localeCompare(b.name));
+      else if (filters.group === "staff_level") rows.sort((a, b) => rank(b) - rank(a) || hubOrder(a.hub) - hubOrder(b.hub) || a.name.localeCompare(b.name));
+      const groupBy = filters.group === "hub" ? (s) => s.hub : filters.group === "staff_level" ? (s) => s.staff_level : undefined;
+      const groupLabel = (key, rs) => filters.group === "hub"
+        ? `<b>${hubName(key)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "person" : "people"}</span> <a class="group-link" href="/hubs/${encodeURIComponent(key)}" data-link>Open hub <span class="sr-only">${hubName(key)}</span>→</a>`
+        : `<b>${levelLabel(key, rs.length)}</b> <span class="muted">· ${rs.length}</span>`;
       $("#list").innerHTML = staff.length ? dataTable({
-        rows, empty: "No employees match these filters", cls: "people",
+        rows, groupBy, groupLabel, empty: "No employees match these filters", cls: "people",
         card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${hubName(s.hub)}${(s.upline_id || s.manager_id) && byId[s.upline_id || s.manager_id] ? ` · reports to ${byId[s.upline_id || s.manager_id].name}` : ""}</span></span>
           <span class="mc-end">${badge(s.role, levelLabel(s.staff_level))}<br>${badge(s.status)}</span>`,
         summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"}`, rowAction: "", rowLabel: (s) => `Open ${s.name}`,
@@ -242,7 +253,7 @@ export default {
       if (staff.length && !rows.length) $("#list").insertAdjacentHTML("beforeend", `<div class="empty-actions"><button type="button" class="btn" id="clear-filters">Clear filters</button></div>`);
     };
     const resetFilters = () => {
-      Object.assign(filters, { q: "", role: "", status: "active" });
+      Object.assign(filters, { q: "", role: "", status: "active" }); // the grouping is a view choice, so it stays
       $("#q").value = ""; $("#role").value = "";
       $$("#st button", el).forEach((x) => { const on = x.dataset.v === "active"; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
       draw(); $("#q").focus();
@@ -252,6 +263,7 @@ export default {
     $("#role").onchange = (e) => { filters.role = e.target.value; draw(); };
     $$("#st button", el).forEach((b) => (b.onclick = () => { filters.status = b.dataset.v; $$("#st button", el).forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); draw(); }));
     el.addEventListener("click", (e) => { if (e.target.closest("#clear-filters")) resetFilters(); });
+    $$("#grp button", el).forEach((b) => (b.onclick = () => { filters.group = b.dataset.v; $$("#grp button", el).forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); draw(); }));
     el.addEventListener("change", (e) => {
       const c = e.target.closest("[data-col]");
       if (!c) return;

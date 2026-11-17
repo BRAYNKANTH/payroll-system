@@ -1031,3 +1031,9 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .empty-actions { display: flex; justify-content: center; padding: 0 0 20px; }
 /* On a phone the list is cards, which have no columns to choose. */
 @media (max-width: 860px) { .colpick { display: none; } }
+
+/* Group headings inside a list: a row in a table, an item in the phone card list. */
+.table tr.group-row th { text-align: left; font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 14px; padding: 10px 14px; background: var(--surface-3); color: var(--text); border-top: 1px solid var(--border-strong); }
+.group-link { margin-left: 10px; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; min-height: 24px; }
+@media (max-width: 860px) { .group-link { min-height: 44px; } }
+.m-list li.m-group { list-style: none; padding: 10px 14px 4px; font-size: 14px; color: var(--text); background: var(--surface-3); position: sticky; top: 0; z-index: 1; }
