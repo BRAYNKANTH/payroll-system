@@ -45,8 +45,8 @@ document.addEventListener("click", hideTip);
 // Visually hidden data table so screen-reader users get the same numbers as the chart.
 function srTable(label, headers, rows) {
   const cell = (c, j) => (j ? `<td>${esc(c)}</td>` : `<th scope="row">${esc(c)}</th>`);
-  return `<table class="sr-only"><caption>${esc(label)}</caption><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join("")}</tr></thead>` +
-    `<tbody>${rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</tbody></table>`;
+  return `<div class="sr-only"><table><caption>${esc(label)}</caption><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join("")}</tr></thead>` +
+    `<tbody>${rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 const seriesTable = (label, labels, series) =>
   srTable(label, ["", ...series.map((s) => s.name)], labels.map((l, i) => [l, ...series.map((s) => "Rs " + money(s.values[i] || 0))]));

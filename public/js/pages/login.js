@@ -20,7 +20,7 @@ export default {
               <div class="short"><dt>Short, taken off pay</dt><dd>1,500.00</dd></div>
             </dl>
           </figure>
-          <p class="flow">Daily sheets, then the month's payroll, then review, finalize and the bank file.</p>
+          <p class="flow">Daily sheets, then the month's payroll, then review and finalize.</p>
         </div>
         <div class="note">Amounts are in Sri Lankan rupees (LKR). Every change is recorded in the audit trail.</div>
       </section>

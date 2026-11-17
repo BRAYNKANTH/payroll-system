@@ -286,7 +286,7 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .empty { text-align: center; padding: 48px 20px; color: var(--text-2); }
 .empty .ico { display: grid; place-items: center; margin: 0 auto 10px; color: var(--text-3); }
 .empty .ico svg { width: 24px; height: 24px; }
-.empty h4 { color: var(--text); font-size: 15px; margin-bottom: 4px; }
+.empty h4, .empty .empty-title { color: var(--text); font-size: 15px; font-weight: 650; margin: 0 0 4px; }
 
 /* ---------- Stepper ---------- */
 .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; }
@@ -1053,3 +1053,16 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 #gs-list .gs-opt[aria-selected="true"], #gs-list .gs-opt:hover { background: var(--surface-3); border-left-color: var(--primary); }
 #gs-list .gs-none { padding: 14px 12px; color: var(--text-2); font-size: 13.5px; }
 @media (max-width: 860px) { .topbar { flex-wrap: wrap; } .gsearch { order: 10; flex: 1 1 100%; min-width: 0; } #gs-list { width: 100%; } .gsearch .gs-key { display: none; } }
+
+/* Quick wins from the accessibility audit */
+/* Check boxes and radio buttons: at least 24 px (WCAG 2.2 SC 2.5.8). */
+input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-color: var(--primary); }
+/* Text links inside lists keep a 24 px tall target. */
+.list-item a[data-link], .card-body .grow a[data-link] { display: inline-block; min-height: 24px; line-height: 24px; }
+/* Required fields */
+.req { color: var(--danger); font-weight: 700; }
+.req-note { grid-column: 1 / -1; margin: 0 0 4px; font-size: 13px; }
+/* The screen shown when the app cannot start */
+.boot-fail { max-width: 520px; margin: 12vh auto 0; padding: 0 24px; font-family: var(--font, system-ui); color: var(--text); }
+.boot-fail h1 { font-size: 24px; margin: 0 0 12px; }
+.boot-fail details { margin-top: 18px; color: var(--text-2); font-size: 13.5px; }

@@ -8,7 +8,7 @@ const INTS = ["opening_stock", "received", "issued", "counted_stock"];
 const prevPeriod = (p) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
 
 export default {
-  title: "Branch stock",
+  title: "Hub stock",
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
@@ -22,7 +22,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Branch stock</h1><p>Each branch's stock for the month. Expected = opening + received − given out. Difference = expected − counted.</p></div>
+        <div><h1>Hub stock</h1><p>Each hub's stock for the month. Expected = opening + received − given out. Difference = expected − counted.</p></div>
         <div class="actions">${editable ? html`
           <button class="btn" id="carry">${icon("copy")} Open from last month's count</button>
           <button class="btn" id="add" ${hubs.length ? "" : "disabled"}>${icon("plus")} Add product</button>` : ""}</div>
@@ -30,7 +30,7 @@ export default {
       ${locked ? lockedBanner(state.period) : ""}
       <div class="card"><div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
-          <span class="muted" id="info"></span><button class="btn primary" id="save">${icon("check")} Save branch stock</button></div>` : ""}</div>`;
+          <span class="muted" id="info"></span><button class="btn primary" id="save">${icon("check")} Save hub stock</button></div>` : ""}</div>`;
 
     const grid = $("#grid");
     let rows = lines.map((l) => ({ ...l, _state: "saved" }));
@@ -38,15 +38,15 @@ export default {
 
     const draw = () => {
       if (!rows.length) {
-        grid.innerHTML = emptyState("No branch stock for this month", editable ? "Add a product, or open the month from last month's count." : "", "box").toString();
+        grid.innerHTML = emptyState("No hub stock for this month", editable ? "Add a product, or open the month from last month's count." : "", "box").toString();
         return;
       }
       grid.innerHTML = html`<div class="table-wrap"><table class="table sheet">
-        <thead><tr><th>Branch</th><th>Product</th><th class="r">Opening</th><th class="r">Received</th><th class="r">Given out</th><th class="r">Counted</th>
+        <thead><tr><th>Hub</th><th>Product</th><th class="r">Opening</th><th class="r">Received</th><th class="r">Given out</th><th class="r">Counted</th>
           <th class="r">Unit price</th><th class="r">Expected</th><th class="r">Difference</th><th class="r">Stock value</th><th></th></tr></thead>
         <tbody>${rows.map((r, i) => r._state === "deleted" ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${hubName(r.hub)}</b><div class="faint text-sm">${r.hub}</div>`
-            : html`<select class="input sm" data-f="hub" aria-label="Branch" style="min-width:140px">${hubOptions(r._draft?.hub ?? r.hub)}</select>`}</td>
+            : html`<select class="input sm" data-f="hub" aria-label="Hub" style="min-width:140px">${hubOptions(r._draft?.hub ?? r.hub)}</select>`}</td>
           <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
           ${INTS.map((k) => html`<td><input data-f="${k}" aria-label="${k.replace("_", " ")}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
           <td><input data-f="unit_price" aria-label="Unit price in rupees, required" aria-required="true" placeholder="Price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
@@ -139,7 +139,7 @@ export default {
       rows.filter((r) => r._state === "deleted").forEach((r) => out.push({ period: state.period, hub: r.hub, product: r.product, _delete: true }));
       if (!out.length) return toast("Nothing to save", "warn");
       const res = await post("/api/hubstock/bulk", { rows: out });
-      toast(`Branch stock saved — ${res.created} added, ${res.updated} updated${res.deleted ? `, ${res.deleted} removed` : ""}`);
+      toast(`Hub stock saved — ${res.created} added, ${res.updated} updated${res.deleted ? `, ${res.deleted} removed` : ""}`);
       this.render(ctx);
     }));
   },

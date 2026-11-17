@@ -49,7 +49,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Hubs</h1><p>Branches where distributors, supervisors and managers work. Figures are for ${monthLabel}.</p></div>
+        <div><h1>Hubs</h1><p>The places where distributors, supervisors and managers work. Figures are for ${monthLabel}.</p></div>
         <div class="actions">${can("manage_hubs") ? html`<button class="btn primary" id="add">${icon("plus")} Add hub</button>` : ""}</div>
       </div>
       ${hubs.length ? html`<div class="grid kpis mb-4">
@@ -83,7 +83,7 @@ export default {
         </div>
         <div style="padding:0 18px 16px" class="row"><a class="btn sm primary" href="/hubs/${h.code}" data-link>${icon("users")} Open hierarchy &amp; members</a>${can("manage_hubs") ? html` <button class="btn sm" data-edit="${h.code}">${icon("edit")} Edit</button>` : ""}</div>
       </div>`;
-    }).join("") : html`<div class="card" style="grid-column:1/-1">${emptyState("No hubs yet", "Create your first hub (branch) to start adding employees.", "store")}</div>`.toString();
+    }).join("") : html`<div class="card" style="grid-column:1/-1">${emptyState("No hubs yet", "Create your first hub to start adding employees.", "store")}</div>`.toString();
 
     const open = (h) => {
       const d = drawer({

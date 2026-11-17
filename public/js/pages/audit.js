@@ -46,7 +46,7 @@ export function auditDiff(a) {
     : `<div><b>${esc(k)}</b>: <s>${esc(show(k, o[k]))}</s> → <ins>${esc(show(k, n[k]))}</ins></div>`).join("")}</div>`);
 }
 
-const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["hub_stock", "Branch stock"], ["allowances", "Allowances"], ["loans", "Advances & loans"],
+const TABLES = [["", "Everything"], ["daily_log", "Daily sheet"], ["weekly_log", "Weekly sheet"], ["stock_recon", "Stock"], ["hub_stock", "Hub stock"], ["allowances", "Allowances"], ["loans", "Advances & loans"],
   ["session", "Sign-ins and sign-outs"], ["export", "Downloads"], ["view", "Views"], ["backup", "Backups"],
   ["staff", "Employees"], ["products", "Products"], ["staff_documents", "Documents"], ["hubs", "Hubs"], ["pay_period_summary", "Approvals"], ["periods", "Periods"], ["users", "Users"], ["settings", "Settings"]];
 const ACTIONS = [["", "Any action"], ["create", "Added"], ["update", "Changed"], ["delete", "Deleted"], ["upload", "Uploaded"], ["login", "Signed in"], ["login_failed", "Sign-in failed"], ["logout", "Signed out"],

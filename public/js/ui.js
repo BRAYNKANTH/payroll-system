@@ -269,6 +269,7 @@ export function linkLabels(root = document) {
     group.setAttribute("role", "group");
     group.setAttribute("aria-labelledby", lbl.id);
   });
+  markRequired(root);
 }
 // Keep labels linked as pages render.
 new MutationObserver((muts) => {
@@ -395,7 +396,7 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
 }
 
 export const emptyState = (title, text = "", ico = "sheet", action = "") =>
-  raw(`<div class="empty"><div class="ico">${icon(ico)}</div><h4>${esc(title)}</h4>${text ? `<p style="margin:0 0 14px">${esc(text)}</p>` : ""}${action}</div>`);
+  raw(`<div class="empty"><div class="ico">${icon(ico)}</div><p class="empty-title">${esc(title)}</p>${text ? `<p style="margin:0 0 14px">${esc(text)}</p>` : ""}${action}</div>`);
 
 // ---- Excel and PDF
 // A page puts exportButtons("daily", { period, hub }) in its header; the click handler below downloads /api/export/daily.xlsx (or .pdf).
@@ -468,3 +469,19 @@ export const formatAmount = (v) => { const n = parseAmount(v); return n === null
 
 export const toCents = (v) => (v === "" || v == null ? null : Math.round(Number(v) * 100));
 export const fromCents = (c) => (c == null ? "" : String(c / 100));
+
+// Marks every required field with a visible asterisk and tells assistive technology it is required.
+// "* means the field is required" is added once at the top of the form. The sign-in form is left alone: every field there is needed.
+export function markRequired(root) {
+  if (!root || !root.querySelectorAll) return;
+  let note = null;
+  root.querySelectorAll("input[required], select[required], textarea[required]").forEach((f) => {
+    const form = f.closest("form");
+    if (form && form.id === "auth-form") return;
+    f.setAttribute("aria-required", "true");
+    const label = (f.labels && f.labels[0]) || (f.id && root.querySelector(`label[for="${f.id}"]`));
+    if (!label) return;
+    if (!label.querySelector(".req")) label.insertAdjacentHTML("beforeend", ' <span class="req" aria-hidden="true">*</span>');
+    if (form && !form.querySelector(".req-note")) form.insertAdjacentHTML("afterbegin", '<p class="req-note muted full">* means the field is required</p>');
+  });
+}

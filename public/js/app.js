@@ -27,7 +27,7 @@ const NAV = [
   { path: "/live", label: "Live sales", icon: "trend", page: "live" },
   { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly" },
   { path: "/stock", label: "Stock count", icon: "box", page: "stock" },
-  { path: "/branch-stock", label: "Branch stock", icon: "store", page: "hubstock" },
+  { path: "/branch-stock", label: "Hub stock", icon: "store", page: "hubstock" },
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances" },
   { group: "Payroll" },
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
@@ -470,5 +470,11 @@ function warmPages() {
 // Start downloading this address's page code now, in parallel with the sign-in check, instead of after it.
 { const first = resolve(location.pathname).page; if (first) loadPage(first).catch(() => {}); }
 boot().catch((e) => {
-  document.body.innerHTML = `<div style="padding:40px;font-family:system-ui" role="alert">Could not start the app: ${esc(e.message)}</div>`;
+  document.body.innerHTML = `<main class="boot-fail" role="alert">
+    <h1>The app could not start</h1>
+    <p>This is usually a short problem with the internet connection or the server. It does not change or delete any data.</p>
+    <p><button type="button" class="btn primary" id="boot-retry">Try again</button></p>
+    <p class="muted">If it keeps happening, tell the person who looks after the system.</p>
+    <details><summary>Technical detail</summary><p>${esc(e.message)}</p></details></main>`;
+  document.getElementById("boot-retry").onclick = () => location.reload();
 });

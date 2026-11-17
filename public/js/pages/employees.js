@@ -62,7 +62,7 @@ export async function employeeForm(existing, onSaved) {
       <div class="form-section">Bank details</div>
       <div class="field"><label>Bank name</label><input class="input" name="bank_name" value="${e.bank_name || ""}" placeholder="e.g. Bank of Ceylon"></div>
       <div class="field"><label>Bank code</label><input class="input" name="bank_code" value="${e.bank_code || ""}" placeholder="e.g. 7010"></div>
-      <div class="field"><label>Branch code</label><input class="input" name="branch_code" value="${e.branch_code || ""}" placeholder="e.g. 001"></div>
+      <div class="field"><label>Bank branch code</label><input class="input" name="branch_code" value="${e.branch_code || ""}" placeholder="e.g. 001"></div>
       <div class="field"><label>Account number</label><input class="input mono" name="bank_account_no" value="${e.bank_account_no || ""}" inputmode="numeric"></div>
       ${existing ? html`<div class="full alert info">${icon("shield")}<div>Changing the account number flags this employee's next payment for review. Another user must approve it before it is paid.</div></div>` : ""}
       ${!existing && can("manage_users") ? html`<div class="form-section">Sign-in</div>
@@ -94,7 +94,7 @@ export async function employeeForm(existing, onSaved) {
     const hint = $("#ef-level-hint", f);
     const coach = lvl === "coacher" && !existing ? staff.find((x) => x.staff_level === "coacher" && x.status === "active" && x.hub === f.hub.value) : null;
     hint.hidden = !coach;
-    hint.textContent = coach ? `This branch already has a coacher (${coach.name}). If ${coach.name} is leaving, add the new coacher, then open ${coach.name}'s profile, choose Mark as left and pick the new coacher to take over.` : "";
+    hint.textContent = coach ? `This hub already has a coacher (${coach.name}). If ${coach.name} is leaving, add the new coacher, then open ${coach.name}'s profile, choose Mark as left and pick the new coacher to take over.` : "";
     $$("[data-target]", f).forEach((x) => (x.hidden = lvl !== "manager" && !guy));
     $("#target-lbl", f).textContent = lvl === "manager" ? "Weekly target (Rs): sales of the manager and the team in a week" : "Monthly target (Rs)";
     $("#basic-hint", f).hidden = guy;
