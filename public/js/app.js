@@ -9,6 +9,7 @@ const store = {
 };
 
 export const state = {
+  routeHub: "", // set while a hub workspace (/hubs/J1/...) is open
   user: null,
   period: store.get("pr.period") || new Date().toISOString().slice(0, 7),
   hub: store.get("pr.hub") || "",
@@ -18,7 +19,8 @@ export const state = {
 };
 // perm may be a list: any one of them is enough.
 export const can = (perm) => [].concat(perm).some((p) => !!state.user?.permissions?.includes(p));
-export const scopeHub = () => state.user?.hub || state.hub || "";
+// The hub the pages work on: a coacher's own hub, else the hub whose workspace is open, else the hub filter.
+export const scopeHub = () => state.user?.hub || state.routeHub || state.hub || "";
 
 const NAV = [
   { group: "Overview" },
@@ -54,24 +56,62 @@ const NAV = [
 ];
 const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
-  { re: /^\/hubs\/([\w-]+)$/, page: "hub", nav: "/hubs", perm: "read" },
   { re: /^\/account$/, page: "account", nav: null },
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
 const isStaff = () => state.user?.role === "staff";
-// "My page" shows for the staff portal, and for a hub manager whose login is linked to their own employee record.
-const navShown = (n) => {
-  if (n.roles && !n.roles.includes(state.user?.role)) return false;
-  if (isStaff()) return n.perm === "self";
-  if (n.perm === "self") return !!state.user?.employee_id;
-  return !n.perm || can(n.perm);
+// ---------------------------------------------------------------- hub-first navigation
+// The company menu is short and depends on who signed in. Opening a hub opens that hub's workspace: five sections, each with its own pages,
+// all showing that hub only. Pages that already existed are reused: the hub is fixed by the address (see scopeHub).
+const WS_TABS = [
+  { key: "overview", label: "Overview", page: "hub", perm: "read" },
+  { key: "people", label: "People", page: "employees", perm: "read" },
+  { key: "sales", label: "Sales", subs: [["", "Live sales", "live"], ["daily", "Daily sheet", "daily"]] },
+  { key: "stock", label: "Stock", subs: [["", "Morning stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub stock sheet", "hubstock"]] },
+  { key: "money", label: "Money", subs: [["", "Weekly sheet", "weekly"], ["loans", "Advances & loans", "loans"], ["allowances", "Allowances", "allowances"]] },
+];
+const SECTIONS = {
+  payroll: { label: "Payroll", tabs: [["/payroll", "Payroll run"], ["/approvals", "Approvals"], ["/payslips", "Payslips"]] },
+  setup: { label: "Setup", tabs: [["/users", "Users & roles"], ["/products", "Products"], ["/settings", "Settings"], ["/audit", "Audit trail"]] },
 };
+const WS_RE = /^\/hubs\/([\w-]+)(?:\/(people|sales|stock|money))?(?:\/([\w-]+))?$/;
+const permOfPage = (page) => NAV.find((n) => n.page === page)?.perm;
+const permOfPath = (path) => NAV.find((n) => n.path === path)?.perm;
+const sectionOf = (path) => Object.entries(SECTIONS).find(([, sec]) => sec.tabs.some(([p]) => p === path))?.[0] || null;
+const hubEntry = () => (state.user?.hub ? `/hubs/${state.user.hub}` : "/hubs");
+
+// What the side menu shows for this person.
+function menuItems() {
+  const u = state.user, out = [];
+  if (!u) return out; // before anyone has signed in
+  const add = (path, label, ic, extra = {}) => out.push({ path, label, icon: ic, ...extra });
+  if (isStaff()) { add("/me", "My page", "users"); return out; }
+  if (can("read")) { // the admin and a coacher
+    add("/", "Home", "dashboard");
+    if (u.hub) add(hubEntry(), "My hub", "store");
+    else { add("/hubs", "Hubs", "store"); add("/employees", "Employees", "users", { short: "People" }); }
+    if (can("manage_products")) add("/hub-stock", "Stock to hubs", "warehouse", { short: "Stock" });
+    if (can("view_pay")) add("/payroll", "Payroll", "play", { badge: true });
+    add("/reports", "Reports", "chart");
+    if (can("manage_users")) add("/users", "Setup", "settings");
+  } else if (can("read_team")) { // a manager
+    add("/team", "My team", "users", { short: "Team" });
+    add("/live", "Live sales", "trend", { short: "Live" });
+    add("/employees", "Employees", "users", { short: "People" });
+    if (can("stock")) add("/morning", "Morning stock", "box", { short: "Stock" });
+  }
+  if (u.employee_id) add("/me", "My page", "user");
+  return out;
+}
+// Which side-menu item lights up for a page.
+function navFor(path) {
+  const inMenu = menuItems().map((m) => m.path);
+  const sec = sectionOf(path);
+  const want = sec === "payroll" ? ["/payroll"] : sec === "setup" ? ["/users"]
+    : path.startsWith("/hubs") ? [hubEntry()] : path.startsWith("/employees") ? ["/employees", hubEntry()] : [path, hubEntry(), "/hubs", "/"];
+  return want.find((x) => inMenu.includes(x)) || null;
+}
 const roleText = (r) => ({ staff: "Staff portal", coacher: "Coacher", manager: "Manager" }[r] || r);
-const groupOf = (path) => {
-  let g = "";
-  for (const n of NAV) { if (n.group) g = n.group; else if (n.path === path) return g; }
-  return "";
-};
 
 const pageCache = {};
 async function loadPage(name) {
@@ -106,11 +146,20 @@ export async function navigate(path, replace = false) {
 
 function resolve(pathname) {
   if (pathname === "/" && !can("read") && can("read_team")) return { page: "team", nav: "/team", params: [], perm: "read_team" }; // a manager lands on their team
+  const w = WS_RE.exec(pathname);
+  if (w) { // a hub workspace: /hubs/J1, /hubs/J1/people, /hubs/J1/sales/daily ...
+    const [, hub, tab = "overview", sub = ""] = w;
+    const spec = WS_TABS.find((t) => t.key === tab);
+    const hit = spec.subs ? spec.subs.find((x) => x[0] === sub) : (sub ? null : ["", spec.label, spec.page]);
+    if (!hit) return { page: null, nav: null, params: [] };
+    const page = spec.subs ? hit[2] : spec.page;
+    return { page, nav: navFor(pathname), params: tab === "overview" ? [hub] : [], perm: spec.perm || permOfPage(page), ws: { hub, tab, sub, label: spec.label, subLabel: hit[1] } };
+  }
   const n = NAV.find((x) => x.path === pathname && x.page);
-  if (n) return { page: n.page, nav: n.path, params: [], perm: n.perm };
+  if (n) return { page: n.page, nav: navFor(pathname), params: [], perm: n.perm };
   for (const r of EXTRA_ROUTES) {
     const m = r.re.exec(pathname);
-    if (m) return { page: r.page, nav: r.nav, params: m.slice(1), perm: r.perm };
+    if (m) return { page: r.page, nav: r.nav === null ? null : navFor(pathname), params: m.slice(1), perm: r.perm };
   }
   return { page: null, nav: null, params: [] };
 }
@@ -136,14 +185,7 @@ function periodPicker() {
 
 // The five things people open most, as a bar at the bottom of a phone. "More" opens the full menu.
 function bottomNav() {
-  const items = [
-    can("read") ? ["/", "Home", "dashboard"] : can("read_team") ? ["/team", "Team", "users"] : null,
-    can("enter_data") ? ["/daily", "Daily", "sheet"] : null,
-    can("stock") ? ["/morning", "Stock", "box"] : null,
-    can(["read", "read_team"]) ? ["/live", "Live", "trend"] : null,
-    can("view_pay") ? ["/payroll", "Payroll", "play"] : null,
-    can(["read", "read_team"]) ? ["/employees", "People", "users"] : null,
-  ].filter(Boolean).slice(0, 4);
+  const items = menuItems().slice(0, 4).map((m) => [m.path, m.short || m.label, m.icon]);
   return `<nav class="bottom-nav" id="bnav" aria-label="Main">${items.map(([path, label, ic]) =>
     `<a href="${path}" data-link data-nav="${path}">${icon(ic)}<span>${label}</span></a>`).join("")}
     <button type="button" id="bnav-more" aria-controls="sidebar" aria-haspopup="true">${icon("menu")}<span>More</span><span class="dot" id="more-dot" hidden></span></button></nav>`;
@@ -158,9 +200,8 @@ function shell() {
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
       <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
       <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
-      <nav class="nav" id="nav" aria-label="Sections">${NAV.filter(navShown).map((n) => n.group
-        ? `<div class="nav-group" aria-hidden="true">${esc(n.group)}</div>`
-        : `<a href="${n.path}" data-link data-nav="${n.path}" title="${esc(n.label)}">${icon(n.icon)}<span>${esc(n.label)}</span>${n.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
+      <nav class="nav" id="nav" aria-label="Main">${menuItems().map((m) =>
+        `<a href="${m.path}" data-link data-nav="${m.path}" title="${esc(m.label)}">${icon(m.icon)}<span>${esc(m.label)}</span>${m.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
       </nav>
       <div class="sidebar-foot">Signed in as <b>${esc(u.username)}</b><br>${esc(roleText(u.role))}${u.hub ? ` · hub ${esc(u.hub)}` : ""}</div>
     </aside>
@@ -191,6 +232,7 @@ function shell() {
         </div>
       </header>
       <div class="filterbar" id="filterbar"></div>
+      <div id="wsbar"></div>
       <main class="content" id="view" tabindex="-1"></main>
     </div>
   </div>
@@ -228,10 +270,10 @@ function shell() {
 
 // ---- mobile sidebar
 let sidebarOpen = false;
-let rail = store.get("pr.rail") === "1"; // desktop: icons-only sidebar, frees width for the sheets
+let rail = store.get("pr.rail2") === "1"; // desktop: icons-only sidebar, frees width for the sheets
 function setRail(on) {
   rail = on;
-  store.set("pr.rail", on ? "1" : "0");
+  store.set("pr.rail2", on ? "1" : "0");
   syncSidebar();
 }
 function syncSidebar() {
@@ -381,11 +423,51 @@ function nameTables(root) {
   });
 }
 
+const sep = `<span class="crumb-sep" aria-hidden="true">›</span>`;
+function crumbsFor(route, mod) {
+  if (route.ws) {
+    const h = state.hubs.find((x) => x.code === route.ws.hub);
+    const base = state.user.hub ? "" : `<a class="crumb-group" href="/hubs" data-link>Hubs</a>${sep}`;
+    return `${base}<span class="crumb-group">${esc(h ? h.name : route.ws.hub)}</span>${sep}<b>${esc(route.ws.subLabel)}</b>`;
+  }
+  const sec = sectionOf(location.pathname);
+  return sec ? `<span class="crumb-group">${esc(SECTIONS[sec].label)}</span>${sep}<b>${esc(mod.title)}</b>` : `<b>${esc(mod.title)}</b>`;
+}
+
+// The strip under the top bar: the sections of the open hub (with a hub switcher for the admin), or the pages of Payroll / Setup.
+function drawBar(route) {
+  const bar = $("#wsbar");
+  if (!bar) return;
+  const filter = $(".hub-filter");
+  if (filter) filter.hidden = !!route?.ws; // inside a hub the hub is already chosen
+  if (route?.ws) {
+    const { hub, tab, sub } = route.ws;
+    const h = state.hubs.find((x) => x.code === hub);
+    const base = `/hubs/${encodeURIComponent(hub)}`;
+    const tabs = WS_TABS.filter((t) => (t.subs ? t.subs.some((x) => can(permOfPage(x[2]))) : can(t.perm || permOfPage(t.page))));
+    const subs = (WS_TABS.find((t) => t.key === tab).subs || []).filter((x) => can(permOfPage(x[2])));
+    bar.innerHTML = `<div class="ws">
+      <div class="ws-top"><span class="ws-hub">${esc(h ? h.name : hub)}</span><span class="faint">${esc(hub)}</span>
+        ${!state.user.hub && state.hubs.length > 1 ? `<label class="sr-only" for="ws-switch">Switch hub</label><select id="ws-switch" class="input sm">${state.hubs.map((x) => `<option value="${esc(x.code)}" ${x.code === hub ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>` : ""}</div>
+      <nav class="ws-tabs" aria-label="Hub sections">${tabs.map((t) => `<a href="${base}${t.key === "overview" ? "" : "/" + t.key}" data-link${t.key === tab ? ' aria-current="page"' : ""}>${esc(t.label)}</a>`).join("")}</nav>
+      ${subs.length > 1 ? `<nav class="ws-sub" aria-label="${esc(route.ws.label)} pages">${subs.map((x) => `<a href="${base}/${tab}${x[0] ? "/" + x[0] : ""}" data-link${x[0] === sub ? ' aria-current="page"' : ""}>${esc(x[1])}</a>`).join("")}</nav>` : ""}</div>`;
+    $("#ws-switch")?.addEventListener("change", (e) => navigate(location.pathname.replace(`/hubs/${hub}`, `/hubs/${e.target.value}`)));
+    return;
+  }
+  const sec = route ? sectionOf(location.pathname) : null;
+  if (sec) {
+    const tabs = SECTIONS[sec].tabs.filter(([p]) => can(permOfPath(p)));
+    bar.innerHTML = `<div class="ws"><nav class="ws-tabs" aria-label="${esc(SECTIONS[sec].label)} pages">${tabs.map(([p, l]) => `<a href="${p}" data-link${p === location.pathname ? ' aria-current="page"' : ""}>${esc(l)}</a>`).join("")}</nav></div>`;
+  } else bar.innerHTML = "";
+}
+
 export async function render({ moveFocus = false } = {}) {
   const seq = ++renderSeq;
   dirtyCheck = null;
   if (isStaff() && !["/me", "/account"].includes(location.pathname)) history.replaceState({}, "", "/me");
-  const { page, nav, params, perm } = resolve(location.pathname);
+  const route = resolve(location.pathname);
+  const { page, nav, params, perm, ws } = route;
+  state.routeHub = ws ? ws.hub : "";
   $$("#nav a, #bnav a").forEach((a) => {
     const on = a.dataset.nav === nav;
     a.classList.toggle("active", on);
@@ -398,11 +480,15 @@ export async function render({ moveFocus = false } = {}) {
   old.replaceWith(view);
   view.setAttribute("aria-busy", "true");
   view.innerHTML = `<div class="loading-screen"><div class="spinner" role="img" aria-label="Loading"></div></div>`;
-  const blocked = !page ? ["Page not found", "There is no page at this address."] : perm && !can(perm) ? ["No access", `Your role (${state.user.role}) cannot open this page.`] : null;
+  const blocked = !page ? ["Page not found", "There is no page at this address."]
+    : ws && !state.hubs.some((h) => h.code === ws.hub) ? ["Hub not found", "There is no hub with this code, or it is not yours."]
+    : ws && state.user.hub && ws.hub !== state.user.hub ? ["No access", "This is another hub. You can open your own hub only."]
+    : perm && !can(perm) ? ["No access", `Your role (${state.user.role}) cannot open this page.`] : null;
   if (blocked) {
     view.removeAttribute("aria-busy");
     document.title = `${blocked[0]} · ${state.settings.company_name || "Payroll"}`;
     $("#crumbs").innerHTML = `<b>${esc(blocked[0])}</b>`;
+    drawBar(null);
     view.innerHTML = `<div class="page-head"><div><h1>${esc(blocked[0])}</h1><p>${esc(blocked[1])}</p></div></div><a class="btn" href="${isStaff() ? "/me" : "/"}" data-link>${isStaff() ? "Back to my page" : "Back to the dashboard"}</a>`;
     if (moveFocus) { const h = view.querySelector("h1"); h.tabIndex = -1; h.focus({ preventScroll: true }); }
     return;
@@ -410,8 +496,8 @@ export async function render({ moveFocus = false } = {}) {
   try {
     const mod = await loadPage(page);
     if (seq !== renderSeq) return;
-    const group = groupOf(nav);
-    $("#crumbs").innerHTML = `${group ? `<span class="crumb-group">${esc(group)}</span><span class="crumb-sep" aria-hidden="true">›</span>` : ""}<b>${esc(mod.title)}</b>`;
+    drawBar(route);
+    $("#crumbs").innerHTML = crumbsFor(route, mod);
     document.title = `${mod.title} · ${state.settings.company_name || "Payroll"}`;
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq !== renderSeq) return;
@@ -480,7 +566,7 @@ export async function boot() {
 
 // Once the first screen is up, fetch the code of the other pages in the background so the next tap has nothing to download.
 function warmPages() {
-  const names = [...new Set(NAV.filter((n) => n.page && navShown(n)).map((n) => n.page)), "employee", "hub"];
+  const names = [...new Set(NAV.filter((n) => n.page && (!n.perm || can(n.perm))).map((n) => n.page)), "employee", "hub"];
   const run = () => names.forEach((n) => loadPage(n).catch(() => {}));
   if ("requestIdleCallback" in window) requestIdleCallback(run, { timeout: 3000 }); else setTimeout(run, 1500);
 }

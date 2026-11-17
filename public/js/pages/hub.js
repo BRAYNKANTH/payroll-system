@@ -39,18 +39,12 @@ export default {
       </li>`;
     };
     const tops = kids[""] || [];
-    const idx = hubs.findIndex((h) => h.code === code);
-    const go = (i) => navigate(`/hubs/${encodeURIComponent(hubs[(i + hubs.length) % hubs.length].code)}`);
 
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>${hub.name}</h1><p>${hub.code}${hub.location ? ` · ${hub.location}` : ""} · ${active.length} active ${active.length === 1 ? "member" : "members"} · sales ${compact(live.people.reduce((t, p) => t + p.business, 0))} this month</p></div>
         <div class="actions">
-          <a class="btn" href="/hubs" data-link>${icon("store")} All hubs</a>
-          ${hubs.length > 1 ? html`<button class="btn" id="prev" aria-label="Previous hub">&larr;</button>
-            <select class="input" id="sw" aria-label="Switch hub" style="width:auto">${hubs.map((h) => html`<option value="${h.code}" ${h.code === code ? "selected" : ""}>${h.name}</option>`)}</select>
-            <button class="btn" id="next" aria-label="Next hub">&rarr;</button>` : ""}
-          ${can("manage_staff") ? html`<a class="btn primary" href="/employees" data-link>${icon("plus")} Add member</a>` : ""}
+          ${can(["manage_staff", "manage_team"]) ? html`<a class="btn primary" href="/hubs/${encodeURIComponent(code)}/people" data-link>${icon("users")} People in this hub</a>` : ""}
         </div>
       </div>
       <div class="card mb-4"><div class="card-head"><h2>Reporting chain</h2><div class="sub">Top of the chain first. Tap anyone to open their record.</div></div>
@@ -77,8 +71,5 @@ export default {
       ],
     }).toString();
 
-    $("#prev")?.addEventListener("click", () => go(idx - 1));
-    $("#next")?.addEventListener("click", () => go(idx + 1));
-    $("#sw")?.addEventListener("change", (e) => navigate(`/hubs/${encodeURIComponent(e.target.value)}`));
   },
 };

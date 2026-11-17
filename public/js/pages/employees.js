@@ -196,6 +196,7 @@ export default {
     const staff = await get("/api/staff" + qs({ hub: scopeHub() }));
     const byId = Object.fromEntries(staff.map((s) => [s.employee_id, s]));
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
+    if (scopeHub() && filters.group === "hub") filters.group = "staff_level"; // one hub: group by position instead
 
     const allCols = [
       { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
@@ -224,7 +225,7 @@ export default {
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
             <select class="input sm" id="role" aria-label="Filter by position" style="width:auto"><option value="">All positions</option>${LEVELS.map(([v, l]) => html`<option value="${v}" ${filters.role === v ? "selected" : ""}>${l}</option>`)}</select>
             <div class="seg" id="st" role="group" aria-label="Filter by status">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.status === v)}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
-            <div class="seg" id="grp" role="group" aria-label="Group by">${[["hub", "By hub"], ["staff_level", "By position"], ["", "No grouping"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
+            <div class="seg" id="grp" role="group" aria-label="Group by">${[...(scopeHub() ? [] : [["hub", "By hub"]]), ["staff_level", "By position"], ["", "No grouping"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
           </div>
           <details class="colpick"><summary class="btn sm">${icon("sheet")} Columns</summary>
             <div class="colpick-menu" role="group" aria-label="Choose the columns to show">${allCols.filter((c) => c.key !== "name").map((c) => html`<label><input type="checkbox" data-col="${c.key}" ${hiddenCols.includes(c.key) ? "" : "checked"}> ${c.label}</label>`)}</div></details>
