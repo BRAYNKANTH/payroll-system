@@ -155,4 +155,4 @@ async function live(db, { period, hub }, canPay) {
   return { period, can_pay: !!canPay, unconfirmed: people.reduce((t, p) => t + p.unconfirmed, 0), feed, people };
 }
 
-module.exports = { addSale, removeSale, confirm, live, today, DAYS_BACK };
+module.exports = { addSale, removeSale, confirm, live, today, addDays, rupees, myself, DAYS_BACK };

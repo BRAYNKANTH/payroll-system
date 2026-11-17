@@ -15,6 +15,8 @@ const loans = require("./loans");
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const target = args[0] || process.env.DATABASE_URL || path.join(__dirname, "data", "demo");
 const remote = /^postgres/.test(target);
+// A hosted database normally gets random passwords. --demo-passwords keeps the well-known demo ones (admin123, staff123 ...) there too, and also creates the demo "admin" login next to the owner's own account.
+const demoPw = process.argv.includes("--demo-passwords");
 
 (async () => {
 if (remote) {
@@ -47,12 +49,16 @@ const DEMO_USERS = [
   ["manager3", "Selvi Anand (Jaffna 03 manager)", "manager", "J3", "manager123"],
 ];
 // A hosted database is reachable from the internet, so it never gets the well-known demo passwords.
-if (remote) for (const u of DEMO_USERS) u[4] = "Pw" + crypto.randomBytes(6).toString("base64url") + "7";
+if (remote && !demoPw) for (const u of DEMO_USERS) u[4] = "Pw" + crypto.randomBytes(6).toString("base64url") + "7";
 // A hosted database already has its owner's admin account: keep it, and do not create another.
 const existingAdmin = await d.get("SELECT username FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
 if (!existingAdmin) await auth.setup(d, { username: DEMO_USERS[0][0], full_name: DEMO_USERS[0][1], password: DEMO_USERS[0][4] });
 const adminUser = { username: existingAdmin?.username || DEMO_USERS[0][0] };
 const created = [];
+if (existingAdmin && demoPw && !(await d.get("SELECT 1 AS x FROM users WHERE lower(username) = lower(?)", DEMO_USERS[0][0]))) {
+  await auth.createUser(d, adminUser, { username: DEMO_USERS[0][0], full_name: DEMO_USERS[0][1], role: "admin", password: DEMO_USERS[0][4] });
+  created.push(DEMO_USERS[0][0]);
+}
 
 // Pay setup per position. Distributors and supervisors are the same level and differ only in target and rates. A manager's target is weekly.
 const PAY = {
@@ -122,11 +128,12 @@ await add("staff", { employee_id: "D11", name: "Kumar Vel", hub: "J1", staff_lev
 const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"], ["coacher1", "Jegan Muthiah", "C01"], ["promo1", "Hari Prasath", "PM01"], ["mgrme1", "Arun Selvam", "M01"],
   ["coacher2", "Mala Krishnan", "C02"], ["coacher3", "Rajan Thevar", "C03"], ["promo2", "Ganesan Pillai", "PM02"], ["mgrme2", "Ravi Shankar", "M02"],
   ["mgrme3", "Selvi Anand", "M03"], ["anitha", "Anitha Jegan", "D04"], ["sutha", "Sutha Pillai", "D07"], ["dinesh", "Dinesh Prabu", "S03"], ["kumar", "Kumar Vel", "D11"]]
-  .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
+  .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote && !demoPw ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
 for (const [username, full_name, employee_id, password] of PORTAL_USERS) {
   await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id, password });
 }
 const sellers = TEAM.filter((t) => t[5] > 0); // everyone who sells, managers included
+const todaySL = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10); // today in Sri Lanka
 
 // Deterministic pseudo-random so the demo is reproducible
 let seed = 42;
@@ -139,6 +146,7 @@ async function month(period, { short = {}, growth = 1, draws = {}, stockShort = 
   for (const [id, , , , , usual, attend] of sellers) {
     for (let day = 1; day <= days; day++) {
       if (new Date(y, m - 1, day).getDay() === 0) continue; // closed Sundays
+      if (`${period}-${String(day).padStart(2, "0")}` >= todaySL) continue; // today and later are still to come: sellers record today on their phone
       if (rnd() > attend) continue;
       const date = `${period}-${String(day).padStart(2, "0")}`;
       const business = Math.round((usual * (0.85 + rnd() * 0.3) * growth) / 10) * 10;
@@ -239,9 +247,19 @@ for (let o = 1; ym(o) <= currentMonth; o++) {
   await svc.runPeriod(d, ym(o), "admin");
 }
 
+// This morning's stock: every seller is given some of each product, so the till on their phone is ready to use.
+const pos = require("./pos");
+const idOf = async (name) => Number((await d.get("SELECT id FROM products WHERE name = ?", name)).id);
+const [shineId, vimId] = [await idOf("Shine"), await idOf("Vim")];
+for (const [id, , , , , usual] of sellers) {
+  if ((await d.get("SELECT status FROM staff WHERE employee_id = ?", id)).status !== "active") continue; // someone who has left gets none
+  const bump = Math.round(usual / 1000);
+  await pos.give(d, adminUser, { employee_id: id, lines: [{ product_id: shineId, qty: 8 + bump }, { product_id: vimId, qty: 6 + bump }], note: "Morning stock" }, null);
+}
+
 console.log(`Seeded ${remote ? "the Postgres database from DATABASE_URL" : target}`);
 console.log(remote ? "Sign-ins (random passwords — save them now, they are not shown again):" : "Demo sign-ins:");
-for (const [u, , r, h, p] of DEMO_USERS.slice(existingAdmin ? 1 : 0)) {
+for (const [u, , r, h, p] of DEMO_USERS.slice(existingAdmin && !created.includes(DEMO_USERS[0][0]) ? 1 : 0)) {
   console.log(`  ${u.padEnd(10)} ${!existingAdmin || created.includes(u) ? p : "(already existed, password unchanged)"}  ${r}${h ? ", " + h : ""}`);
 }
 for (const [u, , e, p] of PORTAL_USERS) console.log(`  ${u.padEnd(10)} ${p}  staff portal (${e})`);

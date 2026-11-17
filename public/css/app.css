@@ -1246,3 +1246,100 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .auth-foot svg { margin-top: 3px; flex-shrink: 0; }
 .caps-warn { display: flex; gap: 6px; align-items: center; color: var(--warning); font-size: var(--t-sm); }
 .btn .btn-label { display: inline; }
+
+/* ---------- The till: selling one product at a time ---------- */
+.till { display: grid; gap: 16px; }
+.till .card { margin: 0; }
+.till-head { padding: 20px 22px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: #fff; border: 0; }
+.till-date { font-size: 14px; opacity: .85; }
+.till-total { font-size: 44px; line-height: 1.1; font-weight: 700; margin: 4px 0 2px; letter-spacing: -.01em; }
+.till-total small { font-size: 18px; font-weight: 600; opacity: .8; margin-right: 6px; }
+.till-sub { font-size: 14.5px; opacity: .9; }
+.till-lock { margin-top: 12px; padding: 8px 12px; border-radius: var(--radius-sm); background: rgba(255,255,255,.18); display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.till-lock svg { width: 16px; height: 16px; }
+.till-search { position: relative; margin-bottom: 14px; }
+.till-search > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); display: grid; color: var(--text-3); pointer-events: none; }
+.till-search .input { height: 52px; padding-left: 44px; font-size: 17px; border-radius: 14px; }
+.till-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.till-prod { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 92px; padding: 14px; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; color: var(--text); font: inherit; transition: border-color .12s ease, box-shadow .12s ease, transform .08s ease; }
+.till-prod:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
+.till-prod:active { transform: scale(.98); }
+.till-prod:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.till-prod.on { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 3px var(--primary-soft); }
+.till-prod.out { opacity: .55; cursor: not-allowed; background: var(--surface-3); }
+.tp-name { font-weight: 650; font-size: 17px; line-height: 1.25; }
+.tp-price { font-size: 15px; color: var(--text-2); }
+.tp-left { margin-top: auto; font-size: 13.5px; font-weight: 600; color: var(--success); }
+.tp-left.low { color: var(--warning); }
+.tp-left.none { color: var(--text-3); }
+
+.till-sheet { position: sticky; bottom: 12px; z-index: 5; padding: 16px; border: 1.5px solid var(--primary); box-shadow: 0 12px 32px -8px rgba(15, 23, 42, .28); border-radius: 20px; background: var(--surface); }
+.ts-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ts-name { font-size: 20px; }
+.ts-qty { display: grid; grid-template-columns: 64px 1fr 64px; gap: 10px; margin: 14px 0 10px; align-items: stretch; }
+.ts-step { display: grid; place-items: center; min-height: 64px; border-radius: 16px; border: 1.5px solid var(--border-strong); background: var(--surface-3); color: var(--text); cursor: pointer; }
+.ts-step svg { width: 26px; height: 26px; }
+.ts-step:active { transform: scale(.96); }
+.ts-step:disabled { opacity: .4; cursor: not-allowed; }
+.ts-step:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ts-qty .input { height: 64px; text-align: center; font-size: 30px; font-weight: 700; border-radius: 16px; padding: 0; }
+.ts-quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip-btn { min-width: 48px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text); font: 600 15px var(--font); cursor: pointer; }
+.chip-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.chip-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.till-sell { width: 100%; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 22px; border: 0; border-radius: 18px;
+  background: var(--success); color: #fff; font: 700 18px var(--font); cursor: pointer; box-shadow: 0 6px 16px -6px rgba(27, 128, 58, .6); transition: transform .08s ease, filter .12s ease; }
+.till-sell b { font-size: 20px; }
+.till-sell:hover { filter: brightness(1.05); }
+.till-sell:active { transform: scale(.985); }
+.till-sell:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+.till-sell.loading, .till-sell:disabled { opacity: .7; pointer-events: none; }
+
+.till-stock { width: 100%; border-collapse: collapse; font-size: 15px; }
+.till-stock th, .till-stock td { padding: 12px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+.till-stock thead th { font-size: 12.5px; color: var(--text-2); font-weight: 650; }
+.till-stock th:first-child, .till-stock td:first-child { text-align: left; padding-left: 18px; }
+.till-stock tbody th { font-weight: 650; color: var(--text); }
+.till-stock td.left { font-size: 18px; }
+.till-stock td.left.low b { color: var(--warning); }
+.till-stock .tag { margin-left: 6px; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--warning-soft); color: var(--warning); vertical-align: middle; }
+.till-stock tr.none td, .till-stock tr.none th { color: var(--text-3); }
+.till-lines { list-style: none; margin: 0; padding: 0; }
+.till-lines li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.till-lines li:last-child { border-bottom: 0; }
+.tl-main { display: flex; flex-direction: column; min-width: 0; }
+.tl-main b { font-size: 16px; }
+.tl-main .muted { font-size: 13.5px; }
+.tl-amt { font-weight: 700; font-size: 16px; }
+.eod-sum { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-3); font-size: 15px; }
+.eod-sum b { text-align: right; }
+@media (max-width: 860px) {
+  .till-sheet { bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .till-total { font-size: 40px; }
+  .till-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .till-lines li .btn.sm { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .till-prod, .till-sell, .ts-step { transition: none; } .till-prod:active, .till-sell:active, .ts-step:active { transform: none; } }
+
+/* ---------- Morning stock: one card per seller ---------- */
+.mcard { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; margin: 0; }
+.mc-top { display: flex; align-items: center; gap: 12px; }
+.mc-who { display: flex; flex-direction: column; min-width: 0; }
+.mc-who b { font-size: 17px; }
+.mc-block { display: flex; flex-direction: column; gap: 6px; }
+.mc-label { font-size: 12.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--text-2); }
+.mc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; background: var(--surface-3); font-size: 14.5px; font-weight: 600; }
+.mc-chip.given { background: var(--success-soft); color: var(--success); }
+.mc-x { display: grid; place-items: center; width: 28px; height: 28px; margin: -2px -6px -2px 0; border: 0; background: none; color: inherit; border-radius: 50%; cursor: pointer; }
+.mc-x:hover { background: rgba(0,0,0,.08); }
+.mc-x:focus-visible { outline: 2px solid var(--primary); }
+.mc-x svg { width: 14px; height: 14px; }
+.mc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 4px; }
+.give-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.give-list li { display: grid; grid-template-columns: 1fr 92px; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
+.give-list li[hidden] { display: none; }
+.give-list label { display: flex; flex-direction: column; min-width: 0; }
+.give-list .input { height: 52px; text-align: center; font-size: 20px; font-weight: 700; }
+@media (max-width: 860px) { .mc-foot .btn { min-height: 44px; } .mc-x { width: 36px; height: 36px; } }

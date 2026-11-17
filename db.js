@@ -290,6 +290,33 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS products_name_lower ON products (lower(name));
 
+-- Stock the hub gives a seller (usually each morning): one row per product given. A seller's stock is everything given minus everything sold.
+CREATE TABLE IF NOT EXISTS stock_issues (
+  id          bigserial PRIMARY KEY,
+  date        text NOT NULL ${DATE_CHECK("date")},
+  employee_id text NOT NULL REFERENCES staff(employee_id),
+  product_id  bigint NOT NULL REFERENCES products(id),
+  qty         integer NOT NULL CHECK (qty > 0),
+  note        text,
+  created_by  text NOT NULL,
+  created_at  text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS stock_issues_emp ON stock_issues (employee_id, date);
+
+-- One row per sale a seller records on their phone: a product, a quantity and the list price at that moment. A day's business total is the sum of these.
+CREATE TABLE IF NOT EXISTS sale_lines (
+  id          bigserial PRIMARY KEY,
+  date        text NOT NULL ${DATE_CHECK("date")},
+  employee_id text NOT NULL REFERENCES staff(employee_id),
+  product_id  bigint NOT NULL REFERENCES products(id),
+  qty         integer NOT NULL CHECK (qty > 0),
+  unit_price  bigint NOT NULL CHECK (unit_price > 0),
+  amount      bigint NOT NULL CHECK (amount > 0),
+  created_by  text NOT NULL,
+  created_at  text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS sale_lines_emp ON sale_lines (employee_id, date);
+
 CREATE TABLE IF NOT EXISTS loans (
   id             bigserial PRIMARY KEY,
   employee_id    text NOT NULL REFERENCES staff(employee_id),
@@ -438,6 +465,8 @@ const AUDITED = {
   allowances:  { key: "id", period: "period" },
   loans:       { key: "id", period: null },
   products:    { key: "id", period: null },
+  stock_issues: { key: "id", period: "date" },
+  sale_lines:  { key: "id", period: "date" },
 };
 
 function triggerSql() {

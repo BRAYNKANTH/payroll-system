@@ -2,8 +2,11 @@
 import { get, post, del } from "../api.js";
 import { state } from "../app.js";
 import { $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime } from "../ui.js";
+import { mountSell } from "./sell.js";
 
 let tab = "month";
+let tabInit = false; // the first time the page opens, a seller lands on the till
+let dirty = false;   // something was sold or changed in the till, so the month figures need a refresh
 const DOC_TYPES = [["nic", "ID / NIC"], ["bank_book", "Bank book front page"], ["ol_results", "O/L results sheet"], ["other", "Other"]];
 const DOC_MAX = 3_000_000;
 const fileSize = (b) => (b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -132,6 +135,7 @@ export default {
     if (!ctx.refresh) el.innerHTML = skeleton(); // grey shapes in the layout of the page, instead of a spinner on a blank screen
     const d = await get("/api/me/portal?period=" + state.period);
     const me = d.me, m = d.month;
+    if (!tabInit) { tabInit = true; tab = me.sells ? "sell" : "month"; }
     const attain = m.target ? m.business / m.target : 0;
     const pay = d.official || d.estimate;
     const final = !!d.official;
@@ -142,7 +146,7 @@ export default {
           <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""}</p></div>
         <div class="actions"><a class="btn" href="/api/me/report.pdf?period=${d.period}" target="_blank" rel="noopener">${icon("file")} <span class="lbl-sm">My report (PDF)</span></a><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
-      <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[["month", "This month", "Month", "chart", ""],
+      <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[...(me.sells ? [["sell", "Sell", "Sell", "bag", ""]] : []), ["month", "This month", "Month", "chart", ""],
         ...(d.team ? [["team", "My team", "Team", "users", d.team.length]] : []), ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
         ...(d.loans.length ? [["loans", "Advances & loans", "Loans", "coins", d.loans.filter((l) => l.state !== "paid").length]] : []),
         ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
@@ -150,6 +154,7 @@ export default {
       <div id="pane"></div>`;
 
     const panes = {
+      sell: () => html`<div id="till" class="till"></div>`,
       month: () => html`
         <section class="hero" aria-label="Pay summary">
           <div class="h-top"><span>${monthName(d.period)}</span><span class="h-chip">${final ? "Final" : pay ? "Not final" : "Open"}</span></div>
@@ -180,15 +185,7 @@ export default {
           ${final ? "" : html`<div class="card-foot muted">The office calculates the final figure at the end of the month and may check some entries first. Your payslip appears here after the month is closed.</div>`}
         </section>` : html`<div class="card mb-4">${emptyState("No sales entered yet this month", "When your daily sales are entered, your progress and an estimate of your pay appear here.", "chart")}</div>`}
 
-        ${me.sells ? html`<section class="card mb-4" id="addsale"><div class="card-head"><div><h2>Add your sales</h2><div class="sub">Enter a day's sales and the money you handed in. Your hub manager confirms it. Until then you can correct or remove it.</div></div></div>
-          <form id="sf" class="card-body form-grid" autocomplete="off">
-            <div class="field"><label for="sf-date">Day</label><input class="input" id="sf-date" type="date" name="date" value="${slToday()}" min="${slToday(-7)}" max="${slToday()}" required></div>
-            <div class="field"><label for="sf-biz">Sales (Rs)</label><input class="input" id="sf-biz" name="business_amount" inputmode="decimal" required></div>
-            <div class="field"><label for="sf-set">Money handed in (Rs)</label><input class="input" id="sf-set" name="settled_amount" inputmode="decimal" required></div>
-            <div class="field"><label for="sf-adv">Advance taken (Rs)</label><input class="input" id="sf-adv" name="personal_minus" inputmode="decimal" placeholder="0"></div>
-            <div class="field full"><label for="sf-note">Note</label><input class="input" id="sf-note" name="notes" maxlength="200" placeholder="Optional"></div>
-            <div class="full"><button class="btn primary" id="sf-save" type="submit">${icon("check")} Save sales</button> <span class="muted">Saving the same day again replaces it.</span></div>
-          </form></section>` : ""}
+
 
         ${me.senior ? "" : html`<section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>`}
         ${m.stock.length ? html`<section class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></section>` : ""}
@@ -258,6 +255,7 @@ export default {
       pane.innerHTML = panes[tab]().toString();
       if (animate) { pane.classList.remove("pane-in"); void pane.offsetWidth; pane.classList.add("pane-in"); }
       $$("#tabs button", el).forEach((b) => b.classList.toggle("on", b.dataset.t === tab));
+      if (tab === "sell") mountSell($("#till"), { onChanged: () => { dirty = true; } }).catch((e) => toast(e.message, "err"));
       if (tab === "month") {
         const daysEl = $("#days");
         if (daysEl) daysEl.innerHTML = m.daily.length ? both(
@@ -279,16 +277,7 @@ export default {
           })), row(`Total · ${m.days} day${m.days === 1 ? "" : "s"}`, money(m.business), { strong: true, vsub: m.settle_up ? `Not handed in ${money(m.settle_up)}` : "" })])) : emptyState("No days entered yet", "", "sheet").toString();
         if (m.stock.length && $("#stock")) $("#stock").innerHTML = group("", m.stock.map((r) => row(r.product, r.shortfall_value ? money(r.shortfall_value) : "—", { sub: `${r.shortfall_qty} missing × ${money(r.unit_price)}`, cls: r.shortfall_value ? "neg" : "" })));
         if (m.allowances.length && $("#allow")) $("#allow").innerHTML = group("", m.allowances.map((r) => row(r.description, money(r.amount))));
-        // Adding a day, and removing one that the office has not confirmed yet.
-        if ($("#sf")) $("#sf").onsubmit = (ev) => {
-          ev.preventDefault();
-          busy($("#sf-save"), async () => {
-            await post("/api/me/sales", Object.fromEntries(new FormData(ev.target)));
-            toast("Sales saved. Your hub manager will confirm them.");
-            buzz(12);
-            await this.render({ ...ctx, refresh: true });
-          });
-        };
+        // A day the seller entered themselves (older entries) can be taken back while the office has not confirmed it.
         $$("[data-rm]").forEach((b) => (b.onclick = () => busy(b, async () => {
           await del(`/api/me/sales/${b.dataset.rm}`);
           toast("Removed");
@@ -329,7 +318,12 @@ export default {
       }
       if (tab === "documents") drawDocs().catch((e) => toast(e.message, "err"));
     };
-    $$("#tabs button", el).forEach((b) => (b.onclick = () => { if (tab !== b.dataset.t) buzz(6); tab = b.dataset.t; show(); }));
+    $$("#tabs button", el).forEach((b) => (b.onclick = () => {
+      if (tab === b.dataset.t) return;
+      buzz(6);
+      const was = tab; tab = b.dataset.t;
+      if (was === "sell" && dirty) { dirty = false; this.render({ ...ctx, refresh: true }); } else show();
+    }));
     if (!panes[tab] || (tab === "loans" && !d.loans.length)) tab = "month";
     show(!ctx.refresh);
 

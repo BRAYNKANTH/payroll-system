@@ -11,6 +11,7 @@ const svc = require("./service");
 const loans = require("./loans");
 const products = require("./products");
 const sales = require("./sales");
+const pos = require("./pos");
 const exporter = require("./export");
 const people = require("./people");
 const auth = require("./auth");
@@ -141,6 +142,15 @@ function createHandler(dbReady) {
       const f = exporter.personReportPdf(d, { canPay: auth.can(user, "view_pay"), company: (await db.getSettings(database)).company_name || "" });
       return { download: f.data, type: f.type, filename: f.filename };
     }],
+    // Selling like a till: the seller's own screen (their stock, today's sales, the end-of-day cash).
+    ["GET", /^\/api\/me\/pos$/, "self", ({ user }) => pos.state(database, user)],
+    ["POST", /^\/api\/me\/pos\/sell$/, "self", ({ user, body }) => pos.sell(database, user, body)],
+    ["DELETE", /^\/api\/me\/pos\/sale\/(\d+)$/, "self", ({ user, m }) => pos.undo(database, user, m[1])],
+    ["POST", /^\/api\/me\/pos\/day$/, "self", ({ user, body }) => pos.endOfDay(database, user, body)],
+    // The office gives each seller their stock for the day.
+    ["GET", /^\/api\/stock-issues$/, "enter_data", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
+    ["POST", /^\/api\/stock-issues$/, "enter_data", ({ user, body }) => pos.give(database, user, body, user.hub)],
+    ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "enter_data", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],
     ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],
     ["DELETE", /^\/api\/me\/sales\/(\d{4}-\d{2}-\d{2})$/, "self", ({ user, m }) => sales.removeSale(database, user, m[1])],
     ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],
