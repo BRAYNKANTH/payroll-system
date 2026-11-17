@@ -117,7 +117,7 @@ function periodPicker() {
   for (let yy = Math.min(y, now - 3); yy <= Math.max(y, now + 1); yy++) years.push(yy);
   return `<div class="period-picker" role="group" aria-label="Pay period">
     <button type="button" id="prev-period" aria-label="Previous month">${icon("left")}</button>
-    <select id="period-month" aria-label="Month">${MONTHS.map((n, i) => `<option value="${i + 1}" ${i + 1 === m ? "selected" : ""}>${n}</option>`).join("")}</select>
+    <select id="period-month" aria-label="Month">${MONTHS.map((n, i) => `<option value="${i + 1}" ${i + 1 === m ? "selected" : ""}>${isMobile() ? n.slice(0, 3) : n}</option>`).join("")}</select>
     <span class="sep"></span>
     <select id="period-year" aria-label="Year">${years.map((yy) => `<option ${yy === y ? "selected" : ""}>${yy}</option>`).join("")}</select>
     <button type="button" id="next-period" aria-label="Next month">${icon("right")}</button>
@@ -156,7 +156,7 @@ function shell() {
         <div class="spacer"></div>
         <div class="filters" id="filters">
           ${isStaff() ? "" : u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
-          <select class="input sm" id="hub-filter" style="width:auto;min-width:140px" aria-label="Hub filter">
+          <select class="input sm hub-filter" id="hub-filter" aria-label="Hub filter">
             <option value="">All hubs</option>${hubOpts}</select>`}
           ${periodPicker()}
         </div>

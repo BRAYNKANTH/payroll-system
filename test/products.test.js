@@ -143,3 +143,13 @@ test("days before someone joined and after they left are not counted as missing"
   assert.ok(c.D1.expected < c.D2.expected);
   assert.ok(c.D1.missing.every((day) => day >= "2026-10-20"));
 });
+
+test("the stock sheets get active product names and selling prices, never the purchase price", async () => {
+  const d = await setup();
+  await products.create(d, { name: "Vim", list_price: 500, cost_price: 200 }, "admin");
+  const old = await products.create(d, { name: "Old soap", list_price: 100, cost_price: 50 }, "admin");
+  await products.update(d, old.id, { status: "inactive" }, "admin");
+  await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "admin");
+  assert.deepEqual(await products.names(d), [{ name: "Shine", list_price: 85000 }, { name: "Vim", list_price: 50000 }]);
+  for (const role of ["admin", "manager"]) assert.ok(auth.can({ role }, "enter_data"), role);
+});

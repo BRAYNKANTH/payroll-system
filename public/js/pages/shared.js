@@ -1,6 +1,6 @@
 // Helpers shared by several pages.
 import { get } from "../api.js";
-import { html, icon, monthName, parseAmount, formatAmount } from "../ui.js";
+import { html, icon, monthName, parseAmount, formatAmount, fromCents, money, announce } from "../ui.js";
 
 // Spreadsheet keyboard navigation: Enter / ↓ moves down, ↑ moves up, in the same column.
 export function sheetKeys(root) {
@@ -37,6 +37,35 @@ export function badNumber(field, value) {
   if (field === "unit_price") { const n = parseAmount(v); return !Number.isFinite(n) || n < 0; }
   return !/^\d+$/.test(v);
 }
+// ---- Product names on the stock sheets
+// `catalogue` is [{ name, list_price }] from /api/products/names. Product fields suggest these names (a datalist), so a
+// name is typed the same way every month; a name outside the list is still allowed but flagged.
+export const productList = (catalogue) =>
+  html`<datalist id="product-list">${catalogue.map((p) => html`<option value="${p.name}"></option>`)}</datalist>`;
+const findProduct = (catalogue, name) => {
+  const key = String(name || "").trim().toLowerCase();
+  return key ? catalogue.find((p) => p.name.toLowerCase() === key) : null;
+};
+// After a product field changes: use the catalogue's spelling, and fill in an empty price with the selling price.
+export function pickProduct(input, catalogue) {
+  if (!input?.matches?.("[data-f=product]")) return;
+  const p = findProduct(catalogue, input.value);
+  if (!p) return;
+  input.value = p.name;
+  const price = input.closest("tr")?.querySelector("[data-f=unit_price]");
+  if (price && !price.value.trim() && !price.disabled) {
+    price.value = fromCents(p.list_price);
+    announce(`${p.name}: unit price filled in as Rs ${money(p.list_price)} from the Products list`);
+  }
+}
+// How many of these product fields hold a name that is not in the catalogue (0 when there is no catalogue to check).
+export const unknownProducts = (catalogue, inputs) =>
+  catalogue.length ? inputs.filter((i) => i.value.trim() && !findProduct(catalogue, i.value)).length : 0;
+
+// Search box for a sheet; the page listens for input on #find.
+export const findBox = (label, placeholder) =>
+  html`<div class="search"><span>${icon("search")}</span><input class="input sm" id="find" type="search" autocomplete="off" aria-label="${label}" placeholder="${placeholder}" style="width:260px"></div>`;
+
 // The value of a stock field as a number: empty counts as 0. Only call it on a value badNumber accepts.
 export const stockNum = (value) => parseAmount(value) ?? 0;
 // Mark each number cell in a row that holds something that is not a number, or a required price left empty after a save attempt.

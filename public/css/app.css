@@ -1121,3 +1121,19 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .topbar .gsearch { flex: 1 1 200px; min-width: 160px; max-width: 320px; }
   .topbar .filters { flex-wrap: wrap; }
 }
+
+/* Stock sheets and phone header (P3 fixes). */
+.warn-text { color: var(--warning); }
+.table tr[hidden] { display: none; }
+.hub-filter { width: auto; min-width: 140px; }
+@media (max-width: 860px) {
+  /* The hub and month filters share one row, so the data starts higher on the screen. */
+  .filterbar .filters { flex-wrap: nowrap; }
+  .filterbar select.hub-filter { flex: 1 1 auto; min-width: 0; }
+  .filterbar .filters > .badge { flex: 1 1 auto; min-width: 0; }
+  .filterbar .period-picker { flex: none; }
+}
+/* Salaries cards on a phone: the exact amount stays, the long explanation goes. */
+@media (max-width: 860px) { .kpi .kpi-note { display: none; } }
+/* Small phones: a long button label keeps its first words so the header buttons fit on one line. */
+@media (max-width: 480px) { .lbl-long { display: none; } }

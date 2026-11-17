@@ -193,6 +193,7 @@ function createHandler(dbReady) {
     // Live sales: everyone who can read sees the sales; only those who may see pay get the commission and pay-so-far columns.
     ["GET", /^\/api\/live$/, "read", ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined }, auth.can(user, "view_pay"))],
     ["POST", /^\/api\/sales\/confirm$/, "enter_data", ({ user, body }) => sales.confirm(database, user, body, user.hub)],
+    ["GET", /^\/api\/products\/names$/, "enter_data", () => products.names(database)],
     ["GET", /^\/api\/products$/, "manage_products", () => products.list(database)],
     ["POST", /^\/api\/products$/, "manage_products", ({ user, body }) => products.create(database, body, user.username)],
     ["PUT", /^\/api\/products\/(\d+)$/, "manage_products", ({ user, body, m }) => products.update(database, m[1], body, user.username)],

@@ -1,7 +1,7 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
-import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, parseAmount } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers } from "./shared.js";
+import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, parseAmount, announce } from "../ui.js";
+import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers, productList, pickProduct, unknownProducts, findBox } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
 
 const INTS = ["opening_stock", "received", "issued", "counted_stock"];
@@ -14,9 +14,10 @@ export default {
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
-    const [lines, locked] = await Promise.all([
+    const [lines, locked, catalogue] = await Promise.all([
       get("/api/hubstock" + qs({ period: state.period, hub: scopeHub() })),
       periodLocked(state.period),
+      can("enter_data") ? get("/api/products/names").catch(() => []) : [],
     ]);
     const hubs = state.hubs.filter((h) => !scopeHub() || h.code === scopeHub());
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
@@ -30,7 +31,9 @@ export default {
           <button type="button" class="btn" id="add" ${hubs.length ? "" : "disabled"}>${icon("plus")} Add product</button>` : ""}</div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
-      <div class="card"><div class="card-body flush" id="grid"></div>
+      ${productList(catalogue)}
+      <div class="card">${lines.length && !isPhone() ? html`<div class="card-head">${findBox("Search hub stock", "Search hub or product")}<span class="muted" id="find-count"></span></div>` : ""}
+        <div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
           <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save hub stock</button></div>` : ""}</div>`;
 
@@ -56,7 +59,7 @@ export default {
           return html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${hubName(r.hub)}</b><div class="faint text-sm">${r.hub}</div>`
             : html`<select class="input sm" data-f="hub" aria-label="Hub" style="min-width:140px">${hubOptions(r._draft?.hub ?? r.hub)}</select>`}</td>
-          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
+          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" list="product-list" autocomplete="off" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
           ${INTS.map((k) => html`<td><input data-f="${k}" data-num aria-label="${LABEL[k]}, ${ctxLabel}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
           <td><input data-f="unit_price" data-num aria-label="Unit price in rupees, required, ${ctxLabel}" aria-required="true" placeholder="Price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-e></td><td class="calc" data-q></td><td class="calc" data-v></td>
@@ -65,6 +68,7 @@ export default {
         })}</tbody>
         <tfoot><tr><td colspan="8">Totals</td><td class="r" id="tot-short"></td><td class="r" id="tot-val"></td><td></td></tr></tfoot></table></div>`.toString();
       if (isPhone()) stackTable(grid.querySelector("table"));
+      applyFind();
       refresh();
     };
 
@@ -101,11 +105,12 @@ export default {
       });
       if ($("#tot-short")) $("#tot-short").innerHTML = short ? `<span class="neg">${money(short)} short</span>` : "—";
       if ($("#tot-val")) $("#tot-val").innerHTML = `<b>${money(value)}</b>`;
-      if ($("#info")) $("#info").innerHTML = (bad ? `<span class="neg">${bad} line${bad > 1 ? "s have" : " has"} a number that isn't valid. </span>` : "") +
+      const unknown = unknownProducts(catalogue, $$("tbody [data-f=product]", grid));
+      if ($("#info")) $("#info").innerHTML = (unknown ? `<span class="warn-text">${unknown} product name${unknown > 1 ? "s aren't" : " isn't"} in the Products list. </span>` : "") + (bad ? `<span class="neg">${bad} line${bad > 1 ? "s have" : " has"} a number that isn't valid. </span>` : "") +
         (dirty ? `${dirty} line${dirty > 1 ? "s" : ""} changed` : "No unsaved changes");
     };
     grid.addEventListener("input", refresh);
-    grid.addEventListener("change", refresh);
+    grid.addEventListener("change", (e) => { pickProduct(e.target, catalogue); refresh(); });
     grid.addEventListener("click", async (e) => {
       const b = e.target.closest("[data-del]");
       if (!b) return;
@@ -116,8 +121,28 @@ export default {
       if (!r.id) rows.splice(b.dataset.del, 1);
       draw();
     });
+    // Desktop search hides the lines that don't match; hidden lines still count in the totals and are still saved.
+    let find = "";
+    const applyFind = () => {
+      const trs = $$("tbody tr", grid);
+      trs.forEach((tr) => {
+        const r = rows[tr.dataset.i];
+        const text = [hubName(read(tr).hub ?? r.hub), read(tr).hub ?? r.hub, read(tr).product ?? r.product].join(" ").toLowerCase();
+        tr.hidden = !!find && r._state !== "new" && !text.includes(find);
+      });
+      if ($("#find-count")) $("#find-count").textContent = find ? `${trs.filter((tr) => !tr.hidden).length} of ${trs.length} lines` : "";
+    };
+    // Before putting the cursor in a hidden line, clear the search.
+    const reveal = (tr) => { if (tr?.hidden) { find = ""; if ($("#find")) $("#find").value = ""; applyFind(); } };
     sheetKeys(grid);
     draw();
+    let typing;
+    $("#find")?.addEventListener("input", (e) => {
+      find = e.target.value.trim().toLowerCase();
+      applyFind();
+      clearTimeout(typing);
+      typing = setTimeout(() => announce(find ? `${$("#find-count").textContent} shown` : "All lines shown"), 600);
+    });
 
     $("#add")?.addEventListener("click", () => {
       snap();
@@ -143,6 +168,7 @@ export default {
       // Numbers that are not numbers: name the lines and put the cursor on the first bad field.
       const badRows = trs.filter((tr) => rows[tr.dataset.i]._dirty && markBadNumbers(tr));
       if (badRows.length) {
+        reveal(badRows[0]);
         [...badRows[0].querySelectorAll("input[data-num]")].find((i) => badNumber(i.dataset.f, i.value))?.focus();
         throw new Error(`Check the numbers for ${listOf(badRows, 5)}. Stock is a whole number of units, and a price looks like 850 or 850.50.`);
       }
@@ -150,6 +176,7 @@ export default {
       const noPrice = trs.filter((tr) => rows[tr.dataset.i]._dirty && read(tr).unit_price === "");
       if (noPrice.length) {
         noPrice.forEach((tr) => { const i = tr.querySelector("[data-f=unit_price]"); i.dataset.missing = "1"; i.setAttribute("aria-invalid", "true"); });
+        reveal(noPrice[0]);
         noPrice[0].querySelector("[data-f=unit_price]").focus();
         throw new Error(`Add a price for ${listOf(noPrice, 5)}. Every product needs a unit price.`);
       }
@@ -158,8 +185,8 @@ export default {
         if (!r._dirty) continue;
         const v = read(tr);
         const product = v.product ?? r.product;
-        if (!product) { tr.querySelector("[data-f=product]")?.focus(); throw new Error("Every line needs a product name"); }
-        if (v.counted_stock === "") { tr.querySelector("[data-f=counted_stock]")?.focus(); throw new Error(`${product}: enter the counted stock`); }
+        if (!product) { reveal(tr); tr.querySelector("[data-f=product]")?.focus(); throw new Error("Every line needs a product name"); }
+        if (v.counted_stock === "") { reveal(tr); tr.querySelector("[data-f=counted_stock]")?.focus(); throw new Error(`${product}: enter the counted stock`); }
         out.push({ period: state.period, hub: v.hub ?? r.hub, product, opening_stock: v.opening_stock || 0, received: v.received || 0, issued: v.issued || 0,
           counted_stock: v.counted_stock, unit_price: String(parseAmount(v.unit_price)) });
       }

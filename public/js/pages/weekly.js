@@ -46,7 +46,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Weekly sheet</h1><p>One row per manager per week.${can("view_pay") ? " Weekly balance = business × profit % − rent − hub fee − security − personal draw." : ""}
-          Business starts as the manager's own sales plus his team's from the daily sheets. Profit is ${+(rule.high * 100).toFixed(2)}% when that reaches the manager's weekly target, otherwise ${+(rule.low * 100).toFixed(2)}%. You can change any figure.</p></div>
+          Business starts as the manager's own sales plus their team's from the daily sheets. Profit is ${+(rule.high * 100).toFixed(2)}% when that reaches the manager's weekly target, otherwise ${+(rule.low * 100).toFixed(2)}%. You can change any figure.</p></div>
         <div class="actions">${exportButtons("weekly", { period: state.period, hub: scopeHub() })}</div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}

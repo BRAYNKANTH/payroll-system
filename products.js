@@ -32,6 +32,11 @@ async function list(db) {
   return rows.map((p) => ({ ...p, ...economics(p.list_price, p.cost_price, settings) }));
 }
 
+// Active product names and selling prices for the stock sheets. Anyone who enters data may see these; the purchase price and profit stay admin-only.
+async function names(db) {
+  return db.all("SELECT name, list_price FROM products WHERE status = 'active' ORDER BY lower(name)");
+}
+
 function cleanName(raw) {
   const name = String(raw ?? "").trim();
   if (!name || name.length > 80) throw httpError(400, "Name is required (up to 80 characters)");
@@ -86,4 +91,4 @@ async function profitReport(db, period) {
   return { period, workers_rate: share, rows, totals: { revenue: sum("revenue"), workers: sum("workers"), cost: sum("cost"), profit: sum("profit"), unmatched: rows.filter((r) => !r.matched).length } };
 }
 
-module.exports = { list, create, update, profitReport, economics };
+module.exports = { list, names, create, update, profitReport, economics };

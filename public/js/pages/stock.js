@@ -1,7 +1,7 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
 import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, raw, parseAmount } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers } from "./shared.js";
+import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers, productList, pickProduct, unknownProducts, findBox } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
 import { announce } from "../ui.js";
 
@@ -18,10 +18,11 @@ export default {
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
-    const [staff, lines, locked] = await Promise.all([
+    const [staff, lines, locked, catalogue] = await Promise.all([
       get("/api/staff" + qs({ hub: scopeHub() })),
       get("/api/stock" + qs({ period: state.period, hub: scopeHub() })),
       periodLocked(state.period),
+      can("enter_data") ? get("/api/products/names").catch(() => []) : [],
     ]);
     const guys = staff.filter((s) => s.role === "guy");
     const names = Object.fromEntries(guys.map((g) => [g.employee_id, g.name]));
@@ -32,11 +33,13 @@ export default {
       <div class="page-head">
         <div><h1>Stock count</h1><p>Shortfall = opening + issued − sold − counted. Its value is deducted from the seller's pay as settle-up.</p></div>
         <div class="actions">${editable ? html`
-          <button type="button" class="btn" id="carry">${icon("copy")} Carry over from last month</button>
+          <button type="button" class="btn" id="carry" aria-label="Carry over from last month">${icon("copy")} Carry over<span class="lbl-long"> from last month</span></button>
           <button type="button" class="btn" id="add">${icon("plus")} Add line</button>` : ""}</div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
-      <div class="card"><div class="card-body flush" id="grid"></div>
+      ${productList(catalogue)}
+      <div class="card">${lines.length && !isPhone() ? html`<div class="card-head">${findBox("Search stock lines", "Search person or product")}<span class="muted" id="find-count"></span></div>` : ""}
+        <div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
           <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save stock count</button></div>` : ""}</div>`;
 
@@ -55,7 +58,11 @@ export default {
     const empOf = (r) => r._draft?.employee_id ?? r.employee_id;
     const peopleIds = () => [...new Set(rows.filter((r) => r._state !== "deleted" && r._state !== "gone").map(empOf))].sort((a, b) => (names[a] || a).localeCompare(names[b] || b));
     let who = peopleIds()[0] || null;
-    const visible = phone ? (r) => empOf(r) === who : (r, i) => i < shown || r._state === "new" || !!r._draft;
+    // Desktop search: only the lines whose person or product matches (new lines always show, so an added line is never hidden).
+    let find = "";
+    const matches = (r) => [names[empOf(r)], empOf(r), r._draft?.product ?? r.product].some((t) => String(t || "").toLowerCase().includes(find));
+    const visible = phone ? (r) => empOf(r) === who
+      : (r, i) => (find ? r._state === "new" || matches(r) : i < shown || r._state === "new" || !!r._draft);
     const personBar = () => {
       const ids = peopleIds();
       const at = Math.max(0, ids.indexOf(who));
@@ -89,7 +96,7 @@ export default {
           return html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint text-sm">${r.employee_id}</div>`
             : html`<select class="input sm" data-f="employee_id" aria-label="Employee" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
-          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
+          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" list="product-list" autocomplete="off" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
           ${INTS.map((k) => html`<td><input data-f="${k}" data-num aria-label="${STOCK_LABEL[k]}, ${ctxLabel}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
           <td><input data-f="unit_price" data-num ${r._needPrice ? raw('data-missing="1"') : ""} aria-required="true" placeholder="Price" aria-label="Unit price in rupees, required, ${ctxLabel}" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-q></td><td class="calc" data-v></td>
@@ -97,8 +104,10 @@ export default {
         </tr>`;
         })}</tbody>
         <tfoot><tr><td colspan="8">Total shortfall</td><td class="r" id="tot"></td><td></td></tr></tfoot></table></div>
-        ${rows.some((r, i) => r._state !== "deleted" && !visible(r, i)) ? html`<div class="more-rows"><span class="muted" role="status">Showing ${rows.filter(visible).length} of ${rows.length} lines</span>
+        ${!find && rows.some((r, i) => r._state !== "deleted" && !visible(r, i)) ? html`<div class="more-rows"><span class="muted" role="status">Showing ${rows.filter(visible).length} of ${rows.length} lines</span>
           <button type="button" class="btn" id="more-lines">Show ${Math.min(150, rows.length - shown)} more</button></div>` : ""}`.toString();
+      const live = rows.filter((r) => r._state !== "deleted" && r._state !== "gone");
+      if ($("#find-count")) $("#find-count").textContent = find ? `${live.filter((r) => visible(r, rows.indexOf(r))).length} of ${live.length} lines` : "";
       $("#more-lines")?.addEventListener("click", () => { snap(); shown += 150; draw(); });
       if (phone) {
         stackTable(grid.querySelector("table"), { grid: true, wideFirst: 2 });
@@ -161,12 +170,13 @@ export default {
       });
       if ($("#tot")) $("#tot").innerHTML = `<span class="neg">${money(total)}</span>${bad ? `<div class="faint text-sm">${bad} line${bad > 1 ? "s" : ""} left out</div>` : ""}`;
       const over = Object.entries(perEmp).filter(([, v]) => v > threshold).map(([e]) => names[e] || e);
-      if ($("#info")) $("#info").innerHTML = (bad ? `<span class="neg">${bad} line${bad > 1 ? "s have" : " has"} a number that isn't valid. </span>` : "") +
+      const unknown = unknownProducts(catalogue, $$("tbody [data-f=product]", grid));
+      if ($("#info")) $("#info").innerHTML = (unknown ? `<span class="warn-text">${unknown} product name${unknown > 1 ? "s aren't" : " isn't"} in the Products list. </span>` : "") + (bad ? `<span class="neg">${bad} line${bad > 1 ? "s have" : " has"} a number that isn't valid. </span>` : "") +
         (dirty ? `${dirty} line${dirty > 1 ? "s" : ""} changed. ` : "No unsaved changes. ") +
         (over.length ? `<span class="neg">Above the Rs ${money(threshold)} review threshold: ${over.map((o) => o.replace(/[<>&]/g, "")).join(", ")}</span>` : "");
     };
     grid.addEventListener("input", refresh);
-    grid.addEventListener("change", refresh);
+    grid.addEventListener("change", (e) => { pickProduct(e.target, catalogue); refresh(); });
     grid.addEventListener("click", async (e) => {
       const b = e.target.closest("[data-del]");
       if (!b) return;
@@ -179,10 +189,20 @@ export default {
     });
     sheetKeys(grid);
     draw();
+    let typing;
+    $("#find")?.addEventListener("input", (e) => {
+      snap();
+      find = e.target.value.trim().toLowerCase();
+      draw();
+      clearTimeout(typing);
+      typing = setTimeout(() => announce(find ? `${$("#find-count").textContent} shown` : "All lines shown"), 600);
+    });
 
     // Bring a line into view (on a phone, switch to its person) and put the cursor in one of its fields.
     const focusLine = (r, field) => {
       if (phone && empOf(r) !== who) goWho(empOf(r));
+      // A line hidden by the search: clear the search so the line can be shown.
+      if (!phone && !visible(r, rows.indexOf(r))) { snap(); find = ""; if ($("#find")) $("#find").value = ""; shown = Math.max(shown, rows.indexOf(r) + 1); draw(); }
       const tr = $$("tbody tr", grid).find((t) => rows[t.dataset.i] === r);
       const inp = tr && (field ? tr.querySelector(`[data-f="${field}"]`) : tr.querySelector("input[aria-invalid=true]"));
       inp?.focus();

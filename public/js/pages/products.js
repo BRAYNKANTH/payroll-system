@@ -23,7 +23,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Products</h1><p>What the company sells. Of every sale the workers get ${workers} (${pct(s.seller, 0)} to the seller, ${pct(s.manager, 0)} to his manager). The company keeps the rest, and the purchase price comes out of that.</p></div>
+        <div><h1>Products</h1><p>What the company sells. Of every sale the workers get ${workers} (${pct(s.seller, 0)} to the seller, ${pct(s.manager, 0)} to their manager). The company keeps the rest, and the purchase price comes out of that.</p></div>
         <div class="actions">${exportButtons("products")}<button class="btn primary" id="add">${icon("plus")} Add product</button></div>
       </div>
       <div class="card"><div class="card-body flush" id="list"></div></div>`;
