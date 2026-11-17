@@ -216,3 +216,19 @@ test("the morning screen shows what the hub holds, and the office's input is che
   const rows = await d.all("SELECT table_name, action, changed_by FROM audit_log WHERE table_name = 'hub_issues'");
   assert.deepEqual(rows.map((r) => [r.table_name, r.action, r.changed_by]), [["hub_issues", "create", "admin"]]);
 });
+
+test("giving to several sellers at once: one save, all or nothing, capped by what the hub holds in total", async () => {
+  const { d, shine, hubHead } = await setup({ hubStock: false });
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 10 }] });
+  const rows = (a, b) => [{ employee_id: "D1", lines: [{ product_id: shine, qty: a }] }, { employee_id: "D3", lines: [{ product_id: shine, qty: b }] }];
+  // 6 + 6 is more than the hub's 10 even though each alone fits: nothing is saved
+  await assert.rejects(() => pos.giveMany(d, hubHead, { rows: rows(6, 6) }, "H1"), /only 10 Shine left/);
+  assert.equal((await d.get("SELECT COUNT(*) AS n FROM stock_issues")).n, 0);
+  const r = await pos.giveMany(d, hubHead, { rows: rows(6, 4) }, "H1");
+  assert.equal(r.sellers, 2);
+  assert.equal((await d.get("SELECT COUNT(*) AS n FROM stock_issues")).n, 2);
+  // a seller of another hub is refused, again with nothing saved
+  await assert.rejects(() => pos.giveMany(d, hubHead, { rows: [{ employee_id: "D2", lines: [{ product_id: shine, qty: 1 }] }] }, "H1"));
+  const m = await pos.morning(d, { date: sales.today(), hub: "H1" });
+  assert.ok(m.sellers.every((s) => s.team && s.team.id));
+});

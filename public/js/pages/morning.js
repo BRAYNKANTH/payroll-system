@@ -20,23 +20,14 @@ export default {
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
     const isToday = day === today;
     const canGive = day <= today && day >= shift(today, -3);
-    const hubs = [...new Set(d.sellers.map((s) => s.hub))];
     const givenTotal = d.sellers.reduce((t, s) => t + s.given.reduce((n, g) => n + g.qty, 0), 0);
     const without = d.sellers.filter((s) => !s.given.length && !s.carried.length).length;
     // The admin does not hand stock to sellers: the admin sees each hub with its coacher and what it holds. The coacher gives it out.
     const overview = can("manage_products") && !state.user.hub;
+    const tm = new Map();
+    for (const x of d.sellers) { const t = x.team || { id: "none", title: "Sellers", sub: "", order: 2 }; if (!tm.has(t.id)) tm.set(t.id, { ...t, people: [] }); tm.get(t.id).people.push(x); }
+    const teams = [...tm.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
     const givenAll = (d.hubs || []).reduce((t, h) => t + h.given_pieces, 0);
-
-    const card = (s) => html`<article class="mcard card" aria-label="${s.name}">
-      <div class="mc-top"><div class="avatar" aria-hidden="true">${initials(s.name)}</div>
-        <div class="mc-who"><b>${s.name}</b><span class="muted">${s.employee_id} · ${levelLabel(s.staff_level)}</span></div></div>
-      <div class="mc-block"><span class="mc-label">Carried over</span>
-        ${s.carried.length ? html`<div class="mc-chips">${s.carried.map((c) => html`<span class="mc-chip">${c.qty} × ${c.product}</span>`)}</div>` : html`<span class="muted">Nothing</span>`}</div>
-      <div class="mc-block"><span class="mc-label">Given ${isToday ? "today" : "on this day"}</span>
-        ${s.given.length ? html`<div class="mc-chips">${s.given.map((g) => html`<span class="mc-chip given">${g.qty} × ${g.product}${canGive ? html`<button type="button" class="mc-x" data-del="${g.id}" aria-label="Take back ${g.qty} ${g.product} from ${s.name}">${icon("x")}</button>` : ""}</span>`)}</div>` : html`<span class="muted">Nothing yet</span>`}</div>
-      <div class="mc-foot"><span class="muted">${s.sold_pieces} ${s.sold_pieces === 1 ? "piece" : "pieces"} sold</span>
-        ${canGive ? html`<button type="button" class="btn primary" data-give="${s.employee_id}">${icon("plus")} Give stock</button>` : ""}</div>
-    </article>`;
 
     el.innerHTML = html`
       <div class="page-head">
@@ -53,7 +44,7 @@ export default {
       </div></div>
       ${overview ? "" : Object.entries(d.pools).map(([h, list]) => html`<section class="card mb-4" aria-label="${hubName(h)} stock"><div class="card-body">
         <div class="row between" style="gap:12px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:17px">${hubName(h)} stock</b><span class="muted">What the hub holds to give out to sellers</span></div>
-        ${list.length ? html`<div class="mc-chips">${list.map((p) => html`<span class="mc-chip ${p.left > 0 ? "given" : ""}">${p.left} × ${p.product}</span>`)}</div>` : html`<span class="muted">No products yet.</span>`}
+        ${list.length ? html`<div class="mc-chips">${list.filter((p) => p.left > 0).slice(0, 8).map((p) => html`<span class="mc-chip given">${p.left} × ${p.product}</span>`)}${list.filter((p) => p.left > 0).length > 8 ? html`<span class="muted">+ ${list.filter((p) => p.left > 0).length - 8} more products</span>` : ""}</div>` : html`<span class="muted">No products yet.</span>`}
         ${list.length && list.every((p) => p.left === 0) ? html`<p class="muted" style="margin:10px 0 0">The hub has no stock to give out. The office sends stock to the hub first.</p>` : ""}</div></section>`)}
       ${!canGive ? html`<div class="alert info mb-4">${icon("info")}<div>${day > today ? "This day has not happened yet." : "Stock can be changed only for the last 3 days. You can still look at this day."}</div></div>` : ""}
       ${overview ? html`<div class="grid three">${d.hubs.map((h) => html`<article class="mcard card" aria-label="${h.name}">
@@ -63,10 +54,19 @@ export default {
           <div class="mc-block"><span class="mc-label">Given out ${isToday ? "today" : "on this day"}</span>
             <span>${h.given_pieces} ${h.given_pieces === 1 ? "piece" : "pieces"} to ${h.sellers - h.without_stock} of ${h.sellers} ${h.sellers === 1 ? "seller" : "sellers"}${h.without_stock && isToday ? html` <span class="badge amber">${h.without_stock} without stock</span>` : ""}</span></div>
           <div class="mc-foot"><span></span><a class="btn primary" href="/hub-stock" data-link>${icon("plus")} Send stock to this hub</a></div></article>`)}</div>`
-      : d.sellers.length ? (hubs.length > 1
-        ? hubs.map((h) => html`<section class="mb-4" aria-label="${hubName(h)}"><h2 class="section-title" style="margin:0 0 10px">${hubName(h)}</h2>
-            <div class="grid three">${d.sellers.filter((s) => s.hub === h).map(card)}</div></section>`)
-        : html`<div class="grid three">${d.sellers.map(card)}</div>`)
+      : d.sellers.length ? html`${teams.map((g) => html`<details class="dgrp card" data-gid="${g.id}" open>
+          <summary><span class="dg-chev" aria-hidden="true">${icon("right")}</span><span class="avatar" aria-hidden="true">${initials(g.title)}</span>
+            <span class="dg-title"><b>${g.title}</b><small>${g.sub}${g.sub ? " · " : ""}${g.people.length} ${g.people.length === 1 ? "seller" : "sellers"}</small></span>
+            <span class="dg-nums"><span><small>Given</small><b>${g.people.reduce((t, x) => t + x.given.reduce((n, y) => n + y.qty, 0), 0)}</b></span><span><small>Sold</small><b>${g.people.reduce((t, x) => t + x.sold_pieces, 0)}</b></span>${canGive && g.people.some((x) => !x.given.length && !x.carried.length) ? html`<span class="dg-prog part">${g.people.filter((x) => !x.given.length && !x.carried.length).length} without stock</span>` : ""}</span></summary>
+          <div class="table-wrap" tabindex="-1"><table class="table sheet msheet">
+            <caption class="sr-only">Stock for ${g.title}'s team</caption>
+            <thead><tr><th scope="col">Seller</th><th scope="col">Carried over</th><th scope="col">Given ${isToday ? "today" : "this day"}</th><th scope="col" class="r">Sold</th>${canGive ? html`<th scope="col"><span class="sr-only">Give stock</span></th>` : ""}</tr></thead>
+            <tbody>${g.people.map((x) => html`<tr data-emp="${x.employee_id}">
+              <th scope="row" class="name"><b>${x.name}</b><div class="faint text-sm fw-400">${x.employee_id} · ${levelLabel(x.staff_level)}</div></th>
+              <td>${x.carried.length ? html`<div class="mc-chips">${x.carried.map((c) => html`<span class="mc-chip">${c.qty} × ${c.product}</span>`)}</div>` : html`<span class="muted">Nothing</span>`}</td>
+              <td>${x.given.length ? html`<div class="mc-chips">${x.given.map((y) => html`<span class="mc-chip given">${y.qty} × ${y.product}${canGive ? html`<button type="button" class="mc-x" data-del="${y.id}" aria-label="Take back ${y.qty} ${y.product} from ${x.name}">${icon("x")}</button>` : ""}</span>`)}</div>` : html`<span class="muted">Nothing yet</span>`}</td>
+              <td class="r num">${x.sold_pieces}</td>${canGive ? html`<td class="r"><button type="button" class="btn sm primary" data-give="${x.employee_id}">${icon("plus")} Give stock</button></td>` : ""}</tr>`)}</tbody></table></div>
+        </details>`)}`
         : html`<div class="card">${emptyState("No sellers here yet", "Add distributors, supervisors or managers to this hub first.", "users")}</div>`}`;
 
     $("#d-prev").onclick = () => { day = shift(day, -1); this.render(ctx); };
@@ -78,30 +78,53 @@ export default {
       await busy(b, async () => { await del(`/api/stock-issues/${b.dataset.del}`); toast("Stock taken back"); await this.render(ctx); });
     }));
 
+    // Giving stock works like a till: search a product, tap it to add it, set the quantity, then give.
     $$("[data-give]", el).forEach((b) => (b.onclick = () => {
-      const s = d.sellers.find((x) => x.employee_id === b.dataset.give);
-      const pool = Object.fromEntries((d.pools[s.hub] || []).map((p) => [p.product_id, p.left]));
+      const x = d.sellers.find((q) => q.employee_id === b.dataset.give);
+      const pool = Object.fromEntries((d.pools[x.hub] || []).map((q) => [q.product_id, q.left]));
+      const have = Object.fromEntries(x.carried.map((c) => [c.product_id, c.qty]));
+      const cart = new Map(); // product id -> qty
       const dr = drawer({
-        title: `Give stock to ${s.name}`,
+        title: `Give stock to ${x.name}`,
         body: html`<div class="give">
-          <p class="muted" style="margin-top:0">${label(day)}. Enter how many of each product. Leave the rest at 0.</p>
+          <p class="muted" style="margin-top:0">${label(day)}. Search a product and tap it to add it.</p>
           <div class="till-search"><span aria-hidden="true">${icon("search")}</span><input id="gq" class="input" type="search" autocomplete="off" placeholder="Search products" aria-label="Search products"></div>
-          <ul class="give-list" role="list">${d.products.map((p) => html`<li data-name="${p.name.toLowerCase()}"><label for="g${p.id}"><b>${p.name}</b><span class="muted">${rs(p.price)} · ${pool[p.id] || 0} in the hub${(s.carried.find((c) => c.product_id === p.id)?.qty) ? ` · ${s.carried.find((c) => c.product_id === p.id).qty} carried over` : ""}</span></label>
-            <input class="input" id="g${p.id}" data-pid="${p.id}" data-max="${pool[p.id] || 0}" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="${pool[p.id] ? "0" : "None"}" maxlength="4" ${pool[p.id] ? "" : "disabled"} aria-label="Quantity of ${p.name}"></li>`)}</ul>
-          ${d.products.length ? "" : html`<p class="muted">There are no products yet. Add them under Products first.</p>`}</div>`.toString(),
-        foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="give-save">Give stock</button>`,
+          <ul class="give-list" id="g-results" role="list" aria-label="Products"></ul>
+          <h3 class="section-title" style="margin:16px 0 8px">To give <span class="muted" id="g-count"></span></h3>
+          <ul class="give-list" id="g-cart" role="list" aria-label="Products to give"></ul></div>`.toString(),
+        foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="give-save" disabled>Give stock</button>`,
       });
-      $("#gq", dr.panel).oninput = (e) => { const q = e.target.value.toLowerCase(); $$(".give-list li", dr.panel).forEach((li) => { li.hidden = q && !li.dataset.name.includes(q); }); };
-      $("#give-save", dr.panel).onclick = (e) => busy(e.currentTarget, async () => {
-        const lines = $$("[data-pid]", dr.panel).map((i) => ({ product_id: Number(i.dataset.pid), qty: Number(i.value) })).filter((l) => l.qty > 0);
+      const q = $("#gq", dr.panel), res = $("#g-results", dr.panel), cartEl = $("#g-cart", dr.panel), save = $("#give-save", dr.panel);
+      const prod = (id) => d.products.find((p) => p.id === Number(id));
+      const drawResults = () => {
+        const t = q.value.trim().toLowerCase();
+        const list = d.products.filter((p) => !cart.has(p.id) && (!t || p.name.toLowerCase().includes(t))).slice(0, 8);
+        res.innerHTML = list.length ? list.map((p) => html`<li><button type="button" class="give-pick" data-add="${p.id}" ${pool[p.id] ? "" : "disabled"}><span><b>${p.name}</b><span class="muted"> ${rs(p.price)} · ${pool[p.id] || 0} in the hub${have[p.id] ? ` · ${have[p.id]} carried over` : ""}</span></span><span class="btn sm">${pool[p.id] ? "Add" : "None left"}</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
+      };
+      const drawCart = () => {
+        cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).name}</b><span class="muted">${pool[id]} in the hub</span></label>
+          <input class="input" id="c${id}" data-cid="${id}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" value="${n}" aria-label="Quantity of ${prod(id).name}">
+          <button type="button" class="mc-x" data-rm="${id}" aria-label="Remove ${prod(id).name}">${icon("x")}</button></li>`).join("") : `<li class="muted" style="padding:8px 2px">Nothing added yet</li>`;
+        $("#g-count", dr.panel).textContent = cart.size ? `· ${[...cart.values()].reduce((a, n) => a + n, 0)} pieces` : "";
+        save.disabled = !cart.size;
+      };
+      const add = (id) => { cart.set(Number(id), 1); drawCart(); drawResults(); $(`#c${id}`, dr.panel)?.select(); };
+      q.oninput = drawResults;
+      q.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); const f = $("[data-add]:not([disabled])", res); if (f) { add(f.dataset.add); q.value = ""; drawResults(); } } };
+      res.onclick = (e) => { const bt = e.target.closest("[data-add]"); if (bt) { add(bt.dataset.add); q.focus(); } };
+      cartEl.onclick = (e) => { const bt = e.target.closest("[data-rm]"); if (bt) { cart.delete(Number(bt.dataset.rm)); drawCart(); drawResults(); } };
+      cartEl.oninput = (e) => { const i = e.target.closest("[data-cid]"); if (i) { i.value = i.value.replace(/\D/g, ""); cart.set(Number(i.dataset.cid), Number(i.value) || 0); $("#g-count", dr.panel).textContent = `· ${[...cart.values()].reduce((a, n) => a + n, 0)} pieces`; } };
+      save.onclick = (e) => busy(e.currentTarget, async () => {
+        const lines = [...cart].map(([product_id, qty]) => ({ product_id, qty })).filter((l) => l.qty > 0);
         if (!lines.length) throw new Error("Enter a quantity for at least one product");
-        const over = $$("[data-pid]", dr.panel).find((i) => Number(i.value) > Number(i.dataset.max));
-        if (over) throw new Error(`The hub has only ${over.dataset.max} of ${d.products.find((p) => p.id === Number(over.dataset.pid)).name}. Ask the office to send more stock`);
-        await post("/api/stock-issues", { employee_id: s.employee_id, date: day, lines });
-        toast(`Stock given to ${s.name}`);
+        const over = lines.find((l) => l.qty > (pool[l.product_id] || 0));
+        if (over) throw new Error(`The hub has only ${pool[over.product_id] || 0} of ${prod(over.product_id).name}. Ask the office to send more stock`);
+        await post("/api/stock-issues", { employee_id: x.employee_id, date: day, lines });
+        toast(`Stock given to ${x.name}`);
         dr.close();
         await this.render(ctx);
       });
+      drawResults(); drawCart(); q.focus();
     }));
   },
 };

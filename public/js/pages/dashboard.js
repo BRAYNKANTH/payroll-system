@@ -21,9 +21,12 @@ function monthCard(d, k) {
   else if (k.pending) { say = `${k.pending} ${k.pending === 1 ? "entry needs" : "entries need"} a look before the salaries can be trusted.`; go = can("review") ? ["/approvals", "Open approvals", "checkCircle"] : null; }
   else if (!k.calculated) { say = "Salaries have not been worked out yet. Finish the daily sheets, then work them out."; go = can("run_payroll") ? ["/payroll", "Work out salaries", "wallet"] : can("enter_data") ? ["/daily", "Open the daily sheet", "sheet"] : null; }
   else { say = "Everything passed the checks. Salaries are ready to view."; go = can("view_pay") ? ["/payroll", "View salaries", "wallet"] : null; }
+  const at = done ? 4 : k.pending ? 1 : !k.calculated ? 0 : 2; // steps before this one are finished
+  const steps = ["Daily entries", "Checks", "Salaries worked out", "Month closed"];
   return html`<section class="card month-card" aria-label="Where this month stands">
     <div class="mc-left"><h2>${monthName(d.period)}</h2><p>${say}</p>
-      ${go ? html`<a class="btn primary" href="${go[0]}" data-link>${icon(go[2])} ${go[1]}</a>` : ""}</div>
+      ${go ? html`<a class="btn primary" href="${go[0]}" data-link>${icon(go[2])} ${go[1]}</a>` : ""}
+      <ol class="mstep" aria-label="Month progress">${steps.map((t, i) => html`<li class="${i < at ? "done" : i === at ? "now" : ""}" ${i === at ? 'aria-current="step"' : ""}><span class="mdot" aria-hidden="true">${i < at ? "✓" : i + 1}</span>${t}<span class="sr-only">${i < at ? " (done)" : i === at ? " (now)" : ""}</span></li>`)}</ol></div>
     <dl class="mc-right"><div><dt>To bank (everyone)</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.to_bank)}` : "Not calculated"}</dd></div>
       <div><dt>Sellers' net pay</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.net_pay)}` : "—"}</dd></div></dl>
   </section>`;
@@ -52,7 +55,7 @@ export default {
     };
     const first = state.user.full_name.split(" ")[0];
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="dash">
       <div class="page-head">
         <div><h1>${greeting()}, ${first}</h1>
           <p>${monthName(d.period)} · ${badge(d.status)} ${!can("view_pay") ? "" : d.last_run_at ? `· payroll last calculated ${new Date(d.last_run_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "· payroll not calculated yet"}</p></div>
@@ -65,11 +68,10 @@ export default {
       ${pay ? monthCard(d, k) : ""}
 
       <div class="grid kpis">
-        ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
-        ${!pay ? "" : kpi("Sellers' gross pay", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "seller" : "sellers"}. Managers are paid through their own account.` : "Run payroll to calculate")}
-        ${!pay ? "" : kpi("To bank (everyone)", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Sellers and managers together. Sellers' net pay is Rs ${compact(k.net_pay)}` : "&nbsp;")}
-        ${kpi("Cash short + stock short", compact(k.settle_up + k.stock_shortfall), "coins", "amber", `Stock Rs ${compact(k.stock_shortfall)}`)}
-        ${!pay ? "" : kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
+        ${kpi("Hub business", money(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${money(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${money(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
+        ${!pay ? "" : kpi("Sellers' gross pay", k.calculated ? money(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "seller" : "sellers"}. Managers are paid through their own account.` : "Run payroll to calculate")}
+        ${kpi("Cash and stock short", money(k.settle_up + k.stock_shortfall), "coins", "amber", `Cash Rs ${money(k.settle_up)} · Stock Rs ${money(k.stock_shortfall)}`)}
+        ${!pay ? "" : kpi("Managers' balance", k.calculated ? money(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
       </div>
 
       <section class="mt-4" aria-labelledby="hubs-h">
@@ -89,7 +91,7 @@ export default {
       </div>
       <details class="more-figures mt-4"><summary class="btn sm">More figures: top performers against target</summary>
         <div class="card mt-3"><div class="card-head"><div><h2>Top performers</h2><div class="sub">Business vs monthly target</div></div></div>
-          <div class="card-body flush" id="top"></div></div></details>`;
+          <div class="card-body flush" id="top"></div></div></details></div>`;
 
     if (pay) $("#exceptions").innerHTML = d.exceptions.length
       ? d.exceptions.slice(0, 7).map((x) => html`

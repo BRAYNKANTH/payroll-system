@@ -1390,3 +1390,57 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .dg-prog.part { background: var(--warning-soft); color: var(--warning); }
 .dgrp .table-wrap { border-top: 1px solid var(--border); }
 @media (max-width: 860px) { .dgrp { margin: 12px 10px 0; } .dgrp > summary { flex-wrap: wrap; } .dg-nums { margin-left: 30px; justify-content: flex-start; width: 100%; } .dsum { padding: 12px 10px; } .dstat { flex: 1 1 130px; } }
+
+/* ---------- Morning stock: one card per manager, one Save for everyone ---------- */
+.msheet .mq { width: 74px; text-align: right; }
+.mc-chip.over { background: var(--danger-soft, #fde8e8); color: var(--danger, #b42318); }
+
+.give-pick { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.give-pick:hover:not([disabled]) { border-color: var(--primary); }
+.give-pick[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ---------- Dashboard: touch-size actions, readable small text, month progress ---------- */
+.dash .btn, .dash .btn.sm { min-height: 44px; }
+.dash .btn.sm { padding-inline: 14px; }
+.dash .kpi .foot, .dash .kpi .label, .dash .hub-nums small, .dash .list-item .grow span, .dash .card-head .sub { font-size: 14px; }
+.dash .list-item .grow b { font-size: 15px; }
+.dash .list-item a[data-link] { display: inline-flex; align-items: center; min-height: 44px; }
+.dash .kpi .value { font-size: 28px; }
+.dash .grid.kpis { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+.dash section + section, .dash .grid + section { margin-top: 24px; }
+.mstep { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 6px; margin: 16px 0 0; padding: 0; font-size: 14px; color: var(--text-3); }
+.mstep li { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; }
+.mstep li + li::before { content: ""; width: 14px; height: 2px; background: var(--border-strong); margin-right: 6px; margin-left: -4px; }
+.mstep .mdot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; border: 2px solid var(--border-strong); background: var(--surface); }
+.mstep .done { color: var(--text-2); }
+.mstep .done .mdot { background: var(--success); border-color: var(--success); color: #fff; }
+.mstep .now { color: var(--text); font-weight: 650; background: var(--primary-soft); }
+.mstep .now .mdot { border-color: var(--primary); color: var(--primary); }
+@media (prefers-reduced-motion: no-preference) { .dash .hub-tile, .dash .kpi { transition: transform .18s ease-out, box-shadow .18s ease-out; } }
+
+/* ---------- Hubs page: one card per hub ---------- */
+.hubs-page .btn { min-height: 44px; }
+.hubs-empty { grid-column: 1 / -1; }
+.hubc { display: flex; flex-direction: column; padding: 0; }
+.hubc-head { display: flex; align-items: center; gap: 12px; padding: 20px 24px 12px; }
+.hubc-ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.hubc-title { flex: 1; min-width: 0; }
+.hubc-title h2 { font-size: 18px; margin: 0; }
+.hubc-title .sub { font-size: 14px; color: var(--text-3); overflow-wrap: anywhere; }
+.hubc-body { padding: 4px 24px 8px; flex: 1; }
+.hubc-people { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.hubc-people b { font-size: 22px; font-family: var(--font-display); }
+.hubc-people .muted, .hubc-levels, .hubc-month { font-size: 14px; }
+.hubc-levels { margin: 2px 0 16px; }
+.hubc-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; padding: 12px 0; border-block: 1px solid var(--border); }
+.hubc-nums.one { grid-template-columns: 1fr; }
+.hubc-nums dt { font-size: 13px; color: var(--text-3); font-weight: 500; }
+.hubc-nums dd { margin: 2px 0 0; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.hubc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.hubc-month { margin-top: 12px; }
+.hubc-foot { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 24px 20px; }
+.hubc-foot .btn { flex: 1 1 auto; justify-content: center; }
+.hubc-foot .btn.primary { flex: 2 1 140px; }
+@media (max-width: 860px) { .hubc-head, .hubc-body, .hubc-foot { padding-inline: 16px; } }
+.hubc-foot .btn, .hubc .hub-link { min-height: 44px; }
+.hubc .hub-link { display: inline-flex; align-items: center; }

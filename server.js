@@ -159,6 +159,7 @@ function createHandler(dbReady) {
     ["POST", /^\/api\/hub-stock$/, "manage_products", ({ user, body }) => pos.giveToHub(database, user, body)],
     ["DELETE", /^\/api\/hub-stock\/(\d+)$/, "manage_products", ({ user, m }) => pos.takeFromHub(database, user, m[1])],
     ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
+    ["POST", /^\/api\/stock-issues\/bulk$/, "stock", ({ user, body }) => pos.giveMany(database, user, body, user.hub)],
     ["POST", /^\/api\/stock-issues$/, "stock", ({ user, body }) => pos.give(database, user, body, user.hub)],
     ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "stock", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],
     ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],

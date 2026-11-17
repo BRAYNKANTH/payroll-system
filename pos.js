@@ -145,11 +145,21 @@ async function checkSeller(db, id, scopeHub) {
   return s;
 }
 
+// The team a seller belongs to: the manager above them (or themselves, for a manager); else whoever they report to.
+function teamOf(person, byId) {
+  const isManager = (x) => x && x.staff_level === "manager";
+  let boss = isManager(person) ? person : null, cur = person, hops = 0;
+  while (!boss && cur?.upline_id && hops++ < 8) { cur = byId.get(cur.upline_id); if (isManager(cur)) boss = cur; }
+  if (boss) return { id: boss.employee_id, title: boss.name, sub: `Manager · ${boss.employee_id}`, order: 0 };
+  const up = byId.get(person.upline_id);
+  return up ? { id: "up:" + up.employee_id, title: `Reports to ${up.name}`, sub: up.employee_id, order: 1 } : { id: "none", title: "No manager", sub: "", order: 2 };
+}
+
 // Who has what: every seller in the hub (or all hubs), with what they carry in, were given on `date`, and have sold.
 async function morning(db, { date, hub }) {
   const day = String(date || sales.today());
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw httpError(400, "date must be YYYY-MM-DD");
-  const people = await db.all(`SELECT s.employee_id, s.name, s.hub, s.staff_level FROM staff s WHERE ${sellersWhere}${hub ? " AND s.hub = ?" : ""} ORDER BY s.hub, s.name`, ...(hub ? [hub] : []));
+  const people = await db.all(`SELECT s.employee_id, s.name, s.hub, s.staff_level, s.upline_id FROM staff s WHERE ${sellersWhere}${hub ? " AND s.hub = ?" : ""} ORDER BY s.hub, s.name`, ...(hub ? [hub] : []));
   const ids = people.map((p) => p.employee_id);
   const products = await db.all("SELECT id, name, list_price, status FROM products ORDER BY lower(name)");
   const pname = new Map(products.map((p) => [key(p.id), p.name]));
@@ -167,6 +177,7 @@ async function morning(db, { date, hub }) {
     const pool = await poolOf(db, h.code);
     pools[h.code] = products.filter((p) => p.status === "active").map((p) => ({ product_id: Number(p.id), product: p.name, left: Math.max(0, pool.get(key(p.id))?.left || 0) }));
   }
+  const everyone = new Map((await db.all("SELECT employee_id, name, staff_level, upline_id FROM staff")).map((x) => [x.employee_id, x]));
   const out = {
     date: day,
     pools,
@@ -175,7 +186,7 @@ async function morning(db, { date, hub }) {
       const mine = given.filter((g) => g.employee_id === p.employee_id).map((g) => ({ id: Number(g.id), product_id: Number(g.product_id), product: pname.get(key(g.product_id)), qty: g.qty }));
       const keep = [...carried.entries()].filter(([k, n]) => k.startsWith(p.employee_id + "|") && n > 0).map(([k, n]) => ({ product_id: Number(k.split("|")[1]), product: pname.get(k.split("|")[1]), qty: n }));
       const soldPieces = [...sold.entries()].filter(([k]) => k.startsWith(p.employee_id + "|")).reduce((t, [, n]) => t + n, 0);
-      return { employee_id: p.employee_id, name: p.name, hub: p.hub, staff_level: p.staff_level, carried: keep, given: mine, sold_pieces: soldPieces };
+      return { employee_id: p.employee_id, name: p.name, hub: p.hub, staff_level: p.staff_level, team: teamOf(p, everyone), carried: keep, given: mine, sold_pieces: soldPieces };
     }),
   };
   // One line per hub: its coacher (who gives the stock out), what is given today and who has none. The admin sees this instead of every seller.
@@ -189,35 +200,43 @@ async function morning(db, { date, hub }) {
   return out;
 }
 
-// Give a seller their stock. `lines` is a list of { product_id, qty }.
-async function give(db, user, body, scopeHub) {
-  const s = await checkSeller(db, body.employee_id, scopeHub);
+// Give stock to several sellers of one hub in one go, all or nothing. `rows` is a list of { employee_id, lines: [{ product_id, qty }] }.
+// Everything comes out of what the hub holds: the total for each product across all the sellers cannot be more than the hub has.
+async function giveMany(db, user, body, scopeHub) {
+  const rows = (Array.isArray(body.rows) ? body.rows : []).filter((r) => Array.isArray(r.lines) && r.lines.length);
+  if (!rows.length) throw httpError(400, "Add at least one product");
+  const sellers = [];
+  for (const r of rows) sellers.push(await checkSeller(db, r.employee_id, scopeHub));
+  const hubs = [...new Set(sellers.map((x) => x.hub))];
+  if (hubs.length > 1) throw httpError(400, "Give stock to one hub at a time");
   const now = sales.today();
   const date = body.date ? String(body.date) : now;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) throw httpError(400, "date must be YYYY-MM-DD");
   if (date > now) throw httpError(400, "You cannot give stock for a day that has not happened yet");
   if (date < sales.addDays(now, -ISSUE_DAYS_BACK)) throw httpError(400, `Stock can be recorded up to ${ISSUE_DAYS_BACK} days back`);
-  const lines = Array.isArray(body.lines) ? body.lines : [];
-  if (!lines.length) throw httpError(400, "Add at least one product");
   const note = String(body.note || "").trim().slice(0, 200) || null;
   await withUser(db, user.username, async (t) => {
     if (await svc.isFinalized(t, date.slice(0, 7))) throw httpError(409, "That month is closed");
-    // Stock comes out of what the office sent to the hub: a coacher cannot give more than the hub holds.
     const want = new Map(), names = new Map();
-    for (const l of lines) {
+    for (const r of rows) for (const l of r.lines) {
       const p = await t.get("SELECT id, name, status FROM products WHERE id = ?", Number(l.product_id));
       if (!p || p.status !== "active") throw httpError(400, "Choose products from the list");
       want.set(key(p.id), (want.get(key(p.id)) || 0) + qty(l.qty)); names.set(key(p.id), p.name);
     }
-    const pool = await poolOf(t, s.hub);
+    const pool = await poolOf(t, hubs[0]);
     for (const [pid, n] of want) {
       const left = Math.max(0, pool.get(pid)?.left || 0);
       if (n > left) throw httpError(409, left ? `The hub has only ${left} ${names.get(pid)} left. Ask the office to send more stock` : `The hub has no ${names.get(pid)} left. Ask the office to send more stock`);
     }
-    for (const l of lines) await t.run("INSERT INTO stock_issues (date, employee_id, product_id, qty, note, created_by) VALUES (?,?,?,?,?,?)", date, s.employee_id, Number(l.product_id), qty(l.qty), note, user.username);
-  }, { lockKey: "hub:" + s.hub });
-  return { given: lines.length, employee_id: s.employee_id, date };
+    for (const [k, r] of rows.entries()) for (const l of r.lines) {
+      await t.run("INSERT INTO stock_issues (date, employee_id, product_id, qty, note, created_by) VALUES (?,?,?,?,?,?)", date, sellers[k].employee_id, Number(l.product_id), qty(l.qty), note, user.username);
+    }
+  }, { lockKey: "hub:" + hubs[0] });
+  return { given: rows.reduce((t, r) => t + r.lines.length, 0), sellers: rows.length, employee_id: sellers[0].employee_id, date };
 }
+
+// Give one seller their stock. `lines` is a list of { product_id, qty }.
+const give = (db, user, body, scopeHub) => giveMany(db, user, { date: body.date, note: body.note, rows: [{ employee_id: body.employee_id, lines: body.lines }] }, scopeHub);
 
 // Take back a line of stock that was given by mistake. Refused when the seller has already sold it.
 async function takeBack(db, user, id, scopeHub) {
@@ -297,4 +316,4 @@ async function takeFromHub(db, user, id) {
   return { deleted: true };
 }
 
-module.exports = { state, sell, undo, endOfDay, morning, give, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };
+module.exports = { state, sell, undo, endOfDay, morning, give, giveMany, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };
