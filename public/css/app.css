@@ -1169,3 +1169,80 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .hub-link, .list-item a[data-link], .card-body .grow a[data-link] { display: inline-flex; align-items: center; min-height: 44px; }
   .more-list a { min-height: 44px; }
 }
+
+/* =========================================================================
+   Ledger Room finish (Nov 2026): a printed statement, not a stack of cards.
+   One memorable device: the gold margin rule marks anything that adds up.
+   Flat and quiet everywhere else; two shadows only (see DESIGN.md).
+   ========================================================================= */
+:root {
+  --rule: 2px;                       /* the margin rule and the top rule of a statement */
+  --t-sm: 14px; --t-base: 16px; --t-lg: 20px; --t-fig: 28px; --t-display: 34px; /* the whole type scale */
+}
+
+/* ---- Type: sentence case, one scale ---- */
+.table th, .table thead th, .th-sort { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); font-weight: 600; color: var(--text-2); }
+.nav-group { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); font-weight: 600; color: var(--sidebar-muted); padding: 18px 10px 6px; }
+.form-section, .sub-head, #gs-list .gs-head { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); }
+.page-head h1 { font-size: var(--t-display); line-height: 1.15; letter-spacing: -.01em; }
+.page-head p { max-width: 62ch; }
+.kpi .value, .stat .s-value, .month-card dd { font-size: var(--t-fig); }
+
+/* ---- Lists and registers are ruled sheets on the page, not floating cards ---- */
+.card:has(> .card-body.flush) { background: transparent; border: 0; border-top: var(--rule) solid var(--text); border-bottom: 1px solid var(--border-strong); border-radius: 0; box-shadow: none; }
+.card:has(> .card-body.flush) > .card-head { padding-left: 0; padding-right: 0; border-bottom: 1px solid var(--border); background: transparent; }
+.card-body.flush .table th:first-child, .card-body.flush .table td:first-child { padding-left: 8px; }
+.card-body.flush .table th:last-child, .card-body.flush .table td:last-child { padding-right: 8px; }
+.card-body.flush .table th { background: transparent; border-bottom: 1px solid var(--border-strong); }
+.table tbody tr:hover td { background: var(--surface-2); }
+.table tfoot td { background: transparent; border-top: var(--rule) solid var(--text); }
+.card-body.flush > .table-wrap:last-child, .card-body.flush > .table:last-child { border-radius: 0; }
+
+/* ---- Totals strip: summary figures read as one ruled line with the gold margin on its left ---- */
+.grid.kpis { gap: 0; overflow: hidden; border-top: var(--rule) solid var(--text); border-bottom: 1px solid var(--border-strong); border-left: var(--rule) solid var(--gold); background: var(--surface); }
+.grid.kpis > .kpi { margin-left: -1px; border: 0; border-left: 1px solid var(--border); border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; background: transparent; transform: none; padding: 16px 20px; }
+.kpi:hover { transform: none; box-shadow: none; }
+.kpi .icon { display: none; }              /* the label already says it; icons here were decoration */
+.kpi .label { font-size: var(--t-sm); color: var(--text-2); }
+.kpi .value { margin-top: 6px; }
+.kpi:has(.icon.red) .value, .kpi .value.neg { color: var(--danger); }
+@media (max-width: 860px) {
+  .grid.kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.kpis > .kpi { padding: 12px 14px; }
+}
+
+/* ---- The month card and hub tiles: same ledger page, no lift on hover ---- */
+.month-card { border-radius: 0; border-left: 0; border-right: 0; border-top: var(--rule) solid var(--text); box-shadow: none; }
+.hub-tile { border-radius: var(--radius); box-shadow: none; transition: border-color .12s; }
+.hub-tile:hover { transform: none; box-shadow: none; border-color: var(--primary); }
+.hub-tile:active { transform: none; }
+
+/* ---- Forms and settings keep cards, but a single flat style ---- */
+.card { box-shadow: none; }
+.drawer .card, .modal .card { border-color: var(--border); }
+
+/* ---- Navigation: the active page is marked by the gold margin rule ---- */
+.nav a.active { background: var(--primary-soft); color: var(--primary-deep, var(--primary)); }
+.nav a.active::before { background: var(--gold); width: var(--rule); left: -10px; border-radius: 0; }
+
+/* ---- Top bar and bottom bar: opaque paper, a hairline, no blur ---- */
+.topbar, .bottom-nav, .savebar, .portal-tabs { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface); box-shadow: none; }
+.topbar { border-bottom: 1px solid var(--border-strong); }
+.bottom-nav { border-top: 1px solid var(--border-strong); }
+.bottom-nav a[aria-current="page"] { border-top-color: var(--gold); border-top-width: var(--rule); }
+
+/* ---- Phone: the page head is compact, tap targets stay 44px ---- */
+@media (max-width: 860px) {
+  .page-head h1 { font-size: 26px; }
+  .card:has(> .card-body.flush) > .card-head { padding-left: 0; padding-right: 0; }
+}
+
+/* ---- Sign-in additions used by login.js ---- */
+.auth-steps { list-style: none; margin: 28px 0 0; padding: 0; max-width: 26em; border-top: var(--rule) solid var(--text); counter-reset: s; }
+.auth-steps li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: var(--t-base); }
+.auth-steps li::before { content: counter(s) "."; font-family: var(--mono); color: var(--accent); }
+.auth-lead { margin: 0; color: var(--text-2); }
+.auth-foot { display: flex; gap: 8px; align-items: flex-start; margin: 20px 0 0; color: var(--text-2); font-size: var(--t-sm); }
+.auth-foot svg { margin-top: 3px; flex-shrink: 0; }
+.caps-warn { display: flex; gap: 6px; align-items: center; color: var(--warning); font-size: var(--t-sm); }
+.btn .btn-label { display: inline; }

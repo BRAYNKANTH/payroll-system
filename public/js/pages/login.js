@@ -20,7 +20,11 @@ export default {
               <div class="short"><dt>Short, taken off pay</dt><dd>1,500.00</dd></div>
             </dl>
           </figure>
-          <p class="flow">Daily sheets, then the month's payroll, then review and finalize.</p>
+          <ol class="auth-steps" aria-label="How a month works">
+            <li>Enter each day's sheet</li>
+            <li>Run the month's payroll</li>
+            <li>Review and finalize</li>
+          </ol>
         </div>
         <div class="note">Amounts are in Sri Lankan rupees (LKR). Every change is recorded in the audit trail.</div>
       </section>
@@ -28,7 +32,7 @@ export default {
         <div class="auth-card">
           <div class="auth-brand" aria-hidden="true"><div class="brand-mark">₨</div><div><div class="brand-name">${esc(company || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
           <h1 class="auth-title">${needsSetup ? "Create the admin account" : "Welcome back"}</h1>
-          <p class="muted" style="margin:0">${needsSetup ? "This is the first run. The account you create here will have full access." : "Sign in to continue to your payroll workspace."}</p>
+          <p class="auth-lead">${needsSetup ? "This is the first run. The account you create here will have full access." : "Sign in to continue to your payroll workspace."}</p>
           <form id="auth-form" novalidate>
             ${needsSetup ? `<div class="field"><label for="full_name">Full name</label><input class="input" id="full_name" name="full_name" autocomplete="name" required></div>` : ""}
             <div class="field"><label for="username">Username</label><input class="input" id="username" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></div>
@@ -36,9 +40,11 @@ export default {
               <div class="pw-wrap"><input class="input" id="password" name="password" type="password" autocomplete="${needsSetup ? "new-password" : "current-password"}" enterkeyhint="go" required>
                 <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password" aria-pressed="false" aria-controls="password">${icon("eye")}</button></div>
               ${needsSetup ? `<span class="hint">At least 8 characters, with letters and numbers.</span>` : ""}</div>
+            <div id="caps-warn" class="hint caps-warn" role="status" hidden>${icon("alert")}<span>Caps Lock is on.</span></div>
             <div id="auth-err" class="alert err" role="alert" hidden>${icon("alert")}<div></div></div>
-            <button class="btn primary" type="submit">${needsSetup ? "Create account & continue" : "Sign in"}</button>
+            <button class="btn primary" type="submit"><span class="btn-label">${needsSetup ? "Create account & continue" : "Sign in"}</span></button>
           </form>
+          <p class="auth-foot">${icon("lock")}<span>${needsSetup ? "Keep these details safe. You can add more people after you sign in." : "Forgot your password? Ask an admin to set a new one."}</span></p>
         </div>
       </main>
     </div>`;
@@ -51,11 +57,14 @@ export default {
       e.currentTarget.setAttribute("aria-pressed", String(show));
       e.currentTarget.setAttribute("aria-label", show ? "Hide password" : "Show password");
     };
+    $("#password").addEventListener("keyup", (e) => { if (e.getModifierState) $("#caps-warn").hidden = !e.getModifierState("CapsLock"); });
+    $("#password").addEventListener("blur", () => { $("#caps-warn").hidden = true; });
     form.addEventListener("input", () => { form.querySelectorAll("[aria-invalid]").forEach((i) => { i.removeAttribute("aria-invalid"); i.removeAttribute("aria-describedby"); }); });
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const btn = form.querySelector("button");
+      const btn = form.querySelector('button[type="submit"]');
       btn.classList.add("loading");
+      btn.querySelector(".btn-label").textContent = needsSetup ? "Creating account…" : "Signing in…";
       $("#auth-err").hidden = true;
       try {
         const body = Object.fromEntries(new FormData(form));
@@ -69,6 +78,7 @@ export default {
         pw.setAttribute("aria-describedby", "auth-err");
         pw.select();
         btn.classList.remove("loading");
+        btn.querySelector(".btn-label").textContent = needsSetup ? "Create account & continue" : "Sign in";
       }
     };
   },
