@@ -1,13 +1,17 @@
 import { get, post, qs } from "../api.js";
-import { state, can, scopeHub } from "../app.js";
-import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, raw } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
+import { state, can, scopeHub, setDirtyCheck } from "../app.js";
+import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, raw, parseAmount } from "../ui.js";
+import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
 import { announce } from "../ui.js";
 
 const INTS = ["opening_stock", "issued", "sold", "counted_stock"];
+const NUMS = [...INTS, "unit_price"];
 const STOCK_LABEL = { opening_stock: "Opening", issued: "Issued", sold: "Sold", counted_stock: "Counted" };
 const prevPeriod = (p) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
+// A draft (what was typed) holds a value that is not a number.
+const draftBad = (v) => NUMS.some((k) => k in v && badNumber(k, v[k]));
+const shortText = (q) => (q > 0 ? `${q} short` : q < 0 ? `${-q} over` : "0");
 
 export default {
   title: "Stock count",
@@ -26,20 +30,23 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Stock count</h1><p>Shortfall = opening + issued − sold − counted. Its value is deducted from the guy's pay as settle-up.</p></div>
+        <div><h1>Stock count</h1><p>Shortfall = opening + issued − sold − counted. Its value is deducted from the seller's pay as settle-up.</p></div>
         <div class="actions">${editable ? html`
-          <button class="btn" id="carry">${icon("copy")} Carry over from last month</button>
-          <button class="btn" id="add">${icon("plus")} Add line</button>` : ""}</div>
+          <button type="button" class="btn" id="carry">${icon("copy")} Carry over from last month</button>
+          <button type="button" class="btn" id="add">${icon("plus")} Add line</button>` : ""}</div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
       <div class="card"><div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
-          <span class="muted" id="info"></span><button class="btn primary" id="save">${icon("check")} Save stock count</button></div>` : ""}</div>`;
+          <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save stock count</button></div>` : ""}</div>`;
 
     const grid = $("#grid");
     let rows = lines.map((l) => ({ ...l, _state: "saved" }));
     const guyOptions = (sel) => guys.filter((g) => g.status === "active" || g.employee_id === sel)
       .map((g) => html`<option value="${g.employee_id}" ${g.employee_id === sel ? "selected" : ""}>${g.name}</option>`);
+    // Lines with edits not yet saved (deleted lines too); the app asks before leaving the page while there are any.
+    const unsaved = () => rows.filter((r) => r._state === "deleted" || (r._dirty && r._state !== "gone")).length;
+    if (editable) setDirtyCheck(unsaved);
 
     // A month can have hundreds of lines; draw the first ones, plus any being edited, and the rest on request.
     let shown = 120;
@@ -72,17 +79,23 @@ export default {
         return;
       }
       grid.innerHTML = html`${phone ? personBar() : ""}<div class="table-wrap"><table class="table sheet">
-        <thead><tr><th>Employee</th><th>Product</th><th class="r">Opening</th><th class="r">Issued</th><th class="r">Sold</th><th class="r">Counted</th>
-          <th class="r">Unit price</th><th class="r">Short qty</th><th class="r">Short value</th><th></th></tr></thead>
-        <tbody>${rows.map((r, i) => r._state === "deleted" || !visible(r, i) ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
+        <thead><tr><th scope="col">Employee</th><th scope="col">Product</th><th scope="col" class="r">Opening</th><th scope="col" class="r">Issued</th><th scope="col" class="r">Sold</th><th scope="col" class="r">Counted</th>
+          <th scope="col" class="r">Unit price</th><th scope="col" class="r">Short qty</th><th scope="col" class="r">Short value</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+        <tbody>${rows.map((r, i) => {
+          if (r._state === "deleted" || !visible(r, i)) return "";
+          const product = r._draft?.product ?? r.product;
+          const person = names[empOf(r)] || empOf(r) || "new line";
+          const ctxLabel = `${product || "new product"}, ${person}`;
+          return html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${names[r.employee_id] || r.employee_id}</b><div class="faint text-sm">${r.employee_id}</div>`
             : html`<select class="input sm" data-f="employee_id" aria-label="Employee" style="min-width:160px">${guyOptions(r._draft?.employee_id ?? r.employee_id)}</select>`}</td>
           <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
-          ${INTS.map((k) => html`<td><input data-f="${k}" aria-label="${STOCK_LABEL[k]}, ${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
-          <td><input data-f="unit_price" aria-required="true" placeholder="Price" aria-label="Unit price (required),${r.product || "new product"}, ${names[r.employee_id] || "new line"}" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
+          ${INTS.map((k) => html`<td><input data-f="${k}" data-num aria-label="${STOCK_LABEL[k]}, ${ctxLabel}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
+          <td><input data-f="unit_price" data-num ${r._needPrice ? raw('data-missing="1"') : ""} aria-required="true" placeholder="Price" aria-label="Unit price in rupees, required, ${ctxLabel}" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-q></td><td class="calc" data-v></td>
-          <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove line">${icon("trash")}</button>` : ""}</td>
-        </tr>`)}</tbody>
+          <td>${editable ? html`<button type="button" class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove ${product || "new line"} for ${person}">${icon("trash")}</button>` : ""}</td>
+        </tr>`;
+        })}</tbody>
         <tfoot><tr><td colspan="8">Total shortfall</td><td class="r" id="tot"></td><td></td></tr></tfoot></table></div>
         ${rows.some((r, i) => r._state !== "deleted" && !visible(r, i)) ? html`<div class="more-rows"><span class="muted" role="status">Showing ${rows.filter(visible).length} of ${rows.length} lines</span>
           <button type="button" class="btn" id="more-lines">Show ${Math.min(150, rows.length - shown)} more</button></div>` : ""}`.toString();
@@ -100,18 +113,21 @@ export default {
     // Redrawing rebuilds the table from `rows`, so keep what has been typed so far in a per-row draft.
     const snap = () => $$("tbody tr", grid).forEach((tr) => { const r = rows[tr.dataset.i]; if (r) r._draft = read(tr); });
     const read = (tr) => Object.fromEntries([...tr.querySelectorAll("[data-f]")].map((i) => [i.dataset.f, i.value.trim()]));
+    const changedFrom = (r, v) => r._state === "new" || INTS.some((k) => stockNum(v[k]) !== (r[k] ?? 0)) || Math.round(stockNum(v.unit_price) * 100) !== r.unit_price;
     const refresh = () => {
-      let total = 0, dirty = 0;
+      let total = 0, dirty = 0, bad = 0;
       const perEmp = {};
       const drawn = new Set($$("tbody tr", grid).map((tr) => Number(tr.dataset.i)));
       rows.forEach((r, i) => { // lines not on screen count with their saved values, or what was typed before moving on
         if (drawn.has(i) || r._state === "deleted" || r._state === "gone") return;
         if (r._draft) {
-          const n = (k) => Number(r._draft[k] || 0);
+          r._dirty = true;
+          if (draftBad(r._draft)) { bad++; dirty++; return; }
+          const n = (k) => stockNum(r._draft[k]);
           const q = n("opening_stock") + n("issued") - n("sold") - n("counted_stock");
           const val = Math.max(0, q) * Math.round(n("unit_price") * 100);
           total += val; perEmp[empOf(r)] = (perEmp[empOf(r)] || 0) + val;
-          r._dirty = r._state === "new" || INTS.some((k) => n(k) !== r[k]) || Math.round(n("unit_price") * 100) !== r.unit_price;
+          r._dirty = changedFrom(r, r._draft);
           if (r._dirty) dirty++;
           return;
         }
@@ -121,22 +137,32 @@ export default {
       $$("tbody tr", grid).forEach((tr) => {
         const r = rows[tr.dataset.i];
         const v = read(tr);
-        const n = (k) => Number(v[k] || 0);
+        if (markBadNumbers(tr)) {
+          // Not a number: say so instead of showing NaN, and keep it out of the totals.
+          tr.querySelector("[data-q]").textContent = "—";
+          tr.querySelector("[data-v]").innerHTML = `<span class="neg">Check the numbers</span>`;
+          tr.classList.add("dirty");
+          r._dirty = true;
+          bad++; dirty++;
+          return;
+        }
+        const n = (k) => stockNum(v[k]);
         const q = n("opening_stock") + n("issued") - n("sold") - n("counted_stock");
         const val = Math.max(0, q) * Math.round(n("unit_price") * 100);
-        tr.querySelector("[data-q]").innerHTML = `<span class="${q > 0 ? "neg" : q < 0 ? "pos" : ""}">${q}</span>`;
+        tr.querySelector("[data-q]").innerHTML = `<span class="${q > 0 ? "neg" : q < 0 ? "pos" : ""}">${shortText(q)}</span>`;
         tr.querySelector("[data-v]").innerHTML = val ? `<span class="neg">${money(val)}</span>` : "—";
         total += val;
         const emp = v.employee_id || r.employee_id;
         perEmp[emp] = (perEmp[emp] || 0) + val;
-        const changed = r._state === "new" || INTS.some((k) => n(k) !== r[k]) || Math.round(n("unit_price") * 100) !== r.unit_price;
+        const changed = changedFrom(r, v);
         tr.classList.toggle("dirty", changed);
         r._dirty = changed;
         if (changed) dirty++;
       });
-      if ($("#tot")) $("#tot").innerHTML = `<span class="neg">${money(total)}</span>`;
+      if ($("#tot")) $("#tot").innerHTML = `<span class="neg">${money(total)}</span>${bad ? `<div class="faint text-sm">${bad} line${bad > 1 ? "s" : ""} left out</div>` : ""}`;
       const over = Object.entries(perEmp).filter(([, v]) => v > threshold).map(([e]) => names[e] || e);
-      if ($("#info")) $("#info").innerHTML = (dirty ? `${dirty} line${dirty > 1 ? "s" : ""} changed. ` : "No unsaved changes. ") +
+      if ($("#info")) $("#info").innerHTML = (bad ? `<span class="neg">${bad} line${bad > 1 ? "s have" : " has"} a number that isn't valid. </span>` : "") +
+        (dirty ? `${dirty} line${dirty > 1 ? "s" : ""} changed. ` : "No unsaved changes. ") +
         (over.length ? `<span class="neg">Above the Rs ${money(threshold)} review threshold: ${over.map((o) => o.replace(/[<>&]/g, "")).join(", ")}</span>` : "");
     };
     grid.addEventListener("input", refresh);
@@ -153,6 +179,14 @@ export default {
     });
     sheetKeys(grid);
     draw();
+
+    // Bring a line into view (on a phone, switch to its person) and put the cursor in one of its fields.
+    const focusLine = (r, field) => {
+      if (phone && empOf(r) !== who) goWho(empOf(r));
+      const tr = $$("tbody tr", grid).find((t) => rows[t.dataset.i] === r);
+      const inp = tr && (field ? tr.querySelector(`[data-f="${field}"]`) : tr.querySelector("input[aria-invalid=true]"));
+      inp?.focus();
+    };
 
     $("#add")?.addEventListener("click", () => {
       snap();
@@ -173,27 +207,44 @@ export default {
     $("#save")?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
       const out = [];
       snap(); // what is on screen joins what was typed for the other people
-      const noPrice = rows.filter((r) => r._dirty && r._state !== "deleted" && r._state !== "gone" && (r._draft || {}).unit_price === "");
+      const live = (r) => r._dirty && r._state !== "deleted" && r._state !== "gone";
+      // Numbers that are not numbers: name the lines and put the cursor on the first one.
+      const badRows = rows.filter((r) => live(r) && r._draft && draftBad(r._draft));
+      if (badRows.length) {
+        const list = badRows.map((r) => `${r._draft.product || r.product || "a new product"} (${names[empOf(r)] || empOf(r)})`);
+        focusLine(badRows[0]);
+        throw new Error(`Check the numbers for ${list.length === 1 ? list[0] : `${list.length} lines: ${list.slice(0, 4).join(", ")}${list.length > 4 ? "…" : ""}`}. Stock is a whole number of units, and a price looks like 850 or 850.50.`);
+      }
+      // Every product needs a price: mark each empty one and put the cursor on the first.
+      const noPrice = rows.filter((r) => live(r) && (r._draft || {}).unit_price === "");
       if (noPrice.length) {
-        const list = noPrice.map((r) => `${r._draft.product || r.product || "a new product"} (${names[empOf(r)] || empOf(r)})`);
+        noPrice.forEach((r) => { r._needPrice = true; });
         if (phone && empOf(noPrice[0]) !== who) goWho(empOf(noPrice[0]));
-        $$("[data-f=unit_price]", grid).find((i) => i.value.trim() === "")?.setAttribute("aria-invalid", "true");
+        $$("tbody tr", grid).forEach((tr) => {
+          if (!rows[tr.dataset.i]?._needPrice) return;
+          const i = tr.querySelector("[data-f=unit_price]");
+          i.dataset.missing = "1";
+          i.setAttribute("aria-invalid", "true");
+        });
+        focusLine(noPrice[0], "unit_price");
+        const list = noPrice.map((r) => `${r._draft.product || r.product || "a new product"} (${names[empOf(r)] || empOf(r)})`);
         throw new Error(`Add a price for ${list.length === 1 ? list[0] : `${list.length} lines: ${list.slice(0, 4).join(", ")}${list.length > 4 ? "…" : ""}`}. Every product needs a unit price.`);
       }
       for (const r of rows) {
-        if (!r._dirty || r._state === "deleted" || r._state === "gone") continue;
+        if (!live(r)) continue;
         const v = r._draft || {};
         const product = v.product ?? r.product;
         const emp = v.employee_id ?? r.employee_id;
-        if (!product) throw new Error("Every line needs a product name");
-        if (v.counted_stock === "") throw new Error(`${product}: enter the counted stock`);
-        if (v.unit_price === "") throw new Error(`${product}: enter the unit price`);
-        out.push({ period: state.period, employee_id: emp, product, opening_stock: v.opening_stock || 0, issued: v.issued || 0, sold: v.sold || 0, counted_stock: v.counted_stock, unit_price: v.unit_price });
+        if (!product) { focusLine(r, "product"); throw new Error("Every line needs a product name"); }
+        if (v.counted_stock === "") { focusLine(r, "counted_stock"); throw new Error(`${product}: enter the counted stock`); }
+        out.push({ period: state.period, employee_id: emp, product, opening_stock: v.opening_stock || 0, issued: v.issued || 0, sold: v.sold || 0,
+          counted_stock: v.counted_stock, unit_price: String(parseAmount(v.unit_price)) });
       }
       rows.filter((r) => r._state === "deleted").forEach((r) => out.push({ period: state.period, employee_id: r.employee_id, product: r.product, _delete: true }));
       if (!out.length) return toast("Nothing to save", "warn");
       const res = await post("/api/stock/bulk", { rows: out });
       toast(`Stock saved — ${res.created} added, ${res.updated} updated${res.deleted ? `, ${res.deleted} removed` : ""}`);
+      setDirtyCheck(null);
       this.render(ctx);
     }));
   },

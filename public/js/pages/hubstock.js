@@ -1,10 +1,12 @@
 import { get, post, qs } from "../api.js";
-import { state, can, scopeHub } from "../app.js";
-import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner } from "./shared.js";
+import { state, can, scopeHub, setDirtyCheck } from "../app.js";
+import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, parseAmount } from "../ui.js";
+import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
 
 const INTS = ["opening_stock", "received", "issued", "counted_stock"];
+// Same words as the column headings, so a screen reader says what is on screen.
+const LABEL = { opening_stock: "Opening", received: "Received", issued: "Given out", counted_stock: "Counted" };
 const prevPeriod = (p) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
 
 export default {
@@ -24,17 +26,19 @@ export default {
       <div class="page-head">
         <div><h1>Hub stock</h1><p>Each hub's stock for the month. Expected = opening + received − given out. Difference = expected − counted.</p></div>
         <div class="actions">${editable ? html`
-          <button class="btn" id="carry">${icon("copy")} Open from last month's count</button>
-          <button class="btn" id="add" ${hubs.length ? "" : "disabled"}>${icon("plus")} Add product</button>` : ""}</div>
+          <button type="button" class="btn" id="carry">${icon("copy")} Open from last month's count</button>
+          <button type="button" class="btn" id="add" ${hubs.length ? "" : "disabled"}>${icon("plus")} Add product</button>` : ""}</div>
       </div>
       ${locked ? lockedBanner(state.period) : ""}
       <div class="card"><div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
-          <span class="muted" id="info"></span><button class="btn primary" id="save">${icon("check")} Save hub stock</button></div>` : ""}</div>`;
+          <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save hub stock</button></div>` : ""}</div>`;
 
     const grid = $("#grid");
     let rows = lines.map((l) => ({ ...l, _state: "saved" }));
     const hubOptions = (sel) => hubs.map((h) => html`<option value="${h.code}" ${h.code === sel ? "selected" : ""}>${h.name}</option>`);
+    // The app asks before leaving the page while lines have unsaved edits (deleted lines too).
+    if (editable) setDirtyCheck(() => rows.filter((r) => r._state === "deleted" || (r._dirty && r._state !== "gone")).length);
 
     const draw = () => {
       if (!rows.length) {
@@ -42,17 +46,23 @@ export default {
         return;
       }
       grid.innerHTML = html`<div class="table-wrap"><table class="table sheet">
-        <thead><tr><th>Hub</th><th>Product</th><th class="r">Opening</th><th class="r">Received</th><th class="r">Given out</th><th class="r">Counted</th>
-          <th class="r">Unit price</th><th class="r">Expected</th><th class="r">Difference</th><th class="r">Stock value</th><th></th></tr></thead>
-        <tbody>${rows.map((r, i) => r._state === "deleted" ? "" : html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
+        <thead><tr><th scope="col">Hub</th><th scope="col">Product</th><th scope="col" class="r">Opening</th><th scope="col" class="r">Received</th><th scope="col" class="r">Given out</th><th scope="col" class="r">Counted</th>
+          <th scope="col" class="r">Unit price</th><th scope="col" class="r">Expected</th><th scope="col" class="r">Difference</th><th scope="col" class="r">Stock value</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+        <tbody>${rows.map((r, i) => {
+          if (r._state === "deleted") return "";
+          const product = r._draft?.product ?? r.product;
+          const hub = hubName(r._draft?.hub ?? r.hub);
+          const ctxLabel = `${product || "new product"}, ${hub || "new line"}`;
+          return html`<tr data-i="${i}" class="${r._state === "new" ? "dirty" : ""}">
           <td class="name">${r.id ? html`<b>${hubName(r.hub)}</b><div class="faint text-sm">${r.hub}</div>`
             : html`<select class="input sm" data-f="hub" aria-label="Hub" style="min-width:140px">${hubOptions(r._draft?.hub ?? r.hub)}</select>`}</td>
-          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
-          ${INTS.map((k) => html`<td><input data-f="${k}" aria-label="${k.replace("_", " ")}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
-          <td><input data-f="unit_price" aria-label="Unit price in rupees, required" aria-required="true" placeholder="Price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
+          <td>${r.id ? html`<b>${r.product}</b>` : html`<input class="text" data-f="product" aria-label="Product name" value="${r._draft?.product ?? r.product ?? ""}" placeholder="Product name">`}</td>
+          ${INTS.map((k) => html`<td><input data-f="${k}" data-num aria-label="${LABEL[k]}, ${ctxLabel}" inputmode="numeric" value="${r._draft?.[k] ?? r[k] ?? ""}" ${editable ? "" : "disabled"} style="min-width:70px"></td>`)}
+          <td><input data-f="unit_price" data-num aria-label="Unit price in rupees, required, ${ctxLabel}" aria-required="true" placeholder="Price" inputmode="decimal" value="${r._draft?.unit_price ?? (r.unit_price != null ? fromCents(r.unit_price) : "")}" ${editable ? "" : "disabled"}></td>
           <td class="calc" data-e></td><td class="calc" data-q></td><td class="calc" data-v></td>
-          <td>${editable ? html`<button class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove product">${icon("trash")}</button>` : ""}</td>
-        </tr>`)}</tbody>
+          <td>${editable ? html`<button type="button" class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove ${product || "new product"} at ${hub}">${icon("trash")}</button>` : ""}</td>
+        </tr>`;
+        })}</tbody>
         <tfoot><tr><td colspan="8">Totals</td><td class="r" id="tot-short"></td><td class="r" id="tot-val"></td><td></td></tr></tfoot></table></div>`.toString();
       if (isPhone()) stackTable(grid.querySelector("table"));
       refresh();
@@ -62,11 +72,21 @@ export default {
     const read = (tr) => Object.fromEntries([...tr.querySelectorAll("[data-f]")].map((i) => [i.dataset.f, i.value.trim()]));
     const snap = () => $$("tbody tr", grid).forEach((tr) => { const r = rows[tr.dataset.i]; if (r) r._draft = read(tr); });
     const refresh = () => {
-      let short = 0, value = 0, dirty = 0;
+      let short = 0, value = 0, dirty = 0, bad = 0;
       $$("tbody tr", grid).forEach((tr) => {
         const r = rows[tr.dataset.i];
         const v = read(tr);
-        const n = (k) => Number(v[k] || 0);
+        if (markBadNumbers(tr)) {
+          // Not a number: say so instead of showing NaN, and keep it out of the totals.
+          tr.querySelector("[data-e]").textContent = "—";
+          tr.querySelector("[data-q]").textContent = "—";
+          tr.querySelector("[data-v]").innerHTML = `<span class="neg">Check the numbers</span>`;
+          tr.classList.add("dirty");
+          r._dirty = true;
+          bad++; dirty++;
+          return;
+        }
+        const n = (k) => stockNum(v[k]);
         const price = Math.round(n("unit_price") * 100);
         const expected = n("opening_stock") + n("received") - n("issued");
         const q = expected - n("counted_stock");
@@ -74,14 +94,15 @@ export default {
         tr.querySelector("[data-q]").innerHTML = v.counted_stock === "" ? "" : `<span class="${q > 0 ? "neg" : q < 0 ? "pos" : ""}">${q > 0 ? `${q} short` : q < 0 ? `${-q} over` : "0"}</span>`;
         tr.querySelector("[data-v]").textContent = v.counted_stock === "" ? "" : money(n("counted_stock") * price);
         if (v.counted_stock !== "") { short += Math.max(0, q) * price; value += n("counted_stock") * price; }
-        const changed = r._state === "new" || INTS.some((k) => n(k) !== r[k]) || price !== r.unit_price;
+        const changed = r._state === "new" || INTS.some((k) => n(k) !== (r[k] ?? 0)) || price !== r.unit_price;
         tr.classList.toggle("dirty", changed);
         r._dirty = changed;
         if (changed) dirty++;
       });
       if ($("#tot-short")) $("#tot-short").innerHTML = short ? `<span class="neg">${money(short)} short</span>` : "—";
       if ($("#tot-val")) $("#tot-val").innerHTML = `<b>${money(value)}</b>`;
-      if ($("#info")) $("#info").textContent = dirty ? `${dirty} line${dirty > 1 ? "s" : ""} changed` : "No unsaved changes";
+      if ($("#info")) $("#info").innerHTML = (bad ? `<span class="neg">${bad} line${bad > 1 ? "s have" : " has"} a number that isn't valid. </span>` : "") +
+        (dirty ? `${dirty} line${dirty > 1 ? "s" : ""} changed` : "No unsaved changes");
     };
     grid.addEventListener("input", refresh);
     grid.addEventListener("change", refresh);
@@ -116,30 +137,37 @@ export default {
     }));
     $("#save")?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
       const out = [];
-      // Every product needs a price. Name all the lines that lack one, mark them, and put the cursor on the first.
-      $$("[data-f=unit_price]", grid).forEach((i) => i.removeAttribute("aria-invalid"));
-      const noPrice = $$("tbody tr", grid).filter((tr) => rows[tr.dataset.i]._dirty && read(tr).unit_price === "");
-      if (noPrice.length) {
-        noPrice.forEach((tr) => tr.querySelector("[data-f=unit_price]").setAttribute("aria-invalid", "true"));
-        noPrice[0].querySelector("[data-f=unit_price]").focus();
-        const list = noPrice.map((tr) => read(tr).product || rows[tr.dataset.i].product || "a new product");
-        throw new Error(`Add a price for ${list.length === 1 ? list[0] : `${list.length} products: ${list.slice(0, 5).join(", ")}${list.length > 5 ? "…" : ""}`}. Every product needs a unit price.`);
+      const trs = $$("tbody tr", grid);
+      const name = (tr) => read(tr).product || rows[tr.dataset.i].product || "a new product";
+      const listOf = (bad, n) => (bad.length === 1 ? name(bad[0]) : `${bad.length} products: ${bad.slice(0, n).map(name).join(", ")}${bad.length > n ? "…" : ""}`);
+      // Numbers that are not numbers: name the lines and put the cursor on the first bad field.
+      const badRows = trs.filter((tr) => rows[tr.dataset.i]._dirty && markBadNumbers(tr));
+      if (badRows.length) {
+        [...badRows[0].querySelectorAll("input[data-num]")].find((i) => badNumber(i.dataset.f, i.value))?.focus();
+        throw new Error(`Check the numbers for ${listOf(badRows, 5)}. Stock is a whole number of units, and a price looks like 850 or 850.50.`);
       }
-      for (const tr of $$("tbody tr", grid)) {
+      // Every product needs a price. Name all the lines that lack one, mark them, and put the cursor on the first.
+      const noPrice = trs.filter((tr) => rows[tr.dataset.i]._dirty && read(tr).unit_price === "");
+      if (noPrice.length) {
+        noPrice.forEach((tr) => { const i = tr.querySelector("[data-f=unit_price]"); i.dataset.missing = "1"; i.setAttribute("aria-invalid", "true"); });
+        noPrice[0].querySelector("[data-f=unit_price]").focus();
+        throw new Error(`Add a price for ${listOf(noPrice, 5)}. Every product needs a unit price.`);
+      }
+      for (const tr of trs) {
         const r = rows[tr.dataset.i];
         if (!r._dirty) continue;
         const v = read(tr);
         const product = v.product ?? r.product;
-        if (!product) throw new Error("Every line needs a product name");
-        if (v.counted_stock === "") throw new Error(`${product}: enter the counted stock`);
-        if (v.unit_price === "") throw new Error(`${product}: enter the unit price`);
+        if (!product) { tr.querySelector("[data-f=product]")?.focus(); throw new Error("Every line needs a product name"); }
+        if (v.counted_stock === "") { tr.querySelector("[data-f=counted_stock]")?.focus(); throw new Error(`${product}: enter the counted stock`); }
         out.push({ period: state.period, hub: v.hub ?? r.hub, product, opening_stock: v.opening_stock || 0, received: v.received || 0, issued: v.issued || 0,
-          counted_stock: v.counted_stock, unit_price: v.unit_price });
+          counted_stock: v.counted_stock, unit_price: String(parseAmount(v.unit_price)) });
       }
       rows.filter((r) => r._state === "deleted").forEach((r) => out.push({ period: state.period, hub: r.hub, product: r.product, _delete: true }));
       if (!out.length) return toast("Nothing to save", "warn");
       const res = await post("/api/hubstock/bulk", { rows: out });
       toast(`Hub stock saved — ${res.created} added, ${res.updated} updated${res.deleted ? `, ${res.deleted} removed` : ""}`);
+      setDirtyCheck(null);
       this.render(ctx);
     }));
   },

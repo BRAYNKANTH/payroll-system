@@ -29,6 +29,29 @@ export const lockedBanner = (period) => html`<div class="alert info mb-4">${icon
 
 export const hubName = (hubs, code) => hubs.find((h) => h.code === code)?.name || code;
 
+// Stock sheets: a count is a whole number of units, 0 or more; a price is an amount of 0 or more ("1,250.50" is fine).
+// Empty is not "bad" here; the save checks which fields are required.
+export function badNumber(field, value) {
+  const v = String(value ?? "").trim();
+  if (v === "") return false;
+  if (field === "unit_price") { const n = parseAmount(v); return !Number.isFinite(n) || n < 0; }
+  return !/^\d+$/.test(v);
+}
+// The value of a stock field as a number: empty counts as 0. Only call it on a value badNumber accepts.
+export const stockNum = (value) => parseAmount(value) ?? 0;
+// Mark each number cell in a row that holds something that is not a number, or a required price left empty after a save attempt.
+// Returns true when the row has a bad number.
+export function markBadNumbers(tr) {
+  let bad = false;
+  tr.querySelectorAll("input[data-num]").forEach((i) => {
+    const wrong = badNumber(i.dataset.f, i.value);
+    const missing = i.dataset.missing === "1" && i.value.trim() === "";
+    if (wrong || missing) i.setAttribute("aria-invalid", "true"); else i.removeAttribute("aria-invalid");
+    if (wrong) bad = true;
+  });
+  return bad;
+}
+
 // Money cells show "14,751.00" when not being edited and plain digits while typing.
 export function moneyInputs(root) {
   root.addEventListener("focusin", (e) => {
