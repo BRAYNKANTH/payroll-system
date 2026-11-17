@@ -4,6 +4,8 @@
 // Mock data shaped like the real business: three Jaffna branches, each with a coacher, a promoting manager, a manager
 // (who sells too), supervisors and distributors. One branch is small enough for its manager to be "retaining". Four months are finalized and the current month is open with flagged cases.
 // All names and numbers are made up.
+//   --open=2026-10  makes that month the one with every exception scenario (the four months before it are finalized, and the months after it
+//                   up to today are filled in cleanly), instead of the current month.
 const path = require("path");
 const crypto = require("crypto");
 const db = require("./db");
@@ -80,6 +82,15 @@ for (const [username, full_name, role, hub, password] of DEMO_USERS.slice(1)) {
   created.push(username);
 }
 
+// The month that carries the exceptions (default: the current month) and a helper for the months around it.
+const openArg = (process.argv.find((a) => a.startsWith("--open=")) || "").slice(7);
+if (openArg && !/^\d{4}-(0[1-9]|1[0-2])$/.test(openArg)) throw new Error("--open must be YYYY-MM");
+const nowDate = new Date();
+const baseDate = openArg ? new Date(openArg + "-01T00:00:00Z") : nowDate;
+const ym = (offset) => new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + offset, 1)).toISOString().slice(0, 7);
+const open = ym(0);
+const currentMonth = nowDate.toISOString().slice(0, 7);
+
 // id, name, hub, position, reports to, usual business per working day, share of days worked.
 // Each branch: one coacher, a promoting manager, a manager (who sells too) and the sellers. Jaffna 03 is small, so its manager is "retaining".
 const TEAM = [
@@ -104,8 +115,13 @@ for (const [i, [id, name, hub, position, upline]] of TEAM.entries()) {
     phone: `077 ${String(100 + i).padStart(3, "0")} ${2000 + i * 7}`, join_date: "2024-03-01",
   });
 }
+// A distributor who joined in the middle of the open month and has no bank account on file yet.
+await add("staff", { employee_id: "D11", name: "Kumar Vel", hub: "J1", staff_level: "distributor", upline_id: "M01", ...PAY.distributor,
+  phone: "077 200 3003", join_date: open + "-12" });
 // Staff-portal logins: a distributor and two supervisors can sign in and see their own figures.
-const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"], ["coacher1", "Jegan Muthiah", "C01"], ["promo1", "Hari Prasath", "PM01"], ["mgrme1", "Arun Selvam", "M01"]]
+const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"], ["coacher1", "Jegan Muthiah", "C01"], ["promo1", "Hari Prasath", "PM01"], ["mgrme1", "Arun Selvam", "M01"],
+  ["coacher2", "Mala Krishnan", "C02"], ["coacher3", "Rajan Thevar", "C03"], ["promo2", "Ganesan Pillai", "PM02"], ["mgrme2", "Ravi Shankar", "M02"],
+  ["mgrme3", "Selvi Anand", "M03"], ["anitha", "Anitha Jegan", "D04"], ["sutha", "Sutha Pillai", "D07"], ["dinesh", "Dinesh Prabu", "S03"], ["kumar", "Kumar Vel", "D11"]]
   .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
 for (const [username, full_name, employee_id, password] of PORTAL_USERS) {
   await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id, password });
@@ -163,20 +179,18 @@ async function closeMonth(period) {
   await svc.finalizePeriod(d, period, "admin");
 }
 
-// Four finalized months, then the current month stays open.
-const now = new Date();
-const ym = (offset) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString().slice(0, 7);
+// Four finalized months, then the open month carries the exceptions.
 const growth = [0.9, 0.95, 1.0, 1.04];
 // A loan that started three months ago (Rs 10,000 still to come) and an advance for the open month, so the loans page has something to show.
 await loans.create(d, { employee_id: "D01", kind: "loan", amount: 40000, instalment: 10000, start_period: ym(-3), issued_on: ym(-3) + "-02", note: "School fees" }, "admin");
 await loans.create(d, { employee_id: "D03", kind: "advance", amount: 5000, start_period: ym(0), issued_on: ym(0) + "-04", note: "Medical" }, "admin");
+await loans.create(d, { employee_id: "S02", kind: "loan", amount: 30000, instalment: 5000, start_period: ym(-2), issued_on: ym(-2) + "-06", note: "Bike repair" }, "admin");
 for (let i = 0; i < 4; i++) {
   await month(ym(i - 4), { growth: growth[i], short: { D02: 1500 } });
   await closeMonth(ym(i - 4));
 }
 
 // The open month has realistic exceptions for the approvals queue.
-const open = ym(0);
 await month(open, { growth: 1.06, short: { D02: 1500, D04: 9000 }, draws: { M02: 45000 }, stockShort: { D07: 9 } });
 const row = (await svc.listEntries(d, "daily", { period: open, employee_id: "D01" }))[0];
 await svc.updateEntry(d, "daily", row.id, { settled_amount: row.settled_amount / 100 - 200, notes: "Recount: Rs 200 short" }, "admin");
@@ -184,7 +198,46 @@ await svc.updateEntry(d, "staff", "D07", { bank_account_no: "3000999888" }, "adm
 // Pavan's last two days were entered by Pavan himself on the staff portal and are waiting for the office to confirm them.
 await d.run(`UPDATE daily_log SET source = 'portal', created_by = 'pavan' WHERE id IN
   (SELECT id FROM daily_log WHERE employee_id = 'D01' AND date >= ? AND date < ? ORDER BY date DESC LIMIT 2)`, open + "-01", svc.shiftPeriod(open, 1) + "-01");
+
+// More scenarios in the open month ------------------------------------------------------------------------------------------------
+// Security with a lifetime cap (it stops once Rs 3,000 has been held in all months together).
+await svc.updateEntry(d, "staff", "D05", { security_deduction_rule: "pct_business:1;cap:3000" }, "admin");
+// A supervisor on the plain scheme: basic plus commission only on what is above the target.
+await svc.updateEntry(d, "staff", "S04", { pay_scheme: "over_target", basic_pay: 30000, target: 120000, commission_rate: 0.3, base_commission_rate: 0, food_per_day: 0, food_min_days: 0 }, "admin");
+// A day where more cash was handed in than sold (a credit line, which is flagged).
+const credit = (await svc.listEntries(d, "daily", { period: open, employee_id: "D05" }))[1];
+await svc.updateEntry(d, "daily", credit.id, { settled_amount: credit.business_amount / 100 + 400, notes: "Customer paid an old balance" }, "admin");
+// Allowances for two people.
+await svc.createEntry(d, "allowances", { period: open, employee_id: "S03", description: "Attendance bonus", amount: 2000 }, "admin");
+await svc.createEntry(d, "allowances", { period: open, employee_id: "S01", description: "Festival bonus", amount: 5000 }, "admin");
+// A new joiner: entries only from the day they joined, no stock count, no bank account.
+const [oy, om] = open.split("-").map(Number);
+const joinDays = [];
+for (let day = 12; day <= new Date(oy, om, 0).getDate(); day++) {
+  if (new Date(oy, om - 1, day).getDay() === 0) continue;
+  const business = Math.round((2600 + rnd() * 900) / 10) * 10;
+  joinDays.push({ date: `${open}-${String(day).padStart(2, "0")}`, employee_id: "D11", business_amount: business, settled_amount: Math.round(business * 0.92 / 10) * 10, personal_minus: 0 });
+}
+await svc.bulkUpsert(d, "daily", joinDays, "manager1");
+// A leaver: a distributor who left near the end of the month (still paid for the days worked).
+const people = require("./people");
+await people.leave(d, "D08", { leave_date: open + "-24", reason: "Moved to another town" }, "admin");
+
 await svc.runPeriod(d, open, "admin");
+// The admin has dealt with some of the flagged lines already; the rest wait in the approvals queue.
+const decide = async (id, decision, note) => {
+  const r = (await svc.getPeriod(d, open)).rows.find((x) => x.employee_id === id);
+  if (r && r.status === "pending_review") await svc.review(d, open, id, "admin", decision, note);
+};
+await decide("D02", "approved", "Checked against the hub's cash book");
+await decide("M03", "approved", "Small hub: the retaining month is confirmed by the owner");
+await decide("D04", "rejected", "Cash short is too large. Recount with the manager and re-enter");
+
+// The months after the open one, up to today, are filled in cleanly so the current month is not empty.
+for (let o = 1; ym(o) <= currentMonth; o++) {
+  await month(ym(o), { growth: 1.05 + o * 0.01 });
+  await svc.runPeriod(d, ym(o), "admin");
+}
 
 console.log(`Seeded ${remote ? "the Postgres database from DATABASE_URL" : target}`);
 console.log(remote ? "Sign-ins (random passwords — save them now, they are not shown again):" : "Demo sign-ins:");

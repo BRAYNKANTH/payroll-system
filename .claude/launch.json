@@ -30,6 +30,16 @@
         "8092"
       ],
       "port": 8092
+    },
+    {
+      "name": "payroll-october",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--no-warnings",
+        "server.js",
+        "data/october"
+      ],
+      "port": 8090
     }
   ]
 }

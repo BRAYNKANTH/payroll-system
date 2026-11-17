@@ -11,6 +11,7 @@ Needs Node 22+.
 ```
 npm install
 npm run demo        # local demo: data/demo with 3 hubs and 5 months of data, then serve it
+npm run demo:october # October 2026 with every exception scenario and a login for each kind of user (data/october)
 npm start           # local real database in data/pglite (first visit asks you to create the admin)
 npm test
 ```
