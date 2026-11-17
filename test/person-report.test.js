@@ -59,3 +59,15 @@ test("a manager's report shows the team and leaves out an estimate, and an empty
   const empty = exporter.personReportPdf(await portal.forEmployee(d, "D1", "2026-01", null), { canPay: true });
   assert.equal(empty.data.subarray(0, 5).toString(), "%PDF-");
 });
+
+test("the commission report counts the over-target income of a tiered seller, not just the base commission", async () => {
+  const d = await setup();
+  const tiered = { pay_scheme: "tiered", basic_pay: 25000, target: 100000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 0, security_deduction_rule: "none" };
+  for (const id of ["T1", "T2"]) await svc.createEntry(d, "staff", { employee_id: id, name: `Name ${id}`, hub: "H1", staff_level: "distributor", upline_id: "M1", ...tiered, bank_account_no: "2222" + id.slice(1).padStart(4, "0") }, "admin");
+  await svc.createEntry(d, "daily", { date: "2026-10-03", employee_id: "T1", business_amount: 120000, settled_amount: 120000 }, "admin"); // 20,000 over target
+  await svc.createEntry(d, "daily", { date: "2026-10-03", employee_id: "T2", business_amount: 80000, settled_amount: 80000 }, "admin"); // below target
+  await svc.runPeriod(d, "2026-10", "admin");
+  const rows = Object.fromEntries((await svc.commissionReport(d, "2026-10")).map((r) => [r.employee_id, r.commission]));
+  assert.equal(rows.T1, 600000, "30% of the Rs 20,000 over target");
+  assert.equal(rows.T2, 2000000, "25% of all Rs 80,000 below target");
+});
