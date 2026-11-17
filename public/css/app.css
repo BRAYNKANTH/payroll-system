@@ -1137,3 +1137,24 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 @media (max-width: 860px) { .kpi .kpi-note { display: none; } }
 /* Small phones: a long button label keeps its first words so the header buttons fit on one line. */
 @media (max-width: 480px) { .lbl-long { display: none; } }
+/* ---------- Audit fixes (Nov 17): sideways scroll, slimmer top bar, contrast ---------- */
+/* A long segmented control scrolls inside itself instead of widening the page. */
+.seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.card-head > .seg, .card-head > div:has(> .seg) { min-width: 0; max-width: 100%; }
+/* Laptop and half-screen widths: one row, search shrinks first. */
+@media (max-width: 1240px) and (min-width: 861px) {
+  .topbar { flex-wrap: nowrap; padding: 10px 16px; gap: 10px; }
+  .topbar .gsearch { flex: 1 1 140px; min-width: 120px; max-width: 260px; }
+  .topbar .filters { flex-wrap: nowrap; flex-shrink: 0; }
+  .topbar .gsearch .gs-key { display: none; }
+  .hub-filter { min-width: 110px; }
+}
+/* Phones: search sits in the header row instead of taking a second one. */
+@media (max-width: 860px) {
+  .topbar { flex-wrap: nowrap; }
+  .topbar .gsearch { order: 0; flex: 1 1 0; min-width: 0; }
+  .topbar .gsearch .input { padding-right: 10px; text-overflow: ellipsis; }
+  .topbar .spacer { display: none; }
+  .btn.icon, .btn.sm.icon, .sidebar-close { min-width: 44px; }
+}
