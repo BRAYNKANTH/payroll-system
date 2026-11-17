@@ -12,7 +12,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Hubs</h1><p>Branches that guys and managers work from. Business figures are for ${new Date(state.period + "-01").toLocaleDateString("en-GB", { month: "long", year: "numeric" })}.</p></div>
+        <div><h1>Hubs</h1><p>Branches where distributors, supervisors and managers work. Business figures are for ${new Date(state.period + "-01").toLocaleDateString("en-GB", { month: "long", year: "numeric" })}.</p></div>
         <div class="actions">${can("manage_hubs") ? html`<button class="btn primary" id="add">${icon("plus")} Add hub</button>` : ""}</div>
       </div>
       <div class="grid three" id="cards"></div>`;
@@ -24,7 +24,7 @@ export default {
       const st = stats[h.code] || {};
       return html`<div class="card">
         <div class="card-head"><div class="row" style="gap:12px"><div class="kpi" style="padding:0"><span class="icon blue" style="width:40px;height:40px">${icon("store")}</span></div>
-          <div><h2><a href="/hubs/${h.code}" data-link style="color:inherit">${h.name}</a></h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
+          <div><h2><a href="/hubs/${h.code}" data-link style="color:inherit;display:inline-block;min-height:24px;padding:2px 0">${h.name}</a></h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
         <div class="card-body">
           <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
             <div><div class="faint" style="font-size:11.5px">Business</div><b class="num">${compact(st.hub_business || 0)}</b></div>

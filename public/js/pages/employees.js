@@ -4,6 +4,12 @@ import { isPhone, stepForm } from "../phone.js";
 import { exportButtons, $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
 let filters = { q: "", role: "", status: "active" };
+// The list starts with the columns people look for most. The rest are one tap away in "Columns" and the choice is remembered.
+const COLS_KEY = "emp.hiddenCols";
+const DEFAULT_HIDDEN = ["basic_pay", "target", "commission_rate", "bank_account_no"];
+let hiddenCols = DEFAULT_HIDDEN;
+try { const v = JSON.parse(localStorage.getItem(COLS_KEY)); if (Array.isArray(v)) hiddenCols = v; } catch { /* storage unavailable: use the default */ }
+const saveCols = () => { try { localStorage.setItem(COLS_KEY, JSON.stringify(hiddenCols)); } catch { /* private window: keep it for this visit only */ } };
 
 function parseRule(rule) {
   const m = /^(fixed|pct_gross|pct_basic|pct_business):([\d.]+)(?:;cap:([\d.]+))?$/.exec(String(rule || "").trim());
@@ -187,6 +193,20 @@ export default {
     const byId = Object.fromEntries(staff.map((s) => [s.employee_id, s]));
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
 
+    const allCols = [
+      { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
+      { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
+      { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
+      { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
+      ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic pay", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),
+      { key: "target", label: "Target", align: "r", render: (s) => s.role === "guy" ? money(s.target) : html`<span class="faint">—</span>` },
+      ...(!can("view_pay") ? [] : [{ key: "commission_rate", label: "Commission", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` }]),
+      { key: "bank_account_no", label: "Bank", render: (s) => !s.bank_account_no ? html`<span class="badge amber plain">missing</span>`
+        : s.bank_account_no !== s.bank_account_verified ? html`<span class="badge red">unverified</span>` : html`<span class="mono faint">…${s.bank_account_no.slice(-4)}</span>` },
+      { key: "status", label: "Status", render: (s) => badge(s.status) },
+      { key: "report", label: "PDF report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
+    ];
+
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Employees</h1><p>${staff.filter((s) => s.status === "active").length} active · ${LEVELS.map(([v]) => [staff.filter((s) => s.staff_level === v && s.status === "active").length, v]).filter(([n]) => n)
@@ -199,8 +219,10 @@ export default {
           <div class="row">
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
             <select class="input sm" id="role" aria-label="Filter by position" style="width:auto"><option value="">All positions</option>${LEVELS.map(([v, l]) => html`<option value="${v}" ${filters.role === v ? "selected" : ""}>${l}</option>`)}</select>
-            <div class="seg" id="st">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button data-v="${v}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
+            <div class="seg" id="st" role="group" aria-label="Filter by status">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.status === v)}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
           </div>
+          <details class="colpick"><summary class="btn sm">${icon("sheet")} Columns</summary>
+            <div class="colpick-menu" role="group" aria-label="Choose the columns to show">${allCols.filter((c) => c.key !== "name").map((c) => html`<label><input type="checkbox" data-col="${c.key}" ${hiddenCols.includes(c.key) ? "" : "checked"}> ${c.label}</label>`)}</div></details>
         </div>
         <div class="card-body flush" id="list"></div>
       </div>`;
@@ -215,25 +237,27 @@ export default {
           <span class="mc-end">${badge(s.role, levelLabel(s.staff_level))}<br>${badge(s.status)}</span>`,
         summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"}`, rowAction: "", rowLabel: (s) => `Open ${s.name}`,
         onRow: (s) => navigate(`/employees/${encodeURIComponent(s.employee_id)}`),
-        cols: [
-          { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
-          { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
-          { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
-          { key: "report", label: "Report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
-        { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
-          ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),
-          { key: "target", label: "Target", align: "r", render: (s) => s.role === "guy" ? money(s.target) : html`<span class="faint">—</span>` },
-          ...(!can("view_pay") ? [] : [{ key: "commission_rate", label: "Comm.", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` }]),
-          { key: "bank_account_no", label: "Bank", render: (s) => !s.bank_account_no ? html`<span class="badge amber plain">missing</span>`
-            : s.bank_account_no !== s.bank_account_verified ? html`<span class="badge red">unverified</span>` : html`<span class="mono faint">…${s.bank_account_no.slice(-4)}</span>` },
-          { key: "status", label: "Status", render: (s) => badge(s.status) },
-        ],
-      }).toString() : emptyState("No employees yet", "Add your guys, supervisors and managers to start entering sheets.", "users").toString();
+        cols: allCols.filter((c) => !hiddenCols.includes(c.key)),
+      }).toString() : emptyState("No employees yet", "Add your distributors, supervisors and managers to start entering sheets.", "users").toString();
+      if (staff.length && !rows.length) $("#list").insertAdjacentHTML("beforeend", `<div class="empty-actions"><button type="button" class="btn" id="clear-filters">Clear filters</button></div>`);
+    };
+    const resetFilters = () => {
+      Object.assign(filters, { q: "", role: "", status: "active" });
+      $("#q").value = ""; $("#role").value = "";
+      $$("#st button", el).forEach((x) => { const on = x.dataset.v === "active"; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
+      draw(); $("#q").focus();
     };
     draw();
     $("#q").oninput = (e) => { filters.q = e.target.value; draw(); };
     $("#role").onchange = (e) => { filters.role = e.target.value; draw(); };
-    $$("#st button", el).forEach((b) => (b.onclick = () => { filters.status = b.dataset.v; $$("#st button", el).forEach((x) => x.classList.toggle("on", x === b)); draw(); }));
+    $$("#st button", el).forEach((b) => (b.onclick = () => { filters.status = b.dataset.v; $$("#st button", el).forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); draw(); }));
+    el.addEventListener("click", (e) => { if (e.target.closest("#clear-filters")) resetFilters(); });
+    el.addEventListener("change", (e) => {
+      const c = e.target.closest("[data-col]");
+      if (!c) return;
+      hiddenCols = c.checked ? hiddenCols.filter((k) => k !== c.dataset.col) : [...new Set([...hiddenCols, c.dataset.col])];
+      saveCols(); draw();
+    });
     $("#add")?.addEventListener("click", () => employeeForm(null, (s) => navigate(`/employees/${encodeURIComponent(s.employee_id)}`)));
   },
 };

@@ -55,10 +55,10 @@ export const initials = (name) => String(name || "?").split(/\s+/).filter(Boolea
 export const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 export const statusLabel = (s) => ({ auto_approved: "Auto-approved", pending_review: "Needs review", approved: "Approved", rejected: "Rejected", finalized: "Finalized", open: "Open" }[s] || titleCase(s));
 export const badge = (s, label) => html`<span class="badge ${s}">${label || statusLabel(s)}</span>`;
-export const roleLabel = (r) => (r === "guy" ? "Guy / Supervisor" : r === "manager" ? "Manager" : titleCase(r));
+export const roleLabel = (r) => (r === "guy" ? "Distributor / Supervisor" : r === "manager" ? "Manager" : titleCase(r));
 // Chain of command, lowest to highest. Rank decides who may report to whom.
 // Distributor and supervisor are the same level; a manager is above them, a promoting manager above a manager, a coacher above all.
-export const LEVELS = [["distributor", "Distributor / Guy"], ["supervisor", "Supervisor"], ["manager", "Manager"],
+export const LEVELS = [["distributor", "Distributor"], ["supervisor", "Supervisor"], ["manager", "Manager"],
   ["promoting_manager", "Promoting manager"], ["coacher", "Coacher"]]; // see LEVEL_RANK in service.js
 // Manager, promoting manager and coacher draw a fixed monthly salary plus a share of sales (only a manager holds a weekly account).
 export const MANAGER_LEVELS = ["manager", "promoting_manager", "coacher"];
@@ -80,7 +80,7 @@ export function positionDefaults(settings) {
 const RANK = { distributor: 0, supervisor: 0, manager: 1, promoting_manager: 2, coacher: 3 };
 export const levelRank = (l) => RANK[l] ?? -1;
 // levelLabel("supervisor") → "Supervisor"; with a count other than 1 → "Supervisors".
-const LEVEL_PLURAL = { distributor: "Distributors / Guys" };
+const LEVEL_PLURAL = { distributor: "Distributors" };
 export const levelLabel = (l, count = 1) => {
   const one = LEVELS.find(([k]) => k === l)?.[1] || titleCase(l);
   return count === 1 ? one : LEVEL_PLURAL[l] || one + "s";

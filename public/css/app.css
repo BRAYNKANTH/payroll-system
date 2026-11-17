@@ -1016,3 +1016,18 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 /* Approvals flags: long reasons wrap inside the row. */
 .flag, .flag > div { min-width: 0; overflow-wrap: anywhere; }
 .flag b { white-space: normal; }
+
+
+/* Table sort buttons and other small controls keep at least a 24 px target (WCAG 2.2 SC 2.5.8). */
+.th-sort { min-height: 24px; }
+
+/* Column chooser and the action under an empty list. */
+.colpick { position: relative; margin-left: auto; }
+.colpick > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; }
+.colpick > summary::-webkit-details-marker { display: none; }
+.colpick-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 190px; display: grid; gap: 2px; padding: 8px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.14)); }
+.colpick-menu label { display: flex; gap: 8px; align-items: center; padding: 6px 8px; min-height: 28px; border-radius: var(--radius-sm); cursor: pointer; }
+.colpick-menu label:hover { background: var(--surface-3); }
+.empty-actions { display: flex; justify-content: center; padding: 0 0 20px; }
+/* On a phone the list is cards, which have no columns to choose. */
+@media (max-width: 860px) { .colpick { display: none; } }
