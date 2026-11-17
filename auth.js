@@ -125,14 +125,17 @@ async function createUser(db, actor, body) {
   if (await findUser(db, body.username)) throw httpError(409, "Username already exists");
   let hub = body.hub || null;
   let employeeId = null;
+  let role = body.role;
   if (body.role === "staff") {
-    // The portal login is tied to one sales person and takes that person's hub.
-    const s = await db.get("SELECT employee_id, hub, role, status FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
+    // The portal login is tied to one person and takes that person's hub.
+    const s = await db.get("SELECT employee_id, hub, role, status, staff_level FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
     if (!s) throw httpError(400, "Choose the employee this login is for");
     if (s.status !== "active") throw httpError(400, "That employee is inactive");
     if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
     employeeId = s.employee_id;
     hub = s.hub;
+    // The coacher heads the hub: their login handles everything for that hub (the hub manager's office access, limited to it) and also has My page.
+    if (s.staff_level === "coacher") role = "manager";
   } else if (body.role === "manager" && body.employee_id) {
     // A hub manager login may also be linked to the person's own employee record (a manager, promoting manager or coacher), which adds "My page".
     const s = await db.get("SELECT employee_id, hub, status FROM staff WHERE employee_id = ?", String(body.employee_id));
@@ -144,7 +147,7 @@ async function createUser(db, actor, body) {
   }
   await withUser(db, actor.username, (t) =>
     t.run(`INSERT INTO users (username, full_name, role, hub, employee_id, password_hash, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      body.username.trim(), body.full_name.trim(), body.role, hub, employeeId, hashPassword(body.password), actor.username));
+      body.username.trim(), body.full_name.trim(), role, hub, employeeId, hashPassword(body.password), actor.username));
   return publicUser(await findUser(db, body.username));
 }
 async function updateUser(db, actor, username, body) {

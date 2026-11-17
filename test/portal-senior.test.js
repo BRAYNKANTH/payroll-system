@@ -84,3 +84,17 @@ test("a hub manager login can be linked to a coacher's own record, which gives M
   assert.equal(plain.employee_id, null);
   await assert.rejects(() => portal.summary(d, plain, period), /not linked/);
 });
+
+test("a coacher is the head of the hub: a plain portal login for a coacher gets the hub's office access plus My page, never pay", async () => {
+  const { d, period } = await setup();
+  const admin = await auth.userFromToken(d, (await auth.login(d, "owner", PW)).token);
+  const u = await auth.createUser(d, admin, { username: "head", full_name: "Head", role: "staff", employee_id: "C1", password: PW });
+  assert.deepEqual([u.role, u.hub, u.employee_id], ["manager", "H1", "C1"]);
+  const me = await auth.userFromToken(d, (await auth.login(d, "head", PW)).token);
+  for (const p of ["read", "enter_data", "manage_team", "self"]) assert.ok(auth.can(me, p), p);
+  for (const p of ["view_pay", "run_payroll", "finalize", "manage_users", "settings"]) assert.ok(!auth.can(me, p), p);
+  assert.equal((await portal.summary(d, me, period)).me.level_name, "Coacher");
+  // a promoting manager or a manager still gets the plain portal
+  const pm = await auth.createUser(d, admin, { username: "pmgr", full_name: "PM", role: "staff", employee_id: "PM1", password: PW });
+  assert.equal(pm.role, "staff");
+});

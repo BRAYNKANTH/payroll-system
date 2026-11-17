@@ -4,7 +4,7 @@ import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago, LE
 const LV = Object.fromEntries(LEVELS);
 
 const ROLES = [
-  ["staff", "Staff portal", "Any employee (distributor, supervisor, manager, promoting manager or coacher) who signs in to see their own sales, pay and payslips. Seniors also see the sales of their team"],
+  ["staff", "Staff portal", "Any employee (distributor, supervisor, manager, promoting manager or coacher) who signs in to see their own sales, pay and payslips. Seniors also see the sales of their team. A coacher is the head of the hub, so their login also opens the office pages of that hub (never anyone's pay)"],
   ["admin", "Admin", "Everything, including finalizing months, users and settings"],
   ["manager", "Hub manager", "Enter sheets, confirm sales and register the team of their own hub. Sees sales, the money handed in and advances, never pay"],
 ];
@@ -92,7 +92,7 @@ export default {
         <span class="mc-end">${roleBadge(u.role)}<br>${badge(u.status)}</span>`,
       cols: [
         { key: "full_name", label: "User", render: (u) => html`<div class="who"><div class="avatar">${initials(u.full_name)}</div><div><b>${u.full_name}</b><span>${u.username}</span></div></div>` },
-        { key: "role", label: "Role", render: (u) => roleBadge(u.role) },
+        { key: "role", label: "Role", render: (u) => (u.role === "manager" && byId[u.employee_id]?.staff_level === "coacher" ? badge("green", "Coacher · hub head") : roleBadge(u.role)) },
         { key: "hub", label: "Hub access", render: (u) => (u.role === "staff" ? html`<span class="badge plain">${u.employee_id}</span>` : u.hub ? html`<span class="badge plain">${u.hub} only</span>` : html`<span class="faint">All hubs</span>`) },
         { key: "last_login_at", label: "Last sign-in", render: (u) => ago(u.last_login_at) },
         { key: "status", label: "Status", render: (u) => badge(u.status) },
@@ -111,7 +111,7 @@ export default {
         title: "Create logins for employees",
         body: html`<div id="bk">
           ${cands.length ? html`
-          <p class="muted" style="margin-top:0">Each person signs in with their <b>mobile number</b> as the username. Tick who should get a login, choose how passwords are set, then create.</p>
+          <p class="muted" style="margin-top:0">Each person signs in with their <b>mobile number</b> as the username. A coacher is the head of the hub, so their login also opens the office pages for that hub. Tick who should get a login, choose how passwords are set, then create.</p>
           <div class="field"><label>Passwords</label>
             <select class="input" id="bk-mode"><option value="gen">A different random password for each person</option><option value="same">The same starting password for everyone</option></select></div>
           <div class="field" id="bk-same-wrap" hidden><label>Starting password</label><input class="input" id="bk-same" type="text" autocomplete="off" placeholder="At least 8 characters, letters and numbers"></div>
