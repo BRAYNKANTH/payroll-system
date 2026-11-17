@@ -39,7 +39,7 @@ export default {
       const st = stats[h.code] || {};
       return html`<div class="card">
         <div class="card-head"><div class="row" style="gap:12px"><div class="kpi" style="padding:0"><span class="icon blue" style="width:40px;height:40px">${icon("store")}</span></div>
-          <div><h2><a href="/hubs/${h.code}" data-link style="color:inherit;display:inline-block;min-height:24px;padding:2px 0">${h.name}</a></h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
+          <div><h2><a href="/hubs/${h.code}" data-link class="hub-link">${h.name}</a></h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}</div></div></div>${badge(h.status)}</div>
         <div class="card-body">
           <div class="row between" style="align-items:baseline;margin-bottom:6px"><b style="font-size:20px">${plural(x.active.length, "person", "people")}</b>
             <span class="muted" style="font-size:12.5px">${x.head ? `Head: ${x.head.name}` : "No coacher yet"}</span></div>
