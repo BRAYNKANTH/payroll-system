@@ -1,6 +1,6 @@
 import { get } from "../api.js";
 import { state, scopeHub } from "../app.js";
-import { $, html, icon, money, badge, dataTable, emptyState, monthName, levelLabel } from "../ui.js";
+import { $, html, icon, money, badge, dataTable, emptyState, monthName, levelLabel, announce } from "../ui.js";
 import { openPayslip } from "./breakdown.js";
 
 let q = "";
@@ -28,6 +28,7 @@ export default {
       $("#list").innerHTML = rows.length ? dataTable({
         rows: shown, empty: "No matching employees",
         onRow: (r) => openPayslip(p, r.employee_id),
+        rowAction: "View", rowLabel: (r) => `View payslip for ${r.name}`,
         card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span></span>
           <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
         cols: [
@@ -37,11 +38,18 @@ export default {
           { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions) },
           { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>` },
           { key: "status", label: "Status", render: (r) => badge(r.status) },
-          { key: "x", label: "", sort: false, align: "r", render: () => html`<span class="btn sm">${icon("file")} View</span>` },
         ],
       }).toString() : emptyState("No payslips yet", "Payslips appear once payroll has been calculated for this month.", "file").toString();
+      return shown.length;
     };
     draw();
-    $("#q")?.addEventListener("input", (e) => { q = e.target.value; draw(); });
+    // Say how many payslips match once typing pauses.
+    let typing;
+    $("#q")?.addEventListener("input", (e) => {
+      q = e.target.value;
+      const n = draw();
+      clearTimeout(typing);
+      typing = setTimeout(() => announce(`${n} payslip${n === 1 ? "" : "s"} shown`), 600);
+    });
   },
 };

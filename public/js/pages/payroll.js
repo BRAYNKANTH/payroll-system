@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce } from "../ui.js";
 import { openBreakdown } from "./breakdown.js";
 
 let filter = "all";
@@ -25,7 +25,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Salaries — ${monthName(p)}</h1><p>What each person earns this month, worked out from the daily, weekly and stock sheets. This page is for viewing only.</p></div>
+        <div><h1>Salaries — ${monthName(p)}</h1><p>What each person earns this month, worked out from the daily, weekly and stock sheets. To change a figure, correct the sheet it comes from${can("run_payroll") && !finalized ? ", then press “Update salary figures”" : ""}.</p></div>
         <div class="actions">
           ${calculated ? exportButtons("register", { period: p }) : ""}
           ${badge(data.status)}
@@ -48,7 +48,7 @@ export default {
       <div class="card">
         <div class="card-head">
           <div class="row">
-            <div class="seg" id="pay-filters">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button data-f="${f}" class="${filter === f ? "on" : ""}">${l}</button>`)}</div>
+            <div class="seg" id="pay-filters" role="group" aria-label="Show">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button type="button" data-f="${f}" class="${filter === f ? "on" : ""}" aria-pressed="${filter === f ? "true" : "false"}">${l}</button>`)}</div>
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name or ID" value="${search}" style="width:220px"></div>
           </div>
           <details class="more-menu"><summary class="btn sm">More views and downloads</summary><div class="more-list">
@@ -74,6 +74,7 @@ export default {
           <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
         summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"} · net pay Rs ${money(sum("net_pay", rs))} · to bank Rs ${money(sum("disbursed_amount", rs))}`,
         onRow: (r) => openBreakdown(r, p, { finalized, onChange: () => this.render(ctx) }),
+        rowLabel: (r) => `Open pay details for ${r.name}`,
         cols: [
           { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>`, total: (rs) => `${rs.length} employees` },
           { key: "role", label: "Position", render: (r) => badge(r.role, levelLabel(r.staff_level)) },
@@ -86,11 +87,24 @@ export default {
           { key: "status", label: "Status", render: (r) => html`${badge(r.status)}${r.flags.length ? html`<div style="margin-top:4px">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</div>` : ""}` },
         ],
       }).toString();
+      return rows.length;
     };
+    // After a filter or search, say how many people are shown (search waits for a pause in typing).
+    const shownText = (n) => `${n} ${n === 1 ? "person" : "people"} shown`;
+    let typing;
     if (calculated) {
       drawTable();
-      $$("#pay-filters button", el).forEach((b) => (b.onclick = () => { filter = b.dataset.f; $$("#pay-filters button", el).forEach((x) => x.classList.toggle("on", x === b)); drawTable(); }));
-      $("#q").oninput = (e) => { search = e.target.value; drawTable(); };
+      $$("#pay-filters button", el).forEach((b) => (b.onclick = () => {
+        filter = b.dataset.f;
+        $$("#pay-filters button", el).forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+        announce(shownText(drawTable()));
+      }));
+      $("#q").oninput = (e) => {
+        search = e.target.value;
+        const n = drawTable();
+        clearTimeout(typing);
+        typing = setTimeout(() => announce(shownText(n)), 600);
+      };
     }
 
     const run = (e) => busy(e.currentTarget, async () => {

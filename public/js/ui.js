@@ -135,9 +135,11 @@ export const icon = (name, cls = "") => raw(`<svg class="i ${cls}" viewBox="0 0 
 
 // ---- live regions & toasts
 // Screen readers only announce changes to live regions that already exist, so both are created up front.
+// The app shell replaces the whole <body> after sign-in, which removes them; this puts them back whenever they are missing.
 const live = {};
-function ensureLive() {
-  if (live.polite) return;
+export function ensureLive() {
+  if (live.polite && document.body.contains(live.polite) && document.body.contains(live.assertive) && document.body.contains(live.box)) return;
+  for (const k of ["polite", "assertive", "box"]) { live[k]?.remove(); delete live[k]; }
   for (const [k, attrs] of [["polite", 'aria-live="polite" role="status"'], ["assertive", 'aria-live="assertive" role="alert"']]) {
     const el = document.createElement("div");
     el.className = "sr-only";
@@ -164,7 +166,6 @@ if (document.readyState !== "loading") ensureLive(); else document.addEventListe
 // Success messages fade after a few seconds; errors and warnings stay until dismissed.
 export function toast(msg, kind = "ok") {
   ensureLive();
-  if (!document.body.contains(live.box)) { live.polite.remove(); live.assertive.remove(); Object.keys(live).forEach((k) => delete live[k]); ensureLive(); }
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
   el.innerHTML = `${icon(kind === "ok" ? "checkCircle" : "alert")}<div class="toast-msg">${esc(msg)}</div>

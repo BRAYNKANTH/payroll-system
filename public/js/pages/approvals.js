@@ -31,12 +31,12 @@ export default {
         return html`<div class="card"><div class="card-head"><div><h2>${monthName(p)}</h2><div class="sub">${items.length} to resolve</div></div></div>
           <div class="card-body">${items.map((r) => html`
             <div class="row" style="align-items:flex-start;padding:12px 0;border-top:1px solid var(--border);gap:14px" data-open="${r.period}|${r.employee_id}">
-              <div class="avatar">${initials(r.name)}</div>
+              <div class="avatar" aria-hidden="true">${initials(r.name)}</div>
               <div style="flex:1;min-width:0">
                 <div class="row between"><div><b>${r.name}</b> <span class="faint">${r.employee_id} · ${r.hub}</span></div>${badge(r.status)}</div>
                 <div style="margin:8px 0 6px">${flagList(r.flags)}</div>
                 <div class="row between"><span class="muted">Net pay <b class="${r.net_pay < 0 ? "neg" : ""}">Rs ${money(r.net_pay)}</b>${r.review_note ? ` · note: ${r.review_note}` : ""}</span>
-                  <button class="btn sm primary" data-open-btn>${icon("eye")} Review</button></div>
+                  <button type="button" class="btn sm primary" data-open-btn aria-label="Review ${r.name}">${icon("eye")} Review</button></div>
               </div>
             </div>`)}</div></div>`;
       }).join("");

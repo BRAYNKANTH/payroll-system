@@ -1,6 +1,6 @@
 // App shell: auth gate, router, sidebar/topbar layout and shared state.
 import { get, post, setUnauthorizedHandler } from "./api.js";
-import { $, $$, esc, icon, initials, monthName, toast, announce, confirmDialog } from "./ui.js";
+import { $, $$, esc, icon, initials, monthName, toast, announce, confirmDialog, ensureLive } from "./ui.js";
 import { mountSearch } from "./search.js";
 
 const store = {
@@ -178,6 +178,7 @@ function shell() {
     </div>
   </div>
   ${isStaff() ? "" : bottomNav()}`;
+  ensureLive(); // the body was just replaced; put the screen-reader live regions back before anything is announced
 
   // Mobile: the hub/month filters move below the header so the sticky bar stays one row tall.
   const placeFilters = () => {
