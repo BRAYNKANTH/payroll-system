@@ -1,45 +1,19 @@
 import { get, post, put, qs } from "../api.js";
 import { state, can } from "../app.js";
 import { $, html, icon, badge, toast, busy, drawer, emptyState, compact, LEVELS, levelLabel } from "../ui.js";
+import { loadHubData, hubInfo, plural } from "../hubinfo.js";
 
 export default {
   title: "Hubs",
   async render(ctx) {
     const { el } = ctx;
     const pay = can("view_pay");
-    const [hubs, staff, dash, live, queue] = await Promise.all([
-      get("/api/hubs"), get("/api/staff"), get("/api/dashboard" + qs({ period: state.period })),
-      get("/api/live" + qs({ period: state.period })).catch(() => ({ people: [] })),
-      pay ? get("/api/review-queue").catch(() => []) : Promise.resolve([]),
-    ]);
+    const [data, dash] = await Promise.all([loadHubData(state.period, pay), get("/api/dashboard" + qs({ period: state.period }))]);
+    const { hubs, staff } = data;
     state.hubs = hubs;
     const stats = Object.fromEntries(dash.by_hub.map((h) => [h.code, h]));
     const monthLabel = new Date(state.period + "-01").toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-    // Everything a hub card shows, worked out once per hub.
-    const info = Object.fromEntries(hubs.map((h) => {
-      const all = staff.filter((s) => s.hub === h.code);
-      const active = all.filter((s) => s.status === "active");
-      const sold = live.people.filter((p) => p.hub === h.code);
-      const attention = [];
-      const toReview = queue.filter((r) => r.hub === h.code && r.period === state.period).length;
-      const unconfirmed = sold.reduce((t, p) => t + (p.unconfirmed || 0), 0);
-      const noBank = active.filter((s) => !s.bank_account_no).length;
-      const unverified = active.filter((s) => s.bank_account_no && s.bank_account_no !== s.bank_account_verified).length;
-      if (toReview) attention.push(["red", plural(toReview, "pay line to review", "pay lines to review"), toReview]);
-      if (unconfirmed) attention.push(["amber", plural(unconfirmed, "day to confirm", "days to confirm"), unconfirmed]);
-      if (noBank) attention.push(["amber", plural(noBank, "person without a bank account", "people without a bank account"), noBank]);
-      if (unverified) attention.push(["amber", plural(unverified, "unverified bank account", "unverified bank accounts"), unverified]);
-      return [h.code, {
-        all, active, attention,
-        sales: sold.reduce((t, p) => t + p.business, 0),
-        levels: LEVELS.slice().reverse().map(([v]) => [v, active.filter((s) => s.staff_level === v).length]).filter(([, n]) => n),
-        head: active.find((s) => s.staff_level === "coacher"),
-        joined: all.filter((s) => (s.join_date || "").startsWith(state.period)).length,
-        left: all.filter((s) => (s.leave_date || "").startsWith(state.period)).length,
-      }];
-    }));
+    const info = hubInfo(data, state.period);
     const totals = {
       people: Object.values(info).reduce((t, x) => t + x.active.length, 0),
       sales: Object.values(info).reduce((t, x) => t + x.sales, 0),

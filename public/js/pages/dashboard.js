@@ -1,7 +1,7 @@
 import { get, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
-import { $, html, esc, icon, money, rs, compact, pct, badge, shortMonth, monthName, dataTable, initials, emptyState, raw } from "../ui.js";
-import { lineChart, donutChart, barChart, PALETTE } from "../charts.js";
+import { $, html, esc, icon, money, rs, compact, pct, badge, monthName, initials, emptyState, raw } from "../ui.js";
+import { loadHubData, hubInfo, plural } from "../hubinfo.js";
 import { isPhone, foldCards } from "../phone.js";
 
 const kpi = (label, value, ic, color, foot = "") => html`
@@ -33,9 +33,23 @@ export default {
   title: "Dashboard",
   periodic: true,
   async render({ el }) {
-    const d = await get("/api/dashboard" + qs({ period: state.period, hub: scopeHub() }));
-    const k = d.kpis;
     const pay = can("view_pay"); // without it the server has already removed every pay figure
+    const [d, hubData] = await Promise.all([get("/api/dashboard" + qs({ period: state.period, hub: scopeHub() })), loadHubData(state.period, pay)]);
+    const k = d.kpis;
+    const info = hubInfo(hubData, state.period);
+    const stats = Object.fromEntries(d.by_hub.map((h) => [h.code, h]));
+    // One card per hub: the way in to that hub's people, sales and what is waiting.
+    const hubTile = (h) => {
+      const x = info[h.code], st = stats[h.code] || {};
+      return html`<a class="card hub-tile" href="/hubs/${encodeURIComponent(h.code)}" data-link>
+        <span class="hub-top"><b class="hub-name">${h.name}</b><span class="faint">${h.code}${h.status !== "active" ? " · inactive" : ""}</span></span>
+        <span class="hub-count">${plural(x.active.length, "person", "people")}</span>
+        <span class="muted hub-head">${x.head ? `Head: ${x.head.name}` : "No coacher yet"}</span>
+        <span class="hub-nums"><span><small>Sales</small><b class="num">${compact(x.sales)}</b></span>
+          ${pay ? html`<span><small>Gross pay</small><b class="num">${compact(st.gross_pay || 0)}</b></span><span><small>Mgr balance</small><b class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</b></span>` : ""}</span>
+        <span class="hub-chips">${x.attention.length ? x.attention.map(([tone, text]) => html`<span class="badge ${tone}">${text}</span>`) : html`<span class="badge green">All clear</span>`}</span>
+        <span class="hub-go">Open hub ${icon("right")}</span></a>`;
+    };
     const first = state.user.full_name.split(" ")[0];
 
     el.innerHTML = html`
@@ -50,7 +64,14 @@ export default {
 
       ${pay ? monthCard(d, k) : ""}
 
-      <div class="grid kpis">
+      <section class="mt-4" aria-labelledby="hubs-h">
+        <div class="row between" style="margin-bottom:10px"><h2 id="hubs-h" class="section-title">${scopeHub() ? "Your hub" : "Hubs"}</h2>
+          <a class="btn sm" href="/hubs" data-link>All hubs and people</a></div>
+        ${hubData.hubs.length ? html`<div class="grid three">${hubData.hubs.map(hubTile)}</div>`
+          : html`<div class="card">${emptyState("No hubs yet", "Add your first hub to start adding people.", "store", can("manage_hubs") ? `<a class="btn primary" href="/hubs" data-link>Add a hub</a>` : "")}</div>`}
+      </section>
+
+      <div class="grid kpis mt-4">
         ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
         ${!pay ? "" : kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "guy" : "guys"} · ${k.active_managers} ${k.active_managers === 1 ? "manager" : "managers"}` : "Run payroll to calculate")}
         ${!pay ? "" : kpi("To bank", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Net pay Rs ${compact(k.net_pay)}` : "&nbsp;")}
@@ -58,58 +79,16 @@ export default {
         ${!pay ? "" : kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
       </div>
 
-      <div class="grid two mt-4">
-        <div class="card"><div class="card-head"><div><h2>Six-month trend</h2><div class="sub">${pay ? "Guys' business vs payroll cost" : "Guys' business"}</div></div></div>
-          <div class="card-body" id="trend"></div></div>
-        <div class="card"><div class="card-head"><div><h2>Business by hub</h2><div class="sub">From managers' weekly sheets</div></div></div>
-          <div class="card-body" id="hub-donut"></div></div>
-      </div>
-
-      <div class="grid two mt-4">
-        <div class="card"><div class="card-head"><div><h2>Hubs at a glance</h2><div class="sub">${monthName(d.period)}</div></div>
-          <a class="btn sm" href="/reports" data-link>Reports</a></div>
-          <div class="card-body flush" id="hub-table"></div></div>
+      <div class="grid halves mt-4">
         ${pay ? html`<div class="card"><div class="card-head"><div><h2>Exceptions</h2><div class="sub">Flagged by the payroll rules</div></div>
           ${d.exceptions.length ? html`<a class="btn sm" href="/approvals" data-link>Review</a>` : ""}</div>
           <div class="card-body flush" id="exceptions"></div></div>` : ""}
-      </div>
-
-      <div class="grid halves mt-4">
         <div class="card"><div class="card-head"><div><h2>Top performers</h2><div class="sub">Business vs monthly target</div></div></div>
           <div class="card-body flush" id="top"></div></div>
         <div class="card"><div class="card-head"><div><h2>Daily sheet completeness</h2><div class="sub">Working days without an entry</div></div>
           ${can("enter_data") ? html`<a class="btn sm" href="/daily" data-link>Fill in</a>` : ""}</div>
           <div class="card-body flush" id="complete"></div></div>
       </div>`;
-
-    lineChart($("#trend"), {
-      labels: d.trend.map((t) => shortMonth(t.period)),
-      series: [
-        { name: "Guys' business", color: PALETTE[1], values: d.trend.map((t) => t.business) },
-        ...(pay ? [{ name: "Gross payroll", color: PALETTE[0], values: d.trend.map((t) => t.gross_pay) },
-          { name: "Paid to bank", color: PALETTE[2], values: d.trend.map((t) => t.to_bank) }] : []),
-      ],
-    });
-
-    const hubsWithBiz = d.by_hub.filter((h) => h.hub_business > 0);
-    if (hubsWithBiz.length) {
-      donutChart($("#hub-donut"), {
-        items: hubsWithBiz.map((h, i) => ({ name: h.name, value: h.hub_business, color: PALETTE[i % PALETTE.length] })),
-        center: compact(k.hub_business), sub: "total business",
-      });
-    } else $("#hub-donut").innerHTML = emptyState("No weekly sheets yet", "", "calendar").toString();
-
-    const hubCols = [
-        { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b><div class="faint text-sm">${h.code} · ${h.staff} staff</div>`, total: () => "All hubs" },
-        { key: "hub_business", label: "Business", align: "r", render: (h) => money(h.hub_business), total: (r) => money(r.reduce((t, h) => t + h.hub_business, 0)) },
-        { key: "gross_pay", label: "Gross pay", align: "r", render: (h) => money(h.gross_pay), total: (r) => money(r.reduce((t, h) => t + h.gross_pay, 0)) },
-        { key: "stock_shortfall", label: "Stock short", align: "r", render: (h) => h.stock_shortfall ? html`<span class="neg">${money(h.stock_shortfall)}</span>` : "—", total: (r) => money(r.reduce((t, h) => t + h.stock_shortfall, 0)) },
-        { key: "manager_balance", label: "Mgr balance", align: "r", render: (h) => html`<span class="${h.manager_balance < 0 ? "neg" : ""}">${money(h.manager_balance)}</span>`, total: (r) => money(r.reduce((t, h) => t + h.manager_balance, 0)) },
-    ];
-    $("#hub-table").innerHTML = dataTable({
-      rows: d.by_hub, empty: "No hubs yet", footer: d.by_hub.length > 1,
-      cols: pay ? hubCols : hubCols.filter((c) => !["gross_pay", "manager_balance"].includes(c.key)),
-    }).toString();
 
     if (pay) $("#exceptions").innerHTML = d.exceptions.length
       ? d.exceptions.slice(0, 7).map((x) => html`
@@ -136,6 +115,6 @@ export default {
           <span class="num" style="font-size:12px;width:48px;text-align:right">${c.logged}/${c.expected}</span></div>`).join("");
 
     // On a phone the summary cards stay up top and each section below opens on tap. Exceptions open first when there are any.
-    if (isPhone()) foldCards([...el.querySelectorAll(".grid.two > .card, .grid.halves > .card")], { open: d.exceptions.length ? [3] : [] });
+    if (isPhone()) foldCards([...el.querySelectorAll(".grid.halves > .card")], { open: pay && d.exceptions.length ? [0] : [] });
   },
 };

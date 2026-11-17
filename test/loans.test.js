@@ -33,7 +33,7 @@ test("engine: the instalment comes off pay and is itemised", () => {
   assert.equal(r.total_deductions, 1000000);
   assert.equal(r.net_pay, 2000000);
   assert.equal(r.detail.loans[0].outstanding_after, 2000000);
-  assert.match(r.detail.deductions.at(-1).label, /^Loan instalment \(balance after: Rs 20,000\.00\)$/);
+  assert.match(r.detail.deductions.at(-1).label, /^Loan payment \(Rs 20,000\.00 still to pay\)$/);
 });
 
 test("engine: an instalment bigger than the pay left is cut back and never makes pay negative", () => {
@@ -176,5 +176,5 @@ test("the staff portal shows the person's own loans and the instalment in their 
   assert.equal(s.loans[0].outstanding, 3000000);
   assert.equal(s.loans[0].due, 1000000);
   assert.equal("note" in s.loans[0], false); // office notes stay private
-  assert.ok(s.estimate.deduction_lines.some((l) => /^Loan instalment/.test(l.label) && l.amount === 1000000));
+  assert.ok(s.estimate.deduction_lines.some((l) => /^Loan payment/.test(l.label) && l.amount === 1000000));
 });

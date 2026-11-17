@@ -964,7 +964,7 @@ async function commissionReport(db, period) {
     employee_id: r.employee_id, name: r.name, hub: r.hub, business: r.detail.total_business, target: r.detail.target,
     over_target: r.detail.over_target_amount, rate: r.detail.commission_rate,
     // Commission earned on sales: the base commission below the target, plus the over-target income (tiered scheme) or the commission over target.
-    commission: r.detail.earnings.filter((e) => /^(Commission|Over-target income)/.test(e.label)).reduce((t, e) => t + e.amount, 0),
+    commission: r.detail.earnings.filter((e) => /^(Commission|Extra pay above target)/.test(e.label)).reduce((t, e) => t + e.amount, 0),
   })).sort((a, b) => b.commission - a.commission);
 }
 

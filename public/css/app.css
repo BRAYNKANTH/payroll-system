@@ -78,7 +78,7 @@
 [hidden] { display: none !important; }
 svg.i { width: 16px; height: 16px; vertical-align: -3px; flex-shrink: 0; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 h1, h2, h3, h4 { margin: 0; line-height: 1.25; }
@@ -207,7 +207,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .field .hint { font-size: 13px; color: var(--text-3); }
 .input, select.input, textarea.input {
   height: 38px; padding: 0 11px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface);
-  color: var(--text); font: 14px var(--font); width: 100%; transition: border-color .15s ease-out;
+  color: var(--text); font: 16px var(--font); width: 100%; transition: border-color .15s ease-out;
 }
 textarea.input { height: auto; padding: 9px 11px; resize: vertical; min-height: 80px; }
 .input:focus { outline: 2px solid var(--primary); outline-offset: 1px; border-color: var(--primary); }
@@ -657,7 +657,7 @@ details.fold > summary:focus-visible { outline: 2px solid var(--primary); outlin
   .sub-head, .kpi .value small, .nav .count { font-size: 13px; }
   .nav-group { font-size: 12px; }
   /* Captions that pages size inline (11px to 12.5px) also come up to 13px on a phone */
-  [style*="font-size:11px"]:not(.avatar), [style*="font-size:11.5px"]:not(.avatar), [style*="font-size:12px"]:not(.avatar), [style*="font-size:12.5px"]:not(.avatar) { font-size: 13px !important; }
+  [style*="font-size:11px"]:not(.avatar), [style*="font-size:11.5px"]:not(.avatar), [style*="font-size:12px"]:not(.avatar), [style*="font-size:12.5px"]:not(.avatar) { font-size: 13.5px !important; }
   .nav a { font-size: 15px; }
   .btn { font-size: 14.5px; }
   .card-head h2, .card-head h3, details.fold > summary h2 { font-size: 16px; }
@@ -796,21 +796,22 @@ html:has(.portal-tabs) { overscroll-behavior-y: contain; }
 
 
 /* ---------- Easy to read: bigger text at every screen size ---------- */
-body { font-size: 15px; }
-table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step .t { font-size: 14.5px; }
-.table thead th, .th-sort { font-size: 12.5px; }
-.nav a, .menu a, .menu button { font-size: 15px; }
-.btn { font-size: 14px; }
-.btn.sm { font-size: 13.5px; }
-.input.sm { font-size: 14px; }
-.card-head h2, .card-head h3 { font-size: 16px; }
+body { font-size: 16px; line-height: 1.5; }
+table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step .t { font-size: 15px; }
+.table thead th, .th-sort { font-size: 13.5px; }
+.nav a, .menu a, .menu button { font-size: 15.5px; }
+.btn { font-size: 15px; }
+.btn.sm { font-size: 14px; }
+.input.sm { font-size: 15px; }
+.card-head h2, .card-head h3 { font-size: 17px; }
 .card-head .sub, .kpi .foot, .kpi .label, .field .hint, .field-error, .list-item .grow span, .step .d, .table .who span, .text-sm, .legend, .btn-hint,
-.topbar .crumb, .sidebar-foot, .user-chip .who span, .brand-sub, .badge, .chip, .form-section, .field label, .field .lbl, .sub-head, .kpi .value small, .nav .count { font-size: 13px; }
-.nav-group { font-size: 12px; }
-.chart text { font-size: 12px; }
-.table thead th, .th-sort { font-size: 13px; }
-.flag { font-size: 14px; }
-/* Text that pages size inline (11px to 12.5px) comes up to 13px */
+.topbar .crumb, .sidebar-foot, .user-chip .who span, .brand-sub, .form-section, .field label, .field .lbl, .sub-head, .kpi .value small, .nav .count { font-size: 14px; }
+.badge, .chip { font-size: 13px; }
+.nav-group { font-size: 12.5px; }
+.chart text { font-size: 13px; }
+.table thead th, .th-sort { font-size: 13.5px; }
+.flag { font-size: 15px; }
+/* Text that pages size inline (11px to 12.5px) comes up to 13.5px */
 [style*="font-size:11px"]:not(.avatar), [style*="font-size: 11px"]:not(.avatar), [style*="font-size:11.5px"]:not(.avatar), [style*="font-size: 11.5px"]:not(.avatar),
 [style*="font-size:12px"]:not(.avatar), [style*="font-size: 12px"]:not(.avatar), [style*="font-size:12.5px"]:not(.avatar), [style*="font-size: 12.5px"]:not(.avatar) { font-size: 13px !important; }
 
@@ -820,7 +821,7 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
   .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--surface);
     border-top: 1px solid var(--border); padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-shadow: 0 -6px 18px -10px rgba(14, 34, 64, .25); }
   .bottom-nav a, .bottom-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; padding: 6px 2px; border: 0; background: none;
-    color: var(--text-2); font: 600 12.5px var(--font); text-decoration: none; border-top: 3px solid transparent; cursor: pointer; position: relative; transition: transform .12s ease, background-color .12s ease; }
+    color: var(--text-2); font: 600 13.5px var(--font); text-decoration: none; border-top: 3px solid transparent; cursor: pointer; position: relative; transition: transform .12s ease, background-color .12s ease; }
   .bottom-nav svg { width: 24px; height: 24px; }
   .bottom-nav a[aria-current="page"] { color: var(--primary); border-top-color: var(--accent); }
   .bottom-nav a:active, .bottom-nav button:active { transform: scale(.94); background: var(--surface-3); }
@@ -1066,3 +1067,26 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .boot-fail { max-width: 520px; margin: 12vh auto 0; padding: 0 24px; font-family: var(--font, system-ui); color: var(--text); }
 .boot-fail h1 { font-size: 24px; margin: 0 0 12px; }
 .boot-fail details { margin-top: 18px; color: var(--text-2); font-size: 13.5px; }
+
+/* Plain-word glossary on the seller's page */
+.glossary { margin: 0; }
+.glossary dt { font-weight: 650; margin-top: 12px; }
+.glossary dt:first-child { margin-top: 0; }
+.glossary dd { margin: 2px 0 0; color: var(--text-2); }
+
+/* Hub cards on the dashboard: the whole card is the link into that hub */
+.section-title { margin: 0; font-size: 18px; }
+.hub-tile { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; text-decoration: none; color: inherit; border: 1px solid var(--border); }
+.hub-tile:hover { border-color: var(--primary); box-shadow: var(--shadow-md, 0 4px 14px rgba(14,34,64,.10)); }
+.hub-tile:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.hub-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hub-name { font-size: 17px; }
+.hub-count { font-size: 22px; font-weight: 700; }
+.hub-head { font-size: 14px; }
+.hub-nums { display: flex; gap: 18px; flex-wrap: wrap; }
+.hub-nums span { display: flex; flex-direction: column; }
+.hub-nums small { color: var(--text-2); font-size: 13px; }
+.hub-chips { display: flex; gap: 6px; flex-wrap: wrap; min-height: 28px; }
+.hub-go { margin-top: auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--primary); min-height: 24px; }
+.hub-go svg { width: 16px; height: 16px; }
+@media (max-width: 860px) { .hub-go { min-height: 44px; } }

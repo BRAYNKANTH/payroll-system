@@ -132,7 +132,7 @@ export function donutChart(el, { items, center = "", sub = "", label = "Donut ch
     <svg viewBox="0 0 200 200" style="width:170px;height:170px;flex-shrink:0" role="img" aria-label="${esc(label)}: ${esc(items.map((it) => `${it.name} Rs ${money(it.value)}`).join(", "))}">
       <circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--surface-3)" stroke-width="26"/>${g}
       <text x="100" y="98" text-anchor="middle" style="font:700 18px var(--font);fill:var(--text)">${esc(center)}</text>
-      <text x="100" y="118" text-anchor="middle" style="font:11px var(--font);fill:var(--text-3)">${esc(sub)}</text>
+      <text x="100" y="118" text-anchor="middle" style="font:13px var(--font);fill:var(--text-3)">${esc(sub)}</text>
     </svg>
     <div style="display:grid;gap:8px;flex:1;min-width:160px">${items.map((it) => `
       <div style="display:flex;align-items:center;gap:8px;font-size:13px"><i style="width:10px;height:10px;border-radius:3px;background:${it.color}"></i>

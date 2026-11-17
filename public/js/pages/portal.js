@@ -32,8 +32,8 @@ function payRules(p, me, rate) {
   }
   if (p.food_per_day) lines.push(`Food: <b>${rs(p.food_per_day)}</b> for every day you work${p.food_min_days ? `, once you have worked ${p.food_min_days} days or more` : ""}.`);
   const m = /^(fixed|pct_gross|pct_basic|pct_business):([\d.]+)/.exec(p.security_deduction_rule || "");
-  if (m) lines.push(`Security held back: <b>${m[1] === "fixed" ? `Rs ${m[2]}` : `${m[2]}%`}</b>${{ fixed: " each month", pct_gross: " of your gross pay", pct_basic: " of your basic pay", pct_business: " of your sales" }[m[1]]}.`);
-  lines.push("Taken off your pay: the difference between your sales and the money you handed in, any stock that is missing, and any advance or loan instalment.");
+  if (m) lines.push(`Security deposit held back: <b>${m[1] === "fixed" ? `Rs ${m[2]}` : `${m[2]}%`}</b>${{ fixed: " each month", pct_gross: " of your total earnings", pct_basic: " of your basic pay", pct_business: " of your sales" }[m[1]]}.`);
+  lines.push("Taken off your pay: the difference between your sales and the money you handed in, any stock that is missing, and any advance or loan payment.");
   return lines;
 }
 
@@ -47,10 +47,38 @@ const keep = (l) => l.amount !== 0 || /Basic/.test(l.label);
 // The engine's labels carry its internal rule names; show them in plain words.
 const plain = (label) => {
   const sec = /^Security \((fixed|pct_gross|pct_basic|pct_business):([\d.]+)/.exec(label);
-  if (sec) return `Security (${sec[1] === "fixed" ? `Rs ${sec[2]} a month` : `${sec[2]}% of your ${{ pct_gross: "gross pay", pct_basic: "basic pay", pct_business: "sales" }[sec[1]]}`})`;
-  return label === "Personal minus" ? "Advance taken" : label;
+  if (sec) return `Security deposit (${sec[1] === "fixed" ? `Rs ${sec[2]} a month` : `${sec[2]}% of your ${{ pct_gross: "total earnings", pct_basic: "basic pay", pct_business: "sales" }[sec[1]]}`})`;
+  const old = [
+    [/^Personal minus$/, "Advance taken"], [/^Stock shortfall$/, "Missing stock"],
+    [/^Settle-up \(business − settled\)$/, "Cash not handed in (sales minus cash handed in)"],
+    [/^Over-target income \((.+?) of (Rs [\d.,]+) over target\)$/, "Extra pay above target ($1 of $2 sales above your target)"],
+    [/^Commission \((.+?) of (Rs [\d.,]+) business\)$/, "Commission ($1 of your sales, $2; the target was not reached)"],
+    [/^Commission \((.+?) of (Rs [\d.,]+) over target\)$/, "Commission ($1 of $2 sales above your target)"],
+    [/^Loan instalment \(balance after: (Rs [\d.,]+)(.*)\)$/, "Loan payment ($1 still to pay$2)"],
+    [/^Advance repaid \(balance after: (Rs [\d.,]+)(.*)\)$/, "Advance paid back ($1 still to pay$2)"],
+    [/^Share of sales below/, "Share of your team's sales"],
+  ];
+  for (const [re, to] of old) if (re.test(label)) return label.replace(re, to);
+  return label;
 };
-const payGroups = (p) => group("Earnings", [...p.earnings.filter(keep).map((l) => row(plain(l.label), money(l.amount))), row("Gross earnings", money(p.gross), { strong: true })])
+
+// Short, plain meanings for the words on this page.
+const GLOSSARY = [
+  ["Estimate", "A guess made from the days entered so far. It can change until the office closes the month."],
+  ["Target", "The amount of sales you are asked to reach in a month."],
+  ["Extra pay above target", "Extra money for the sales you make above your target."],
+  ["Cash not handed in", "Sales minus the cash you handed in. If you hand in less than you sold, the difference is taken off your pay."],
+  ["Advance", "Money you took before pay day. It is taken off your pay."],
+  ["Loan payment", "The part of a loan you pay back each month."],
+  ["Security deposit", "A small amount held back from your pay as a safety deposit. Ask your hub head when it is returned."],
+  ["Missing stock", "Items the records say you had, but that were not found at the stock count. Their value is taken off."],
+  ["Allowance", "Extra money added by the office, for example a bonus."],
+  ["Total earnings", "Everything you earned, before anything is taken off."],
+  ["Net pay", "What is left after everything is taken off. This is what you are paid."],
+  ["Carried to next month", "A balance that moves to next month: money you still owe, or are still owed."],
+];
+const glossary = () => `<details class="card fold"><summary><h2>What do these words mean?</h2></summary><div class="card-body"><dl class="glossary">${GLOSSARY.map(([t, d]) => `<dt>${esc(t)}</dt><dd>${esc(d)}</dd>`).join("")}</dl></div></details>`;
+const payGroups = (p) => group("Earnings", [...p.earnings.filter(keep).map((l) => row(plain(l.label), money(l.amount))), row("Total earnings", money(p.gross), { strong: true })])
   + group("Taken off", [...p.deduction_lines.filter(keep).map((l) => row(plain(l.label), money(l.amount))), row("Total taken off", money(p.deductions), { strong: true })]);
 
 const stat = (label, value, sub = "", ic = "", cls = "") => `<div class="stat ${cls}"><div class="s-label">${ic ? `<span class="s-ic">${icon(ic)}</span>` : ""}${esc(label)}</div><div class="s-value">${value}</div>${sub ? `<div class="s-sub">${sub}</div>` : ""}</div>`;
@@ -139,8 +167,8 @@ export default {
         ] : [
           stat("Sales so far", `<small>Rs</small>${n0(m.business)}`, `${m.days} day${m.days === 1 ? "" : "s"} worked`, "chart", "blue"),
           m.over_target > 0 || attain >= 1 ? stat("Over target by", `<small>Rs</small>${n0(m.over_target)}`, "Target passed", "trend", "green") : stat("Still to go", `<small>Rs</small>${n0(m.to_go)}`, "to reach your target", "trend", "amber"),
-          stat("Taken off so far", `<small>Rs</small>${n0(m.settle_up + m.personal)}`, `Short Rs ${n0(m.settle_up)} · advances Rs ${n0(m.personal)}`, "coins", "amber"),
-          stat("Security held", `<small>Rs</small>${n0(d.security_held)}`, "in total, from closed months", "shield", ""),
+          stat("Taken off so far", `<small>Rs</small>${n0(m.settle_up + m.personal)}`, `Cash not handed in Rs ${n0(m.settle_up)} · advances Rs ${n0(m.personal)}`, "coins", "amber"),
+          stat("Security deposit held", `<small>Rs</small>${n0(d.security_held)}`, "in total, from closed months", "shield", ""),
         ]).join(""))}</div>
 
         ${pay ? html`<section class="card mb-4 glist"><div class="card-head"><div><h2>${final ? `Your pay for ${monthName(d.period)}` : "Estimate so far"}</h2>
@@ -165,14 +193,16 @@ export default {
         ${me.senior ? "" : html`<section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>`}
         ${m.stock.length ? html`<section class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></section>` : ""}
         ${m.allowances.length ? html`<section class="card mb-4"><div class="card-head"><h2>Allowances this month</h2></div><div class="card-body flush" id="allow"></div></section>` : ""}
-        <details class="card fold"><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay, me, d.senior_rate).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>`,
+        <details class="card fold"><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay, me, d.senior_rate).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>
+        ${raw(glossary())}`,
 
       team: () => html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">${monthName(d.period)}: sales of everyone below you. Sales only, never anyone's pay.</div></div></div>
         <div class="card-body flush" id="team"></div></section>
         <p class="muted" style="margin-top:12px">Total sales below you: <b class="num">Rs ${money(d.below_sales)}</b>.</p>`,
 
       payslips: () => d.history.length ? html`<section class="card"><div class="card-body flush" id="hist"></div></section>
-        <p class="muted" style="margin-top:12px">Security held back so far: <b class="num">Rs ${money(d.security_held)}</b>.</p>`
+        <p class="muted" style="margin-top:12px">Security deposit held back so far: <b class="num">Rs ${money(d.security_held)}</b>.</p>
+        ${raw(glossary())}`
         : html`<div class="card">${emptyState("No payslips yet", "Your payslip for a month appears here once the office has closed that month.", "file")}</div>`,
 
       loans: () => html`<section class="card mb-4 glist"><div class="card-head"><div><h2>Advances and loans</h2><div class="sub">Money you took from the company, and what is left to pay back. It comes off your pay each month.</div></div></div>
@@ -245,8 +275,8 @@ export default {
           }).toString(),
           group("", [...m.daily.slice().reverse().map((r) => row(dateLabel(r.date), money(r.business_amount), {
             sub: `Handed in ${money(r.settled_amount)}${r.personal_minus ? ` · Advance ${money(r.personal_minus)}` : ""}${r.notes ? ` · ${r.notes}` : ""}${r.source === "portal" && !r.confirmed ? " · waiting for confirmation" : ""}`,
-            vsub: r.settle_up_minus ? `Short ${money(r.settle_up_minus)}` : "", cls: "",
-          })), row(`Total · ${m.days} day${m.days === 1 ? "" : "s"}`, money(m.business), { strong: true, vsub: m.settle_up ? `Short ${money(m.settle_up)}` : "" })])) : emptyState("No days entered yet", "", "sheet").toString();
+            vsub: r.settle_up_minus ? `Not handed in ${money(r.settle_up_minus)}` : "", cls: "",
+          })), row(`Total · ${m.days} day${m.days === 1 ? "" : "s"}`, money(m.business), { strong: true, vsub: m.settle_up ? `Not handed in ${money(m.settle_up)}` : "" })])) : emptyState("No days entered yet", "", "sheet").toString();
         if (m.stock.length && $("#stock")) $("#stock").innerHTML = group("", m.stock.map((r) => row(r.product, r.shortfall_value ? money(r.shortfall_value) : "—", { sub: `${r.shortfall_qty} missing × ${money(r.unit_price)}`, cls: r.shortfall_value ? "neg" : "" })));
         if (m.allowances.length && $("#allow")) $("#allow").innerHTML = group("", m.allowances.map((r) => row(r.description, money(r.amount))));
         // Adding a day, and removing one that the office has not confirmed yet.
@@ -287,7 +317,7 @@ export default {
             rows: d.history, sortable: false, rowAction: "",
             cols: [
               { key: "period", label: "Month", render: (r) => html`<b>${monthName(r.period)}</b>` },
-              { key: "gross_earnings", label: "Gross", align: "r", render: (r) => money(r.gross_earnings) },
+              { key: "gross_earnings", label: "Earned", align: "r", render: (r) => money(r.gross_earnings) },
               { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions) },
               { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>` },
               { key: "disbursed_amount", label: "Paid to bank", align: "r", render: (r) => money(r.disbursed_amount) },
@@ -295,7 +325,7 @@ export default {
               { key: "slip", label: "", sort: false, align: "r", render: (r) => html`<a class="btn sm" href="/api/me/payslip/${r.period}" target="_blank" rel="noopener">${icon("printer")} Payslip</a>` },
             ],
           }).toString(),
-          group("", d.history.map((r) => row(monthName(r.period), money(r.net_pay), { sub: `Gross ${n0(r.gross_earnings)} · Taken off ${n0(r.total_deductions)}`, vsub: `Paid ${n0(r.disbursed_amount)}`, cls: r.net_pay < 0 ? "neg" : "", href: `/api/me/payslip/${r.period}` }))));
+          group("", d.history.map((r) => row(monthName(r.period), money(r.net_pay), { sub: `Earned ${n0(r.gross_earnings)} · Taken off ${n0(r.total_deductions)}`, vsub: `Paid ${n0(r.disbursed_amount)}`, cls: r.net_pay < 0 ? "neg" : "", href: `/api/me/payslip/${r.period}` }))));
       }
       if (tab === "documents") drawDocs().catch((e) => toast(e.message, "err"));
     };

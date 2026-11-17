@@ -25,6 +25,14 @@ function parseSecurityRule(rule) {
   return { kind: m[1], value, cap };
 }
 
+// The security rule in plain words, e.g. "1% of your sales", "Rs 1,500 a month", "5% of your basic pay, until Rs 25,000.00 is held".
+function describeSecurity(rule) {
+  const r = parseSecurityRule(rule);
+  if (r.kind === "none") return "";
+  const what = r.kind === "fixed" ? `Rs ${fmt(r.value)} a month` : `${fmtRate(r.value)} of your ${{ pct_gross: "total earnings", pct_basic: "basic pay", pct_business: "sales" }[r.kind]}`;
+  return r.cap != null ? `${what}, until Rs ${fmt(r.cap)} is held` : what;
+}
+
 function securityDeduction(rule, { gross, basic, business = 0, heldToDate }) {
   const r = parseSecurityRule(rule);
   let amount = 0;
@@ -98,21 +106,21 @@ function computeGuy({ staff, daily, stock, allowances, openingBalance, securityH
       ...(tiered ? { pay_scheme: "tiered", target_met: metTarget, food_allowance: food } : {}),
       earnings: tiered ? [
         ...(metTarget ? [{ label: "Basic pay", amount: basic }] : [
-          { label: `Commission (${fmtRate(staff.base_commission_rate)} of Rs ${fmt(totalBusiness)} business)`, amount: baseCommission },
+          { label: `Commission (${fmtRate(staff.base_commission_rate)} of your sales, Rs ${fmt(totalBusiness)}; the target was not reached)`, amount: baseCommission },
         ]),
-        { label: `Over-target income (${fmtRate(staff.commission_rate)} of Rs ${fmt(overTarget)} over target)`, amount: commission },
+        { label: `Extra pay above target (${fmtRate(staff.commission_rate)} of Rs ${fmt(overTarget)} sales above your target)`, amount: commission },
         { label: `Food allowance (${foodDays} days × Rs ${fmt(staff.food_per_day)})`, amount: food },
         ...allowances.map((a) => ({ label: `Allowance: ${a.description}`, amount: a.amount })),
       ] : [
         { label: "Basic pay", amount: staff.basic_pay },
-        { label: `Commission (${fmtRate(staff.commission_rate)} of Rs ${fmt(overTarget)} over target)`, amount: commission },
+        { label: `Commission (${fmtRate(staff.commission_rate)} of Rs ${fmt(overTarget)} sales above your target)`, amount: commission },
         ...allowances.map((a) => ({ label: `Allowance: ${a.description}`, amount: a.amount })),
       ],
       deductions: [
-        { key: "settle_up_daily", label: "Settle-up (business − settled)", amount: settleUpDaily },
-        { key: "stock_shortfall", label: "Stock shortfall", amount: stockShortfall },
-        { key: "personal", label: "Personal minus", amount: personal },
-        { key: "security", label: `Security (${staff.security_deduction_rule})`, amount: security },
+        { key: "settle_up_daily", label: "Cash not handed in (sales minus cash handed in)", amount: settleUpDaily },
+        { key: "stock_shortfall", label: "Missing stock", amount: stockShortfall },
+        { key: "personal", label: "Advance taken", amount: personal },
+        { key: "security", label: `Security deposit${describeSecurity(staff.security_deduction_rule) ? ` (${describeSecurity(staff.security_deduction_rule)})` : ""}`, amount: security },
         ...loanLines.map((l) => ({ key: "loan", label: loanLabel(l), amount: l.amount })),
       ],
       ...(loanLines.length ? { loans: loanLines } : {}),
@@ -170,9 +178,9 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
     { key: "rent", label: "Rent", amount: sum(weeks, "rent") },
     { key: "hub_fee", label: "Hub fee", amount: sum(weeks, "hub_fee") },
     { key: "security_cost", label: "Security cost", amount: sum(weeks, "security_cost") },
-    { key: "personal_draw", label: "Personal draw", amount: sum(weeks, "personal_draw") },
-    { key: "company_return", label: `Company return (${fmtRate(companyReturnRate)} of business)`, amount: companyReturn },
-    { key: "team_over_target", label: "Team's extra on sales over target", amount: sum(team, "over_target") },
+    { key: "personal_draw", label: "Money drawn for personal use", amount: sum(weeks, "personal_draw") },
+    { key: "company_return", label: `Share returned to the company (${fmtRate(companyReturnRate)} of business)`, amount: companyReturn },
+    { key: "team_over_target", label: "Team's extra pay above target (paid from your share)", amount: sum(team, "over_target") },
     { key: "team_food", label: "Team's food allowance", amount: sum(team, "food") },
   ];
   const totalDeductions = sum(deductions, "amount");
@@ -197,7 +205,7 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
       earnings: [
         retaining
           ? { label: `Retaining commission (${fmtRate(retainRate)} of Rs ${fmt(monthSales)}: sales below Rs ${fmt(retainThreshold)})`, amount: commission }
-          : { label: "Weekly commission (Σ weekly business × profit %)", amount: commission },
+          : { label: "Weekly commission (each week's business × that week's profit share)", amount: commission },
         ...(ownSales ? [{ label: `Own sales commission (${fmtRate(ownRate)} of Rs ${fmt(ownSales)})`, amount: ownCommission }] : []),
         ...(salary ? [{ label: "Basic salary (paid to bank)", amount: salary }] : [])],
       deductions,
@@ -224,7 +232,7 @@ function computeSenior({ staff, belowSales = 0, rate = 0, openingBalance = 0 }) 
       basic_salary: salary, below_sales: belowSales, commission_rate: rate,
       earnings: [
         { label: "Basic salary (paid to bank)", amount: salary },
-        { label: `Share of sales below (${fmtRate(rate)} of Rs ${fmt(belowSales)})`, amount: commission },
+        { label: `Share of your team's sales (${fmtRate(rate)} of Rs ${fmt(belowSales)})`, amount: commission },
       ],
       deductions: [],
     },
@@ -249,7 +257,7 @@ function evaluateFlags(result, { staff, previous, settings }) {
   const negatives = result.detail.deductions.filter((d) => d.amount < 0);
   for (const d of negatives) add("NEGATIVE_DEDUCTION", `${d.label} totals Rs ${fmt(d.amount)}`);
   for (const l of result.detail.negative_lines || []) {
-    add("NEGATIVE_DEDUCTION", `${l.date}: settle-up Rs ${fmt(l.settle_up_minus)}, personal Rs ${fmt(l.personal_minus)}`);
+    add("NEGATIVE_DEDUCTION", `${l.date}: cash not handed in Rs ${fmt(l.settle_up_minus)}, advance Rs ${fmt(l.personal_minus)}`);
   }
   if (result.role === "guy" && result.total_deductions > result.gross_earnings) {
     add("DEDUCTIONS_EXCEED_GROSS", `Deductions Rs ${fmt(result.total_deductions)} exceed gross Rs ${fmt(result.gross_earnings)}`);
@@ -281,9 +289,9 @@ function evaluateFlags(result, { staff, previous, settings }) {
 }
 
 function loanLabel(l) {
-  const what = l.kind === "advance" ? "Advance repaid" : "Loan instalment";
-  const short = l.amount < l.planned ? `, only Rs ${fmt(l.amount)} of Rs ${fmt(l.planned)} could be taken` : "";
-  return `${what} (balance after: Rs ${fmt(l.outstanding_after)}${short})`;
+  const what = l.kind === "advance" ? "Advance paid back" : "Loan payment";
+  const short = l.amount < l.planned ? `; only Rs ${fmt(l.amount)} of Rs ${fmt(l.planned)} could be taken this month` : "";
+  return `${what} (${l.outstanding_after > 0 ? `Rs ${fmt(l.outstanding_after)} still to pay` : "this clears it"}${short})`;
 }
 
 function fmt(cents) {
