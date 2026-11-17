@@ -1,6 +1,7 @@
 import { get, post, put, qs } from "../api.js";
 import { state, can, scopeHub, navigate } from "../app.js";
 import { isPhone, stepForm } from "../phone.js";
+import { managerGroupOf, teamOrder } from "./shared.js";
 import { exportButtons, $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
 let filters = { q: "", role: "", status: "active", group: "hub" };
@@ -196,7 +197,7 @@ export default {
     const staff = await get("/api/staff" + qs({ hub: scopeHub() }));
     const byId = Object.fromEntries(staff.map((s) => [s.employee_id, s]));
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
-    if (scopeHub() && filters.group === "hub") filters.group = "staff_level"; // one hub: group by position instead
+    if (scopeHub() && filters.group === "hub") filters.group = "manager"; // one hub: group by manager instead
 
     const allCols = [
       { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
@@ -225,7 +226,7 @@ export default {
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
             <select class="input sm" id="role" aria-label="Filter by position" style="width:auto"><option value="">All positions</option>${LEVELS.map(([v, l]) => html`<option value="${v}" ${filters.role === v ? "selected" : ""}>${l}</option>`)}</select>
             <div class="seg" id="st" role="group" aria-label="Filter by status">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.status === v)}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
-            <div class="seg" id="grp" role="group" aria-label="Group by">${[...(scopeHub() ? [] : [["hub", "By hub"]]), ["staff_level", "By position"], ["", "No grouping"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
+            <div class="seg" id="grp" role="group" aria-label="Group by">${[...(scopeHub() ? [] : [["hub", "By hub"]]), ["manager", "By manager"], ["staff_level", "By position"], ["", "No grouping"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
           </div>
           <details class="colpick"><summary class="btn sm">${icon("sheet")} Columns</summary>
             <div class="colpick-menu" role="group" aria-label="Choose the columns to show">${allCols.filter((c) => c.key !== "name").map((c) => html`<label><input type="checkbox" data-col="${c.key}" ${hiddenCols.includes(c.key) ? "" : "checked"}> ${c.label}</label>`)}</div></details>
@@ -242,10 +243,12 @@ export default {
       const hubOrder = (c) => { const i = state.hubs.findIndex((h) => h.code === c); return i < 0 ? 999 : i; };
       // Grouped lists keep the chain order inside each group: coacher first, then promoting manager, manager, supervisors, distributors.
       if (filters.group === "hub") rows.sort((a, b) => hubOrder(a.hub) - hubOrder(b.hub) || rank(b) - rank(a) || a.name.localeCompare(b.name));
+      else if (filters.group === "manager") rows.sort((a, b) => { const x = managerGroupOf(a, byId), y = managerGroupOf(b, byId); return x.order - y.order || x.name.localeCompare(y.name) || teamOrder(a, b); });
       else if (filters.group === "staff_level") rows.sort((a, b) => rank(b) - rank(a) || hubOrder(a.hub) - hubOrder(b.hub) || a.name.localeCompare(b.name));
-      const groupBy = filters.group === "hub" ? (s) => s.hub : filters.group === "staff_level" ? (s) => s.staff_level : undefined;
+      const groupBy = filters.group === "hub" ? (s) => s.hub : filters.group === "manager" ? (s) => managerGroupOf(s, byId).id : filters.group === "staff_level" ? (s) => s.staff_level : undefined;
       const groupLabel = (key, rs) => filters.group === "hub"
         ? `<b>${hubName(key)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "person" : "people"}</span> ${can("read") ? `<a class="group-link" href="/hubs/${encodeURIComponent(key)}" data-link>Open hub <span class="sr-only">${hubName(key)}</span>→</a>` : ""}`
+        : filters.group === "manager" ? (() => { const g = managerGroupOf(rs[0], byId); return `<b>${g.title}</b> <span class="muted">· ${g.sub ? g.sub + " · " : ""}${rs.length} ${rs.length === 1 ? "person" : "people"}</span>`; })()
         : `<b>${levelLabel(key, rs.length)}</b> <span class="muted">· ${rs.length}</span>`;
       $("#list").innerHTML = staff.length ? dataTable({
         rows, groupBy, groupLabel, empty: "No employees match these filters", cls: "people",

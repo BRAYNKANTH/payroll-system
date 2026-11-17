@@ -1,19 +1,26 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
 import { exportButtons, $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount } from "../ui.js";
-import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons } from "./shared.js";
+import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons, managerGroupOf, teamOrder } from "./shared.js";
 import { isPhone } from "../phone.js";
-import { announce, badge } from "../ui.js";
+import { announce, badge, initials } from "../ui.js";
 
 // On a phone the daily sheet is entered one person at a time ("one by one"); the grid is still there for people who prefer it.
 const viewPref = () => { try { return localStorage.getItem("pr.daily.view") || "quick"; } catch { return "quick"; } };
 const setViewPref = (v) => { try { localStorage.setItem("pr.daily.view", v); } catch { /* private mode */ } };
+
+// Which manager cards are folded is remembered in this browser.
+const CLOSED_KEY = "pr.daily.closed";
+const loadClosed = () => { try { return JSON.parse(localStorage.getItem(CLOSED_KEY)) || []; } catch { return []; } };
+const saveClosed = (ids) => { try { localStorage.setItem(CLOSED_KEY, JSON.stringify(ids)); } catch { /* private mode */ } };
 
 const FIELDS = [
   { k: "business_amount", label: "Business" },
   { k: "settled_amount", label: "Settled" },
   { k: "personal_minus", label: "Personal minus" },
 ];
+
+const levelName = (g) => ({ manager: "Manager", supervisor: "Supervisor", distributor: "Distributor" }[g.staff_level] || g.staff_level);
 
 function daysIn(period) {
   const [y, m] = period.split("-").map(Number);
@@ -24,6 +31,7 @@ function daysIn(period) {
 let mode = "day";
 let currentDate = null;
 let currentEmp = null;
+let staffAll = []; // everyone in view, including the people above the sellers, so each seller's manager can be found
 
 export default {
   title: "Daily sheet",
@@ -34,6 +42,7 @@ export default {
       get("/api/staff" + qs({ hub: scopeHub() })),
       periodLocked(state.period),
     ]);
+    staffAll = staff;
     const guys = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager") && s.status === "active"); // everyone who sells, managers included
     const editable = can("enter_data") && !locked;
     const days = daysIn(state.period);
@@ -79,7 +88,7 @@ export default {
 // ---------------------------------------------------------------- grid core
 
 // rows: [{ key, label, sub, date, employee_id, existing, muted }]
-function buildGrid({ rows, editable, firstCol, onSaved }) {
+function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
   const stale = $("#grid");
   const grid = stale.cloneNode(false); // drop listeners from the previous day/employee
   stale.replaceWith(grid);
@@ -95,12 +104,7 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
   };
   const cell = (f, r, value) => html`<td><input data-f="${f.k}" data-money inputmode="decimal" autocomplete="off" value="${value}" ${editable ? "" : "disabled"}
     aria-label="${f.label}, ${r.label}${r.sub ? ", " + r.sub : ""}"></td>`;
-  grid.innerHTML = html`
-    <div class="table-wrap" tabindex="-1"><table class="table sheet">
-      <caption class="sr-only">Daily entries. Enter or arrow keys move between rows.</caption>
-      <thead><tr><th scope="col">${firstCol}</th>${FIELDS.slice(0, 2).map((f) => html`<th scope="col" class="r">${f.label}</th>`)}<th scope="col" class="r">Settle-up minus</th>
-        <th scope="col" class="r">${FIELDS[2].label}</th><th scope="col">Notes</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>
-      <tbody>${rows.map((r, i) => html`
+  const rowHtml = (r, i) => html`
         <tr data-i="${i}" style="${r.muted ? "opacity:.6" : ""}">
           <th scope="row" class="name"><b>${r.label}</b><div class="faint text-sm fw-400">${r.sub}</div></th>
           ${FIELDS.slice(0, 2).map((f) => cell(f, r, r.existing ? amt(r.existing[f.k]) : ""))}
@@ -108,14 +112,42 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
           ${cell(FIELDS[2], r, r.existing && r.existing.personal_minus ? amt(r.existing.personal_minus) : "")}
           <td><input class="text" data-f="notes" value="${r.existing?.notes || ""}" ${editable ? "" : "disabled"} aria-label="Notes, ${r.label}"></td>
           <td>${r.existing?.updated_by ? html`<span class="badge plain" title="Edited by ${r.existing.updated_by}">edited</span>` : ""}</td>
-        </tr>`)}</tbody>
-      <tfoot><tr><th scope="row">Total</th><td class="r" data-t="business_amount"></td><td class="r" data-t="settled_amount"></td><td class="r" data-t="settle"></td><td class="r" data-t="personal_minus"></td><td colspan="2"></td></tr></tfoot>
-    </table></div>
+        </tr>`;
+  const tableOf = (idxs, foot, caption) => html`
+    <div class="table-wrap" tabindex="-1"><table class="table sheet">
+      <caption class="sr-only">${caption}</caption>
+      <thead><tr><th scope="col">${firstCol}</th>${FIELDS.slice(0, 2).map((f) => html`<th scope="col" class="r">${f.label}</th>`)}<th scope="col" class="r">Settle-up minus</th>
+        <th scope="col" class="r">${FIELDS[2].label}</th><th scope="col">Notes</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>
+      <tbody>${idxs.map((i) => rowHtml(rows[i], i))}</tbody>
+      ${foot ? html`<tfoot><tr><th scope="row">Total</th><td class="r" data-t="business_amount"></td><td class="r" data-t="settled_amount"></td><td class="r" data-t="settle"></td><td class="r" data-t="personal_minus"></td><td colspan="2"></td></tr></tfoot>` : ""}
+    </table></div>`;
+  const closed = loadClosed();
+  grid.innerHTML = html`
+    ${groups ? html`
+      <div class="dsum" role="group" aria-label="Totals for everyone on this sheet">
+        <div class="dstat"><span>Business</span><b data-s="business_amount">0.00</b></div>
+        <div class="dstat"><span>Handed in</span><b data-s="settled_amount">0.00</b></div>
+        <div class="dstat"><span>Short</span><b data-s="settle">0.00</b></div>
+        <div class="dstat"><span>Entered</span><b data-s="entered">0 of ${rows.length}</b></div>
+        <div class="dsum-actions"><button type="button" class="btn sm" id="grp-open">Expand all</button><button type="button" class="btn sm" id="grp-close">Collapse all</button></div>
+      </div>
+      ${groups.map((g) => html`<details class="dgrp card" data-gid="${g.id}" ${closed.includes(g.id) ? "" : "open"}>
+        <summary><span class="dg-chev" aria-hidden="true">${icon("right")}</span><span class="avatar" aria-hidden="true">${initials(g.title)}</span>
+          <span class="dg-title"><b>${g.title}</b><small>${g.sub}${g.sub ? " · " : ""}${g.idxs.length} ${g.idxs.length === 1 ? "person" : "people"}</small></span>
+          <span class="dg-nums"><span><small>Business</small><b data-gt="business_amount">0.00</b></span><span><small>Short</small><b data-gt="settle">0.00</b></span><span class="dg-prog" data-gt="entered"></span></span></summary>
+        ${tableOf(g.idxs, false, `Daily entries for ${g.title}'s group. Enter or arrow keys move between rows.`)}
+      </details>`)}`
+      : tableOf(rows.map((_, i) => i), true, "Daily entries. Enter or arrow keys move between rows.")}
     <p class="scroll-hint">Swipe the table sideways to see all columns.</p>
     <div id="sheet-errors"></div>
     ${editable ? html`<div class="savebar">
       <span class="muted" id="dirty-info" role="status">No unsaved changes</span>
       <div class="row"><button type="button" class="btn" id="revert" disabled>Discard</button><button type="button" class="btn primary" id="save" disabled>${icon("check")} Save sheet</button></div></div>` : ""}`;
+  if (groups) {
+    $$("details.dgrp", grid).forEach((d) => d.addEventListener("toggle", () => saveClosed($$("details.dgrp", grid).filter((x) => !x.open).map((x) => x.dataset.gid))));
+    $("#grp-open", grid).onclick = () => $$("details.dgrp", grid).forEach((d) => (d.open = true));
+    $("#grp-close", grid).onclick = () => $$("details.dgrp", grid).forEach((d) => (d.open = false));
+  }
 
   // Validate as the user types: bad amounts are marked on the cell, never shown as "NaN".
   const validate = (tr) => {
@@ -151,10 +183,38 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
       if (changed) dirty++;
     });
     const t = totalsRow();
-    $('[data-t="business_amount"]', grid).textContent = money(t.business_amount);
-    $('[data-t="settled_amount"]', grid).textContent = money(t.settled_amount);
-    $('[data-t="settle"]', grid).textContent = money(t.business_amount - t.settled_amount);
-    $('[data-t="personal_minus"]', grid).textContent = money(t.personal_minus);
+    if ($('[data-t="business_amount"]', grid)) { // one flat table: the totals row
+      $('[data-t="business_amount"]', grid).textContent = money(t.business_amount);
+      $('[data-t="settled_amount"]', grid).textContent = money(t.settled_amount);
+      $('[data-t="settle"]', grid).textContent = money(t.business_amount - t.settled_amount);
+      $('[data-t="personal_minus"]', grid).textContent = money(t.personal_minus);
+    }
+    if (groups) { // one card per manager: their own totals, and how many of their people are entered
+      const per = {};
+      let enteredAll = 0;
+      $$("tbody tr", grid).forEach((tr) => {
+        const gid = rows[tr.dataset.i].group;
+        const v = (f) => tr.querySelector(`[data-f="${f}"]`).value.trim();
+        const x = (per[gid] = per[gid] || { b: 0, s: 0, n: 0, of: 0 });
+        x.of++;
+        if (v("business_amount") !== "" || v("settled_amount") !== "") { x.n++; enteredAll++; }
+        if (isAmount(v("business_amount"))) x.b += cents(v("business_amount"));
+        if (isAmount(v("settled_amount"))) x.s += cents(v("settled_amount"));
+      });
+      const short = (el, c) => { el.textContent = money(c); el.classList.toggle("neg", c > 0); };
+      for (const g of groups) {
+        const card = $(`details.dgrp[data-gid="${g.id}"]`, grid), x = per[g.id] || { b: 0, s: 0, n: 0, of: 0 };
+        $('[data-gt="business_amount"]', card).textContent = money(x.b);
+        short($('[data-gt="settle"]', card), x.b - x.s);
+        const prog = $('[data-gt="entered"]', card);
+        prog.textContent = `${x.n} of ${x.of} entered`;
+        prog.className = `dg-prog ${x.n === x.of ? "done" : x.n ? "part" : ""}`;
+      }
+      $('[data-s="business_amount"]', grid).textContent = money(t.business_amount);
+      $('[data-s="settled_amount"]', grid).textContent = money(t.settled_amount);
+      short($('[data-s="settle"]', grid), t.business_amount - t.settled_amount);
+      $('[data-s="entered"]', grid).textContent = `${enteredAll} of ${rows.length}`;
+    }
     if (editable) {
       $("#save").disabled = $("#revert").disabled = !dirty;
       $("#dirty-info").textContent = dirty ? `${dirty} row${dirty > 1 ? "s" : ""} changed — not saved yet` : "No unsaved changes";
@@ -197,7 +257,7 @@ function buildGrid({ rows, editable, firstCol, onSaved }) {
         personal_minus: parseAmount(v("personal_minus")) || 0, notes: v("notes") });
     }
     showErrors(problems);
-    if (problems.length) { $("tbody [aria-invalid=true]", grid)?.focus(); return; }
+    if (problems.length) { const bad = $("tbody [aria-invalid=true]", grid); bad?.closest("details")?.setAttribute("open", ""); bad?.focus(); return; }
     if (!out.length) return;
     if (deletions && !(await confirmDialog({ title: "Delete entries?", message: `${deletions} cleared row${deletions > 1 ? "s" : ""} will be deleted. Deletions are recorded in the audit trail.`, confirmText: "Delete & save", danger: true }))) return;
     try {
@@ -242,11 +302,20 @@ async function dayMode(ctx, guys, days, editable) {
     setDirtyCheck(null);
     return quickEntry({ guys, byEmp, date: currentDate, toGrid: () => { setViewPref("grid"); dayMode(ctx, guys, days, editable); }, refresh: () => dayMode(ctx, guys, days, editable) });
   }
-  buildGrid({
-    firstCol: "Employee", editable,
-    rows: guys.map((g) => ({ label: g.name, sub: `${g.employee_id} · ${g.hub}`, date: currentDate, employee_id: g.employee_id, existing: byEmp[g.employee_id] })),
-    onSaved: () => dayMode(ctx, guys, days, editable),
-  });
+  // One card per manager: the manager and everyone who reports to them, so the sheet reads team by team.
+  const byId = Object.fromEntries(staffAll.map((s) => [s.employee_id, s]));
+  const teams = new Map();
+  for (const g of guys) {
+    const k = managerGroupOf(g, byId);
+    if (!teams.has(k.id)) teams.set(k.id, { ...k, people: [] });
+    teams.get(k.id).people.push(g);
+  }
+  const rows = [], groups = [];
+  for (const t of [...teams.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))) {
+    const idxs = t.people.sort(teamOrder).map((g) => rows.push({ label: g.name, sub: `${g.employee_id} · ${levelName(g)}`, date: currentDate, employee_id: g.employee_id, existing: byEmp[g.employee_id], group: t.id }) - 1);
+    groups.push({ id: t.id, title: t.title, sub: `${t.sub}${scopeHub() || !t.hub ? "" : " · " + t.hub}`, idxs });
+  }
+  buildGrid({ firstCol: "Employee", editable, rows, groups, onSaved: () => dayMode(ctx, guys, days, editable) });
 }
 
 async function empMode(ctx, guys, days, editable) {

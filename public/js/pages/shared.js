@@ -1,15 +1,34 @@
 // Helpers shared by several pages.
 import { get } from "../api.js";
-import { html, icon, monthName, parseAmount, formatAmount, fromCents, money, announce } from "../ui.js";
+import { html, icon, monthName, parseAmount, formatAmount, fromCents, money, announce, LEVELS } from "../ui.js";
 
 // Spreadsheet keyboard navigation: Enter / ↓ moves down, ↑ moves up, in the same column.
+// Everyone sits in a group: the manager they report to (directly or through others), or, when no manager is above them, whoever they report to.
+// Returns { id, title, sub, order, name, hub }. byId maps employee_id -> person (the whole hub, with the people above the sellers).
+export function managerGroupOf(person, byId) {
+  if (person.staff_level === "coacher" || person.staff_level === "promoting_manager") return { id: "lead:" + person.hub, title: "Leadership", sub: `Coacher and promoting manager · ${person.hub}`, order: -1, name: "", hub: person.hub };
+  const isManager = (x) => x && x.staff_level === "manager";
+  let boss = isManager(person) ? person : null, cur = person, hops = 0;
+  while (!boss && cur?.upline_id && hops++ < 8) { cur = byId[cur.upline_id]; if (isManager(cur)) boss = cur; }
+  if (boss) return { id: boss.employee_id, title: boss.name, sub: `Manager · ${boss.employee_id}`, order: 0, name: boss.name, hub: boss.hub };
+  const up = byId[person.upline_id];
+  if (up) return { id: "up:" + up.employee_id, title: `Reports to ${up.name}`, sub: up.employee_id, order: 1, name: up.name, hub: up.hub };
+  return { id: "none", title: "No manager", sub: "", order: 2, name: "", hub: person.hub };
+}
+// People sorted the way a team reads: the manager first, then supervisors, then distributors, each by name.
+const posIndex = (l) => LEVELS.findIndex(([v]) => v === l);
+export const teamOrder = (a, b) => (posIndex(b.staff_level) - posIndex(a.staff_level)) || a.name.localeCompare(b.name);
+
 export function sheetKeys(root) {
   root.addEventListener("keydown", (e) => {
     const input = e.target.closest("input[data-f]");
     if (!input || !["Enter", "ArrowDown", "ArrowUp"].includes(e.key)) return;
     const tr = input.closest("tr");
-    const next = e.key === "ArrowUp" ? tr.previousElementSibling : tr.nextElementSibling;
+    const all = [...root.querySelectorAll("tbody tr")];
+    const at = all.indexOf(tr);
+    const next = all[e.key === "ArrowUp" ? at - 1 : at + 1];
     const target = next?.querySelector(`input[data-f="${input.dataset.f}"]`);
+    if (target) target.closest("details")?.setAttribute("open", ""); // a collapsed card opens when the cursor moves into it
     if (target) { e.preventDefault(); target.focus(); target.select(); }
   });
   root.addEventListener("focusin", (e) => {

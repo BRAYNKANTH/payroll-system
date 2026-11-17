@@ -1360,3 +1360,33 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .ws-sub a { flex: 0 0 auto; padding: 7px 14px; min-height: 36px; display: inline-flex; align-items: center; border-radius: 999px; border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text-2); font-size: 14.5px; font-weight: 600; text-decoration: none; }
 .ws-sub a[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: #fff; }
 @media (max-width: 860px) { .ws { padding: 10px 14px 0; } .ws-sub a { min-height: 44px; } .ws-top select { margin-left: 0; width: 100%; } }
+
+/* ---------- Daily sheet: totals strip and one card per manager ---------- */
+.dsum { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; padding: 16px 18px; background: var(--surface-3); border-bottom: 1px solid var(--border); }
+.dstat { display: flex; flex-direction: column; gap: 2px; min-width: 130px; padding: 10px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+.dstat span { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.dstat b { font-size: 22px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--text); }
+.dstat b.neg { color: var(--danger); }
+.dsum-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dgrp { margin: 14px 18px 0; overflow: hidden; }
+.dgrp:last-of-type { margin-bottom: 14px; }
+.dgrp > summary { display: flex; align-items: center; gap: 12px; padding: 12px 18px; min-height: 64px; cursor: pointer; list-style: none; background: var(--surface); }
+.dgrp > summary::-webkit-details-marker { display: none; }
+.dgrp > summary:hover { background: var(--surface-3); }
+.dgrp > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.dg-chev { display: grid; color: var(--text-3); transition: transform .15s ease; }
+.dg-chev svg { width: 18px; height: 18px; }
+.dgrp[open] .dg-chev { transform: rotate(90deg); }
+.dg-title { display: flex; flex-direction: column; min-width: 0; }
+.dg-title b { font-size: 17px; }
+.dg-title small { font-size: 13.5px; color: var(--text-2); }
+.dg-nums { margin-left: auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
+.dg-nums > span { display: flex; flex-direction: column; text-align: right; }
+.dg-nums small { font-size: 12.5px; color: var(--text-2); }
+.dg-nums b { font-variant-numeric: tabular-nums; font-size: 16px; }
+.dg-nums b.neg { color: var(--danger); }
+.dg-nums .dg-prog { flex-direction: row; padding: 4px 12px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-size: 13.5px; font-weight: 600; }
+.dg-prog.done { background: var(--success-soft); color: var(--success); }
+.dg-prog.part { background: var(--warning-soft); color: var(--warning); }
+.dgrp .table-wrap { border-top: 1px solid var(--border); }
+@media (max-width: 860px) { .dgrp { margin: 12px 10px 0; } .dgrp > summary { flex-wrap: wrap; } .dg-nums { margin-left: 30px; justify-content: flex-start; width: 100%; } .dsum { padding: 12px 10px; } .dstat { flex: 1 1 130px; } }
