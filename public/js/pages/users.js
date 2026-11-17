@@ -21,7 +21,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Users & roles</h1><p>Who can sign in, and what they are allowed to do.</p></div>
-        <div class="actions"><button class="btn primary" id="add">${icon("plus")} Add user</button></div>
+        <div class="actions"><button class="btn" id="bulk">${icon("users")} Create logins for employees</button><button class="btn primary" id="add">${icon("plus")} Add user</button></div>
       </div>
       <div class="grid kpis mb-4">${ROLES.map(([k, , d]) => html`
         <div class="card kpi"><div class="label">${roleBadge(k)}</div>
@@ -40,7 +40,7 @@ export default {
           : html`<div class="field full"><span class="lbl">Role</span>
             <div class="grid halves" style="gap:8px;margin-top:4px">${ROLES.map(([k, l, desc]) => html`
               <label class="card" style="padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;box-shadow:none">
-                <input type="radio" name="role" value="${k}" ${(u?.role || "manager") === k ? "checked" : ""} ${self ? "disabled" : ""} style="margin-top:3px">
+                <input type="radio" name="role" value="${k}" ${(u?.role || "staff") === k ? "checked" : ""} ${self ? "disabled" : ""} style="margin-top:3px">
                 <span><b style="color:var(--text)">${l}</b><br><span class="faint" style="font-weight:400">${desc}</span></span></label>`)}</div>
             ${self ? html`<span class="hint">You can't change your own role.</span>` : ""}</div>
           <div class="field full" id="emp-wrap" hidden><label for="emp-sel" id="emp-lbl">Employee</label>
@@ -99,5 +99,58 @@ export default {
       ],
     }).toString();
     $("#add").onclick = () => open(null);
+
+    // One step for many people: every active employee without a login gets one, the mobile number being the username.
+    const A = "abcdefghjkmnpqrstuvwxyz", N = "23456789";
+    const pick = (set, n) => Array.from(crypto.getRandomValues(new Uint32Array(n)), (x) => set[x % set.length]).join("");
+    const makePw = () => pick(A, 4) + pick(N, 4);
+    const digits = (v) => String(v || "").replace(/\D/g, "");
+    $("#bulk").onclick = () => {
+      const cands = free.map((x) => ({ ...x, user: digits(x.phone) })).sort((a, b) => a.name.localeCompare(b.name));
+      const d = drawer({
+        title: "Create logins for employees",
+        body: html`<div id="bk">
+          ${cands.length ? html`
+          <p class="muted" style="margin-top:0">Each person signs in with their <b>mobile number</b> as the username. Tick who should get a login, choose how passwords are set, then create.</p>
+          <div class="field"><label>Passwords</label>
+            <select class="input" id="bk-mode"><option value="gen">A different random password for each person</option><option value="same">The same starting password for everyone</option></select></div>
+          <div class="field" id="bk-same-wrap" hidden><label>Starting password</label><input class="input" id="bk-same" type="text" autocomplete="off" placeholder="At least 8 characters, letters and numbers"></div>
+          <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" id="bk-all" checked> Select all with a mobile number</label>
+          <div style="max-height:46vh;overflow:auto;border:1px solid var(--border,#e5e7eb);border-radius:10px">
+            <table class="table" style="width:100%"><thead><tr><th scope="col"></th><th scope="col">Employee</th><th scope="col">Username</th></tr></thead><tbody>
+            ${cands.map((x, i) => html`<tr><td><input type="checkbox" class="bk-row" data-i="${i}" ${x.user.length >= 3 ? "checked" : "disabled"} aria-label="Create a login for ${x.name}"></td>
+              <td><b>${x.name}</b><br><span class="faint" style="font-size:12px">${LV[x.staff_level] || x.staff_level} · ${x.employee_id} · ${x.hub}</span></td>
+              <td>${x.user.length >= 3 ? x.user : html`<span class="faint">no mobile number</span>`}</td></tr>`)}
+            </tbody></table></div>` : html`<div class="alert info">${icon("info")}<div>Every active employee already has a login.</div></div>`}
+        </div>`.toString(),
+        foot: `<button class="btn" data-close>Close</button>${cands.length ? '<button class="btn primary" id="bk-go">Create logins</button>' : ""}`,
+      });
+      if (!cands.length) return;
+      const body = $("#bk", d.panel), all = $("#bk-all", d.panel);
+      $("#bk-mode", d.panel).onchange = (e) => { $("#bk-same-wrap", d.panel).hidden = e.target.value !== "same"; };
+      all.onchange = () => d.panel.querySelectorAll(".bk-row:not(:disabled)").forEach((c) => { c.checked = all.checked; });
+      $("#bk-go", d.panel).onclick = (e) => busy(e.currentTarget, async () => {
+        const chosen = [...d.panel.querySelectorAll(".bk-row:checked")].map((c) => cands[+c.dataset.i]);
+        if (!chosen.length) throw new Error("Tick at least one person");
+        const same = $("#bk-mode", d.panel).value === "same", sp = $("#bk-same", d.panel).value;
+        if (same && !(sp.length >= 8 && /[A-Za-z]/.test(sp) && /\d/.test(sp))) throw new Error("The starting password needs at least 8 characters with letters and numbers");
+        const out = [];
+        for (const x of chosen) {
+          const pw = same ? sp : makePw();
+          try { await post("/api/users", { username: x.user, full_name: x.name, role: "staff", employee_id: x.employee_id, password: pw }); out.push([x, x.user, pw, ""]); }
+          catch (err) { out.push([x, x.user, "", err.message]); }
+        }
+        const ok = out.filter((r) => !r[3]);
+        body.innerHTML = html`<div class="alert ${ok.length ? "info" : "warn"}">${icon("info")}<div><b>${ok.length} login${ok.length === 1 ? "" : "s"} created${out.length > ok.length ? `, ${out.length - ok.length} failed` : ""}.</b> Passwords are shown only now. Copy or print this list and hand each person their own.</div></div>
+          <div style="overflow:auto;margin-top:10px"><table class="table" style="width:100%"><thead><tr><th scope="col">Employee</th><th scope="col">Username</th><th scope="col">Password</th></tr></thead><tbody>
+          ${out.map(([x, u, pw, err]) => html`<tr><td>${x.name}</td><td class="mono">${u}</td><td class="mono">${err ? html`<span class="neg">${err}</span>` : pw}</td></tr>`)}</tbody></table></div>`.toString();
+        const foot = d.panel.querySelector(".drawer-foot");
+        foot.innerHTML = `<button class="btn" data-close>Done</button><button class="btn" id="bk-copy">Copy list</button><button class="btn primary" id="bk-print">Print</button>`;
+        const lines = ok.map(([x, u, pw]) => `${x.name}\t${u}\t${pw}`).join("\n");
+        $("#bk-copy", d.panel).onclick = async () => { try { await navigator.clipboard.writeText("Employee\tUsername\tPassword\n" + lines); toast("List copied"); } catch { toast("Could not copy; select the table and copy it", "err"); } };
+        $("#bk-print", d.panel).onclick = () => window.print();
+        foot.querySelector("[data-close]").addEventListener("click", () => this.render(ctx));
+      });
+    };
   },
 };
