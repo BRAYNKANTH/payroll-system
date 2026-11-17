@@ -161,12 +161,13 @@ async function morning(db, { date, hub }) {
   for (const r of before) carried.set(r.employee_id + "|" + key(r.product_id), num(r.n));
   for (const r of soldBefore) carried.set(r.employee_id + "|" + key(r.product_id), (carried.get(r.employee_id + "|" + key(r.product_id)) || 0) - num(r.n));
   const sold = new Map(soldToday.map((r) => [r.employee_id + "|" + key(r.product_id), num(r.n)]));
+  const allHubs = await db.all(`SELECT code, name, status FROM hubs ${hub ? "WHERE code = ?" : ""} ORDER BY code`, ...(hub ? [hub] : []));
   const pools = {};
-  for (const h of [...new Set(people.map((p) => p.hub))]) {
-    const pool = await poolOf(db, h);
-    pools[h] = products.filter((p) => p.status === "active").map((p) => ({ product_id: Number(p.id), product: p.name, left: Math.max(0, pool.get(key(p.id))?.left || 0) }));
+  for (const h of allHubs) {
+    const pool = await poolOf(db, h.code);
+    pools[h.code] = products.filter((p) => p.status === "active").map((p) => ({ product_id: Number(p.id), product: p.name, left: Math.max(0, pool.get(key(p.id))?.left || 0) }));
   }
-  return {
+  const out = {
     date: day,
     pools,
     products: products.filter((p) => p.status === "active").map((p) => ({ id: Number(p.id), name: p.name, price: num(p.list_price) })),
@@ -177,6 +178,15 @@ async function morning(db, { date, hub }) {
       return { employee_id: p.employee_id, name: p.name, hub: p.hub, staff_level: p.staff_level, carried: keep, given: mine, sold_pieces: soldPieces };
     }),
   };
+  // One line per hub: its coacher (who gives the stock out), what is given today and who has none. The admin sees this instead of every seller.
+  const coachers = await db.all("SELECT hub, employee_id, name FROM staff WHERE staff_level = 'coacher' AND status = 'active' ORDER BY employee_id");
+  out.hubs = allHubs.map((h) => {
+    const mine = out.sellers.filter((x) => x.hub === h.code);
+    const c = coachers.find((x) => x.hub === h.code);
+    return { code: h.code, name: h.name, status: h.status, coacher: c ? { employee_id: c.employee_id, name: c.name } : null, sellers: mine.length,
+      given_pieces: mine.reduce((t, x) => t + x.given.reduce((n, g) => n + g.qty, 0), 0), without_stock: mine.filter((x) => !x.given.length && !x.carried.length).length };
+  });
+  return out;
 }
 
 // Give a seller their stock. `lines` is a list of { product_id, qty }.

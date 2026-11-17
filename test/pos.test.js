@@ -200,6 +200,14 @@ test("the morning screen shows what the hub holds, and the office's input is che
   await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 12 }] });
   const m = await pos.morning(d, { date: sales.today(), hub: "H1" });
   assert.deepEqual(m.pools.H1.map((p) => [p.product, p.left]), [["Shine", 12], ["Vim", 0]]);
+  // the admin's overview: every hub with its coacher, instead of every seller
+  await svc.createEntry(d, "staff", { employee_id: "C1", name: "Head One", hub: "H1", staff_level: "coacher", basic_pay: 30000 }, "admin");
+  await give(d, ADMIN, { employee_id: "D1", lines: [{ product_id: shine, qty: 4 }] });
+  const all = await pos.morning(d, { date: sales.today() });
+  const h1 = all.hubs.find((h) => h.code === "H1"), h2 = all.hubs.find((h) => h.code === "H2");
+  assert.deepEqual([h1.coacher?.name, h1.sellers, h1.given_pieces, h1.without_stock], ["Head One", 2, 4, 1]);
+  assert.deepEqual([h2.coacher, h2.sellers, h2.given_pieces], [null, 1, 0], "a hub with no coacher says so");
+  assert.deepEqual(all.pools.H2.map((p) => [p.product, p.left]), [["Shine", 0], ["Vim", 0]]);
   await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "NOPE", lines: [{ product_id: shine, qty: 1 }] }), /Choose a hub/);
   await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [] }), /at least one product/);
   await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: vim, qty: 0 }] }), /whole number/);

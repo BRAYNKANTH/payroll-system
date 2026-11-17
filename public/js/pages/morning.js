@@ -1,7 +1,7 @@
 // Morning stock: the hub head or hub manager gives each seller their stock for the day.
 // One card per seller shows what they carry over, what they were given today and what they have sold. "Give stock" opens a short list of products.
 import { get, post, del, qs } from "../api.js";
-import { state, scopeHub } from "../app.js";
+import { state, scopeHub, can } from "../app.js";
 import { $, $$, html, esc, icon, toast, busy, drawer, confirmDialog, emptyState, initials, levelLabel } from "../ui.js";
 
 const rs = (c) => `Rs ${(Number(c) / 100).toLocaleString("en-LK", { maximumFractionDigits: 2 })}`;
@@ -23,6 +23,9 @@ export default {
     const hubs = [...new Set(d.sellers.map((s) => s.hub))];
     const givenTotal = d.sellers.reduce((t, s) => t + s.given.reduce((n, g) => n + g.qty, 0), 0);
     const without = d.sellers.filter((s) => !s.given.length && !s.carried.length).length;
+    // The admin does not hand stock to sellers: the admin sees each hub with its coacher and what it holds. The coacher gives it out.
+    const overview = can("manage_products") && !state.user.hub;
+    const givenAll = (d.hubs || []).reduce((t, h) => t + h.given_pieces, 0);
 
     const card = (s) => html`<article class="mcard card" aria-label="${s.name}">
       <div class="mc-top"><div class="avatar" aria-hidden="true">${initials(s.name)}</div>
@@ -37,7 +40,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Morning stock</h1><p>Give each seller the stock they take out today. They see it on their phone and can only sell what they have.</p></div>
+        <div><h1>Morning stock</h1><p>${overview ? "Each hub's coacher gives the stock out to the sellers. Here you see every hub, its coacher, what the hub holds and how much has been given out." : "Give each seller the stock they take out today. They see it on their phone and can only sell what they have."}</p></div>
       </div>
       <div class="card mb-4"><div class="card-body row between" style="gap:12px;flex-wrap:wrap">
         <div class="row" style="gap:8px;align-items:center">
@@ -46,14 +49,21 @@ export default {
           <button type="button" class="btn icon" id="d-next" aria-label="Next day" ${day >= today ? "disabled" : ""}>${icon("right")}</button>
           ${isToday ? "" : html`<button type="button" class="btn sm" id="d-today">Back to today</button>`}
         </div>
-        <div class="muted">${d.sellers.length} ${d.sellers.length === 1 ? "seller" : "sellers"} · ${givenTotal} ${givenTotal === 1 ? "piece" : "pieces"} given${canGive && without ? ` · ${without} with no stock` : ""}</div>
+        <div class="muted">${overview ? `${d.hubs.length} ${d.hubs.length === 1 ? "hub" : "hubs"} · ${givenAll} ${givenAll === 1 ? "piece" : "pieces"} given out` : `${d.sellers.length} ${d.sellers.length === 1 ? "seller" : "sellers"} · ${givenTotal} ${givenTotal === 1 ? "piece" : "pieces"} given${canGive && without ? ` · ${without} with no stock` : ""}`}</div>
       </div></div>
-      ${Object.entries(d.pools).map(([h, list]) => html`<section class="card mb-4" aria-label="${hubName(h)} stock"><div class="card-body">
+      ${overview ? "" : Object.entries(d.pools).map(([h, list]) => html`<section class="card mb-4" aria-label="${hubName(h)} stock"><div class="card-body">
         <div class="row between" style="gap:12px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:17px">${hubName(h)} stock</b><span class="muted">What the hub holds to give out to sellers</span></div>
         ${list.length ? html`<div class="mc-chips">${list.map((p) => html`<span class="mc-chip ${p.left > 0 ? "given" : ""}">${p.left} × ${p.product}</span>`)}</div>` : html`<span class="muted">No products yet.</span>`}
         ${list.length && list.every((p) => p.left === 0) ? html`<p class="muted" style="margin:10px 0 0">The hub has no stock to give out. The office sends stock to the hub first.</p>` : ""}</div></section>`)}
       ${!canGive ? html`<div class="alert info mb-4">${icon("info")}<div>${day > today ? "This day has not happened yet." : "Stock can be changed only for the last 3 days. You can still look at this day."}</div></div>` : ""}
-      ${d.sellers.length ? (hubs.length > 1
+      ${overview ? html`<div class="grid three">${d.hubs.map((h) => html`<article class="mcard card" aria-label="${h.name}">
+          <div class="mc-top"><div class="avatar" aria-hidden="true">${h.code}</div><div class="mc-who"><b>${h.name}</b><span class="muted">${h.code}</span></div></div>
+          <div class="mc-block"><span class="mc-label">Coacher</span>${h.coacher ? html`<b>${h.coacher.name}</b>` : html`<span class="mc-chip" style="background:var(--warning-soft);color:var(--warning)">No coacher yet</span>`}</div>
+          <div class="mc-block"><span class="mc-label">Hub stock</span>${(d.pools[h.code] || []).length ? html`<div class="mc-chips">${d.pools[h.code].map((p) => html`<span class="mc-chip ${p.left > 0 ? "given" : ""}">${p.left} × ${p.product}</span>`)}</div>` : html`<span class="muted">No products yet</span>`}</div>
+          <div class="mc-block"><span class="mc-label">Given out ${isToday ? "today" : "on this day"}</span>
+            <span>${h.given_pieces} ${h.given_pieces === 1 ? "piece" : "pieces"} to ${h.sellers - h.without_stock} of ${h.sellers} ${h.sellers === 1 ? "seller" : "sellers"}${h.without_stock && isToday ? html` <span class="badge amber">${h.without_stock} without stock</span>` : ""}</span></div>
+          <div class="mc-foot"><span></span><a class="btn primary" href="/hub-stock" data-link>${icon("plus")} Send stock to this hub</a></div></article>`)}</div>`
+      : d.sellers.length ? (hubs.length > 1
         ? hubs.map((h) => html`<section class="mb-4" aria-label="${hubName(h)}"><h2 class="section-title" style="margin:0 0 10px">${hubName(h)}</h2>
             <div class="grid three">${d.sellers.filter((s) => s.hub === h).map(card)}</div></section>`)
         : html`<div class="grid three">${d.sellers.map(card)}</div>`)
