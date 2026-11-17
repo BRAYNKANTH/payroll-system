@@ -36,6 +36,9 @@ export async function employeeForm(existing, onSaved) {
         <span class="hint" id="ef-level-hint" hidden></span></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Reports to</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Who sits directly above this person in the chain</span></div>
+      <div class="field" id="ef-keeper-wrap" hidden><span class="lbl">Stock keeper</span>
+        <label style="display:flex;gap:10px;align-items:center;font-weight:400"><input type="checkbox" name="stock_keeper" ${e.stock_keeper ? "checked" : ""}> Can handle the stock of the whole hub</label>
+        <span class="hint">A stock keeper can see and give stock to everyone in the hub, not only the people under them. Their other access does not change.</span></div>
       <div class="field"><label>Hub</label><select class="input" name="hub" ${scopeHub() ? "disabled" : ""}>${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
       <div class="field"><label>Status</label><select class="input" name="status"><option value="active" ${e.status === "active" ? "selected" : ""}>Active</option><option value="inactive" ${e.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
 
@@ -90,6 +93,7 @@ export async function employeeForm(existing, onSaved) {
     const guy = !isManagerLevel(f.staff_level.value);
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
     const lvl = f.staff_level.value;
+    $("#ef-keeper-wrap", f).hidden = lvl !== "manager"; // only a manager can be a stock keeper
     // A branch has one coacher: when adding another, say who is there now and how to hand over.
     const hint = $("#ef-level-hint", f);
     const coach = lvl === "coacher" && !existing ? staff.find((x) => x.staff_level === "coacher" && x.status === "active" && x.hub === f.hub.value) : null;
@@ -170,7 +174,7 @@ export async function employeeForm(existing, onSaved) {
       pay_scheme: tiered ? "tiered" : "over_target",
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
       food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
-      opening_balance: v.opening_balance || 0,
+      opening_balance: v.opening_balance || 0, stock_keeper: v.staff_level === "manager" && !!f.stock_keeper?.checked,
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };
     const login = !existing && v.make_login ? { username: (v.login_username || "").trim(), password: v.login_password || "" } : null;
@@ -195,7 +199,7 @@ export default {
 
     const allCols = [
       { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
-      { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
+      { key: "staff_level", label: "Position", render: (s) => html`${badge(s.role, levelLabel(s.staff_level))}${s.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}` },
       { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
       { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
       ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic pay", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),
@@ -211,7 +215,7 @@ export default {
       <div class="page-head">
         <div><h1>Employees</h1><p>${staff.filter((s) => s.status === "active").length} active · ${LEVELS.map(([v]) => [staff.filter((s) => s.staff_level === v && s.status === "active").length, v]).filter(([n]) => n)
           .map(([n, v]) => `${n} ${levelLabel(v, n).toLowerCase()}`).join(" · ")}</p></div>
-        <div class="actions">${exportButtons("employees", { hub: scopeHub() })}${can("manage_staff") || can("manage_team") ? html`<button class="btn primary" id="add" ${state.hubs.length ? "" : "disabled"}>${icon("plus")} Add employee</button>` : ""}</div>
+        <div class="actions">${can("read") ? exportButtons("employees", { hub: scopeHub() }) : ""}${can("manage_staff") || can("manage_team") ? html`<button class="btn primary" id="add" ${state.hubs.length ? "" : "disabled"}>${icon("plus")} Add employee</button>` : ""}</div>
       </div>
       ${!state.hubs.length ? html`<div class="alert warn mb-4">${icon("alert")}<div>Create at least one hub before adding employees. <a href="/hubs" data-link>Go to hubs →</a></div></div>` : ""}
       <div class="card">
@@ -240,7 +244,7 @@ export default {
       else if (filters.group === "staff_level") rows.sort((a, b) => rank(b) - rank(a) || hubOrder(a.hub) - hubOrder(b.hub) || a.name.localeCompare(b.name));
       const groupBy = filters.group === "hub" ? (s) => s.hub : filters.group === "staff_level" ? (s) => s.staff_level : undefined;
       const groupLabel = (key, rs) => filters.group === "hub"
-        ? `<b>${hubName(key)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "person" : "people"}</span> <a class="group-link" href="/hubs/${encodeURIComponent(key)}" data-link>Open hub <span class="sr-only">${hubName(key)}</span>→</a>`
+        ? `<b>${hubName(key)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "person" : "people"}</span> ${can("read") ? `<a class="group-link" href="/hubs/${encodeURIComponent(key)}" data-link>Open hub <span class="sr-only">${hubName(key)}</span>→</a>` : ""}`
         : `<b>${levelLabel(key, rs.length)}</b> <span class="muted">· ${rs.length}</span>`;
       $("#list").innerHTML = staff.length ? dataTable({
         rows, groupBy, groupLabel, empty: "No employees match these filters", cls: "people",

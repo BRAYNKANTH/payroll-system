@@ -3,15 +3,18 @@ const crypto = require("crypto");
 const { withUser, getSettings, httpError, logEvent } = require("./db");
 
 const NOW = "now_iso()";
-const ROLES = ["manager", "admin", "staff"];
-// What each role may do: the admin (owner and secretary) does everything; a hub manager enters data and
-// registers staff only inside their own hub, and never sees pay; the staff portal sees only its own figures.
+const ROLES = ["coacher", "manager", "admin", "staff"];
+// What each role may do. The admin does everything. A coacher is the head of a hub: they see and handle the whole hub (data entry, the team, stock)
+// but never anyone's pay. A manager sees only the people who report to them (read_team) and never pay; a manager tagged as stock keeper may also
+// handle the stock of the whole hub. The staff portal sees only its own figures.
 const PERMISSIONS = {
   staff: ["self"], // the staff portal: own figures only, nothing in the office pages
-  manager: ["read", "enter_data", "manage_team", "self"], // "self": My page, when the login is linked to an employee record
-  admin: ["read", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings"],
+  manager: ["read_team", "self"], // their own people only; "self" is My page
+  coacher: ["read", "read_team", "enter_data", "manage_team", "stock", "self"],
+  admin: ["read", "read_team", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings", "stock"],
 };
-const can = (user, perm) => !!user && PERMISSIONS[user.role]?.includes(perm);
+const permissionsOf = (u) => [...(PERMISSIONS[u.role] || []), ...(u.role === "manager" && u.stock_keeper ? ["stock"] : [])];
+const can = (user, perm) => !!user && (user.permissions || PERMISSIONS[user.role] || []).includes(perm);
 // perm may be a list: any one of them is enough.
 function requirePerm(user, perm) {
   if (!user) throw httpError(401, "Please sign in");
@@ -40,9 +43,22 @@ function validateUsername(u) {
 const sha256 = (s) => crypto.createHash("sha256").update(s).digest("hex");
 const publicUser = (u) => u && ({
   username: u.username, full_name: u.full_name, role: u.role, hub: u.hub, employee_id: u.employee_id || null, status: u.status,
-  last_login_at: u.last_login_at, created_at: u.created_at, permissions: PERMISSIONS[u.role],
+  staff_level: u.staff_level || null, stock_keeper: !!u.stock_keeper,
+  last_login_at: u.last_login_at, created_at: u.created_at, permissions: permissionsOf(u),
 });
-const findUser = (db, username) => db.get("SELECT * FROM users WHERE lower(username) = lower(?)", String(username || ""));
+// A login with the employee it belongs to (their position and stock-keeper tag decide what it may see).
+const WITH_EMPLOYEE = "SELECT u.*, s.staff_level, s.stock_keeper FROM users u LEFT JOIN staff s ON s.employee_id = u.employee_id";
+const findUser = (db, username) => db.get(`${WITH_EMPLOYEE} WHERE lower(u.username) = lower(?)`, String(username || ""));
+
+// A manager sees only the people under them: everyone who reports to them, directly or through others, and themselves.
+async function teamOf(db, employeeId) {
+  if (!employeeId) return [];
+  const rows = await db.all(`WITH RECURSIVE t(employee_id) AS (
+      SELECT employee_id FROM staff WHERE upline_id = ?
+      UNION SELECT s.employee_id FROM staff s JOIN t ON s.upline_id = t.employee_id)
+    SELECT employee_id FROM t`, employeeId);
+  return [employeeId, ...rows.map((r) => r.employee_id)];
+}
 
 const hasUsers = async (db) => (await db.get("SELECT COUNT(*) AS n FROM users")).n > 0;
 
@@ -100,9 +116,15 @@ async function login(db, username, password) {
 async function userFromToken(db, token) {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const row = await db.get(`
-    SELECT u.* FROM sessions s JOIN users u USING (username)
-    WHERE s.token_hash = ? AND s.expires_at > ${NOW} AND u.status = 'active'`, sha256(token));
-  return row ? publicUser(row) : null;
+    SELECT u.*, s.staff_level, s.stock_keeper FROM sessions x JOIN users u USING (username) LEFT JOIN staff s ON s.employee_id = u.employee_id
+    WHERE x.token_hash = ? AND x.expires_at > ${NOW} AND u.status = 'active'`, sha256(token));
+  if (!row) return null;
+  const user = publicUser(row);
+  if (row.role === "manager") {
+    // Not sent to the browser (not enumerable): the people this manager may see, used by the server to limit every answer.
+    Object.defineProperty(user, "teamIds", { value: await teamOf(db, row.employee_id), enumerable: false });
+  }
+  return user;
 }
 async function logout(db, token) {
   if (!token) return;
@@ -113,7 +135,7 @@ async function logout(db, token) {
 
 // ---- user management (admin)
 async function listUsers(db) {
-  return (await db.all("SELECT * FROM users ORDER BY role DESC, username")).map(publicUser);
+  return (await db.all(`${WITH_EMPLOYEE} ORDER BY u.role DESC, u.username`)).map(publicUser);
 }
 async function createUser(db, actor, body) {
   validateUsername(body.username);
@@ -121,29 +143,34 @@ async function createUser(db, actor, body) {
   if (!String(body.full_name || "").trim()) throw httpError(400, "Full name is required");
   checkPasswordStrength(body.password);
   if (body.hub && !(await db.get("SELECT 1 AS x FROM hubs WHERE code = ?", body.hub))) throw httpError(400, "Unknown hub");
-  if (body.role === "manager" && !body.hub) throw httpError(400, "A hub manager must be limited to one hub");
   if (await findUser(db, body.username)) throw httpError(409, "Username already exists");
   let hub = body.hub || null;
   let employeeId = null;
   let role = body.role;
-  if (body.role === "staff") {
-    // The portal login is tied to one person and takes that person's hub.
+  const employee = async () => {
     const s = await db.get("SELECT employee_id, hub, role, status, staff_level FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
     if (!s) throw httpError(400, "Choose the employee this login is for");
     if (s.status !== "active") throw httpError(400, "That employee is inactive");
     if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
+    return s;
+  };
+  if (role === "staff" || role === "manager") {
+    // These logins belong to one person and take that person's hub.
+    const s = await employee();
     employeeId = s.employee_id;
     hub = s.hub;
-    // The coacher heads the hub: their login handles everything for that hub (the hub manager's office access, limited to it) and also has My page.
-    if (s.staff_level === "coacher") role = "manager";
-  } else if (body.role === "manager" && body.employee_id) {
-    // A hub manager login may also be linked to the person's own employee record (a manager, promoting manager or coacher), which adds "My page".
-    const s = await db.get("SELECT employee_id, hub, status FROM staff WHERE employee_id = ?", String(body.employee_id));
-    if (!s) throw httpError(400, "Unknown employee");
-    if (s.status !== "active") throw httpError(400, "That employee is inactive");
-    if (s.hub !== hub) throw httpError(400, "The employee belongs to a different hub than the one chosen");
-    if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
-    employeeId = s.employee_id;
+    if (role === "manager" && !["manager", "promoting_manager"].includes(s.staff_level)) throw httpError(400, "A manager login is for a manager or a promoting manager");
+    // The position decides the kind of login: a coacher heads the hub; a manager or promoting manager sees their own people.
+    if (role === "staff" && s.staff_level === "coacher") role = "coacher";
+    else if (role === "staff" && ["manager", "promoting_manager"].includes(s.staff_level)) role = "manager";
+  } else if (role === "coacher") {
+    if (!hub) throw httpError(400, "A coacher must be limited to one hub");
+    if (body.employee_id) {
+      const s = await employee();
+      if (s.staff_level !== "coacher") throw httpError(400, "A coacher login can only be linked to a coacher");
+      if (s.hub !== hub) throw httpError(400, "The employee belongs to a different hub than the one chosen");
+      employeeId = s.employee_id;
+    }
   }
   await withUser(db, actor.username, (t) =>
     t.run(`INSERT INTO users (username, full_name, role, hub, employee_id, password_hash, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -158,15 +185,16 @@ async function updateUser(db, actor, username, body) {
   if (body.role !== undefined) {
     if (!ROLES.includes(body.role)) throw httpError(400, "Invalid role");
     if ((body.role === "staff") !== (u.role === "staff")) throw httpError(400, "A staff-portal login cannot be changed into an office role (or the other way). Create a new user instead.");
+    if ((body.role === "manager") !== (u.role === "manager")) throw httpError(400, "A manager login belongs to the manager's own record and cannot be changed into another role (or the other way). Create a new user instead.");
     sets.role = body.role;
   }
-  if (body.hub !== undefined && u.role !== "staff") {
+  if (body.hub !== undefined && u.role !== "staff" && u.role !== "manager") {
     if (body.hub && !(await db.get("SELECT 1 AS x FROM hubs WHERE code = ?", body.hub))) throw httpError(400, "Unknown hub");
     sets.hub = body.hub || null;
   }
   if (body.status !== undefined) { if (!["active", "disabled"].includes(body.status)) throw httpError(400, "Invalid status"); sets.status = body.status; }
   if (body.password) { checkPasswordStrength(body.password); sets.password_hash = hashPassword(body.password); }
-  if ((sets.role ?? u.role) === "manager" && !(sets.hub !== undefined ? sets.hub : u.hub)) throw httpError(400, "A hub manager must be limited to one hub");
+  if ((sets.role ?? u.role) === "coacher" && !(sets.hub !== undefined ? sets.hub : u.hub)) throw httpError(400, "A coacher must be limited to one hub");
   if (u.username.toLowerCase() === actor.username.toLowerCase() && ((sets.role && sets.role !== "admin") || sets.status === "disabled")) {
     throw httpError(400, "You cannot remove your own admin access");
   }
@@ -191,6 +219,6 @@ async function changeOwnPassword(db, actor, { current_password, new_password }) 
 }
 
 module.exports = {
-  ROLES, PERMISSIONS, can, requirePerm, hashPassword, verifyPassword, hasUsers, setup, login, logout, userFromToken,
+  ROLES, PERMISSIONS, can, requirePerm, teamOf, hashPassword, verifyPassword, hasUsers, setup, login, logout, userFromToken,
   listUsers, createUser, updateUser, changeOwnPassword,
 };

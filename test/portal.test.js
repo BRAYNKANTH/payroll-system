@@ -38,7 +38,7 @@ test("a staff login is tied to one employee, and takes their hub", async () => {
   assert.throws(() => auth.requirePerm(u, "read"), /cannot do this/);
 
   await assert.rejects(() => login(d, "D1", "user-d1b"), /already has a login/);
-  assert.equal((await login(d, "M1", "user-m1")).role, "staff", "a manager can have a portal login too");
+  assert.equal((await login(d, "M1", "user-m1")).role, "manager", "a manager login sees their own people and has their own page");
   await assert.rejects(() => login(d, "NOBODY", "user-nobody"), /Choose the employee/);
   await svc.updateEntry(d, "staff", "D2", { status: "inactive" }, "admin");
   await assert.rejects(() => login(d, "D2", "user-d2"), /inactive/);

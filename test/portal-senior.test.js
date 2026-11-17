@@ -70,17 +70,18 @@ test("a coacher cannot enter sales, and a seller has no team", async () => {
   assert.equal(s.me.sells, true);
 });
 
-test("a hub manager login can be linked to a coacher's own record, which gives My page as well as the office pages", async () => {
+test("a coacher login can be linked to the coacher's own record, which gives My page as well as the whole hub", async () => {
   const { d, period } = await setup();
   const admin = await auth.userFromToken(d, (await auth.login(d, "owner", PW)).token);
-  await assert.rejects(() => auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "manager", hub: "H1", employee_id: "NOBODY", password: PW }), /Unknown employee/);
-  const u = await auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "manager", hub: "H1", employee_id: "C1", password: PW });
+  await assert.rejects(() => auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "NOBODY", password: PW }), /Choose the employee/);
+  await assert.rejects(() => auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "M1", password: PW }), /only be linked to a coacher/);
+  const u = await auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "C1", password: PW });
   assert.equal(u.employee_id, "C1");
-  await assert.rejects(() => auth.createUser(d, admin, { username: "c-two", full_name: "C", role: "manager", hub: "H1", employee_id: "C1", password: PW }), /already has a login/);
+  await assert.rejects(() => auth.createUser(d, admin, { username: "c-two", full_name: "C", role: "coacher", hub: "H1", employee_id: "C1", password: PW }), /already has a login/);
   const me = await auth.userFromToken(d, (await auth.login(d, "c-office", PW)).token);
-  assert.ok(auth.can(me, "enter_data") && auth.can(me, "self") && !auth.can(me, "view_pay"));
+  assert.ok(auth.can(me, "enter_data") && auth.can(me, "self") && auth.can(me, "stock") && !auth.can(me, "view_pay"));
   assert.equal((await portal.summary(d, me, period)).me.employee_id, "C1");
-  const plain = await auth.createUser(d, admin, { username: "plain", full_name: "P", role: "manager", hub: "H1", password: PW });
+  const plain = await auth.createUser(d, admin, { username: "plain", full_name: "P", role: "coacher", hub: "H1", password: PW });
   assert.equal(plain.employee_id, null);
   await assert.rejects(() => portal.summary(d, plain, period), /not linked/);
 });
@@ -89,12 +90,12 @@ test("a coacher is the head of the hub: a plain portal login for a coacher gets 
   const { d, period } = await setup();
   const admin = await auth.userFromToken(d, (await auth.login(d, "owner", PW)).token);
   const u = await auth.createUser(d, admin, { username: "head", full_name: "Head", role: "staff", employee_id: "C1", password: PW });
-  assert.deepEqual([u.role, u.hub, u.employee_id], ["manager", "H1", "C1"]);
+  assert.deepEqual([u.role, u.hub, u.employee_id], ["coacher", "H1", "C1"]);
   const me = await auth.userFromToken(d, (await auth.login(d, "head", PW)).token);
   for (const p of ["read", "enter_data", "manage_team", "self"]) assert.ok(auth.can(me, p), p);
   for (const p of ["view_pay", "run_payroll", "finalize", "manage_users", "settings"]) assert.ok(!auth.can(me, p), p);
   assert.equal((await portal.summary(d, me, period)).me.level_name, "Coacher");
-  // a promoting manager or a manager still gets the plain portal
+  // a promoting manager gets the manager login: their own people, never the whole hub
   const pm = await auth.createUser(d, admin, { username: "pmgr", full_name: "PM", role: "staff", employee_id: "PM1", password: PW });
-  assert.equal(pm.role, "staff");
+  assert.equal(pm.role, "manager");
 });

@@ -20,7 +20,7 @@ async function setup() {
   await svc.createEntry(d, "daily", { date: "2026-09-02", employee_id: "G1", business_amount: 120000, settled_amount: 110000, personal_minus: 2000 }, "owner");
   await svc.runPeriod(d, "2026-09", "owner");
   await d.run("INSERT INTO audit_log (table_name, row_key, action, changed_by) VALUES ('pay_period_summary', 'G1@2026-09', 'approve', 'owner')");
-  for (const [username, role, hub] of [["mgr", "manager", "COL"]]) {
+  for (const [username, role, hub] of [["mgr", "coacher", "COL"]]) {
     await auth.createUser(d, admin, { username, full_name: username, role, hub, password: PW });
   }
   return d;

@@ -29,14 +29,14 @@ test("setup creates the first admin only once; bad credentials are refused", asy
 
 test("repeated failed sign-ins lock the username", async () => {
   const { d, admin } = await setup();
-  await auth.createUser(d, admin, { username: "lockme", full_name: "L", role: "manager", hub: "COL", password: PW.lock });
+  await auth.createUser(d, admin, { username: "lockme", full_name: "L", role: "coacher", hub: "COL", password: PW.lock });
   for (let i = 0; i < 5; i++) await assert.rejects(() => auth.login(d, "lockme", "wrong-9999"), /Incorrect/);
   await assert.rejects(() => auth.login(d, "lockme", PW.lock), /Too many/);
 });
 
 test("password hashes never reach the audit log", async () => {
   const { d, admin } = await setup();
-  await auth.createUser(d, admin, { username: "anu", full_name: "Anu", role: "manager", hub: "COL", password: PW.clerk });
+  await auth.createUser(d, admin, { username: "anu", full_name: "Anu", role: "coacher", hub: "COL", password: PW.clerk });
   await auth.updateUser(d, admin, "anu", { password: "changed-pass-2" });
   const log = await svc.auditSearch(d, { table: "users", key: "anu" });
   assert.equal(log.length, 2, "the new user and the password change");
@@ -48,20 +48,24 @@ test("password hashes never reach the audit log", async () => {
 test("role permissions", () => {
   assert.ok(auth.can({ role: "admin" }, "finalize"));
   assert.ok(auth.can({ role: "admin" }, "review") && auth.can({ role: "admin" }, "run_payroll") && auth.can({ role: "admin" }, "view_pay"));
-  assert.deepEqual(auth.ROLES, ["manager", "admin", "staff"], "no accountant, clerk or viewer");
+  assert.deepEqual([...auth.ROLES].sort(), ["admin", "coacher", "manager", "staff"], "no accountant, clerk or viewer");
   for (const gone of ["accountant", "clerk", "viewer"]) assert.ok(!auth.can({ role: gone }, "read"), gone);
   assert.ok(!auth.can({ role: "staff" }, "enter_data"));
-  assert.ok(auth.can({ role: "manager" }, "enter_data") && auth.can({ role: "manager" }, "manage_team"));
-  assert.ok(!auth.can({ role: "manager" }, "manage_staff") && !auth.can({ role: "manager" }, "run_payroll"));
-  assert.doesNotThrow(() => auth.requirePerm({ role: "manager" }, ["manage_staff", "manage_team"]));
+  // a coacher heads a hub: whole-hub work, never pay; a manager only looks at their own people
+  assert.ok(auth.can({ role: "coacher" }, "enter_data") && auth.can({ role: "coacher" }, "manage_team") && auth.can({ role: "coacher" }, "stock"));
+  assert.ok(!auth.can({ role: "coacher" }, "manage_staff") && !auth.can({ role: "coacher" }, "run_payroll") && !auth.can({ role: "coacher" }, "view_pay"));
+  assert.deepEqual(auth.PERMISSIONS.manager, ["read_team", "self"]);
+  assert.ok(!auth.can({ role: "manager" }, "read") && !auth.can({ role: "manager" }, "enter_data") && !auth.can({ role: "manager" }, "stock"));
+  assert.ok(auth.can({ role: "manager", stock_keeper: true, permissions: [...auth.PERMISSIONS.manager, "stock"] }, "stock"), "a stock keeper may handle stock");
+  assert.doesNotThrow(() => auth.requirePerm({ role: "coacher" }, ["manage_staff", "manage_team"]));
   assert.throws(() => auth.requirePerm({ role: "staff" }, ["manage_staff", "manage_team"]), /cannot do this/);
 });
 
-test("a hub manager must be limited to one hub", async () => {
+test("a coacher must be limited to one hub", async () => {
   const { d, admin } = await setup();
-  await assert.rejects(() => auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "manager", password: PW.clerk }), /one hub/);
-  const u = await auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "manager", hub: "COL", password: PW.clerk });
-  assert.equal(u.role, "manager");
+  await assert.rejects(() => auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "coacher", password: PW.clerk }), /one hub/);
+  const u = await auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "coacher", hub: "COL", password: PW.clerk });
+  assert.equal(u.role, "coacher");
   await assert.rejects(() => auth.updateUser(d, admin, "mgr", { hub: "" }), /one hub/);
 });
 
@@ -134,7 +138,7 @@ test("dashboard summarises a period, optionally per hub", async () => {
 
 test("HTTP: sign-in required, roles enforced, forged requests refused, backup", async () => {
   const { d, admin } = await setup();
-  await auth.createUser(d, admin, { username: "view", full_name: "V", role: "manager", hub: "COL", password: PW.viewer });
+  await auth.createUser(d, admin, { username: "view", full_name: "V", role: "coacher", hub: "COL", password: PW.viewer });
   const srv = createServer(d).listen(0, "127.0.0.1");
   await new Promise((r) => srv.once("listening", r));
   const base = `http://127.0.0.1:${srv.address().port}`;

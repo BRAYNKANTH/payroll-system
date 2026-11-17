@@ -16,49 +16,56 @@ export const state = {
   settings: {},
   pending: 0,
 };
-export const can = (perm) => !!state.user?.permissions?.includes(perm);
+// perm may be a list: any one of them is enough.
+export const can = (perm) => [].concat(perm).some((p) => !!state.user?.permissions?.includes(p));
 export const scopeHub = () => state.user?.hub || state.hub || "";
 
 const NAV = [
   { group: "Overview" },
-  { path: "/", label: "Dashboard", icon: "dashboard", page: "dashboard" },
+  { path: "/", label: "Dashboard", icon: "dashboard", page: "dashboard", perm: "read" },
+  { path: "/team", label: "My team", icon: "users", page: "team", perm: "read_team", roles: ["manager"] },
   { group: "Data entry" },
-  { path: "/morning", label: "Morning stock", icon: "box", page: "morning", perm: "enter_data" },
-  { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily" },
-  { path: "/live", label: "Live sales", icon: "trend", page: "live" },
-  { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly" },
-  { path: "/stock", label: "Stock count", icon: "box", page: "stock" },
-  { path: "/branch-stock", label: "Hub stock", icon: "warehouse", page: "hubstock" },
-  { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances" },
+  { path: "/morning", label: "Morning stock", icon: "box", page: "morning", perm: "stock" },
+  { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily", perm: "read" },
+  { path: "/live", label: "Live sales", icon: "trend", page: "live", perm: ["read", "read_team"] },
+  { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly", perm: "read" },
+  { path: "/stock", label: "Stock count", icon: "box", page: "stock", perm: "read" },
+  { path: "/branch-stock", label: "Hub stock", icon: "store", page: "hubstock", perm: "read" },
+  { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances", perm: "read" },
   { group: "Payroll" },
-  { path: "/payroll", label: "Salaries", icon: "wallet", page: "payroll", perm: "view_pay" },
+  { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
   { path: "/approvals", label: "Approvals", icon: "shield", page: "approvals", badge: true, perm: "view_pay" },
-  { path: "/loans", label: "Advances & loans", icon: "coins", page: "loans" },
+  { path: "/loans", label: "Advances & loans", icon: "wallet", page: "loans", perm: "read" },
   { path: "/payslips", label: "Payslips", icon: "file", page: "payslips", perm: "view_pay" },
   { group: "People" },
-  { path: "/employees", label: "Employees", icon: "users", page: "employees" },
-  { path: "/hubs", label: "Hubs", icon: "store", page: "hubs" },
+  { path: "/employees", label: "Employees", icon: "users", page: "employees", perm: ["read", "read_team"] },
+  { path: "/hubs", label: "Hubs", icon: "store", page: "hubs", perm: "read" },
   { group: "Insights" },
-  { path: "/reports", label: "Reports", icon: "chart", page: "reports" },
-  { path: "/audit", label: "Audit trail", icon: "history", page: "audit" },
+  { path: "/reports", label: "Reports", icon: "chart", page: "reports", perm: "read" },
+  { path: "/audit", label: "Audit trail", icon: "history", page: "audit", perm: "read" },
   { group: "My account", perm: "self" },
-  { path: "/me", label: "My page", icon: "user", page: "portal", perm: "self" },
+  { path: "/me", label: "My page", icon: "users", page: "portal", perm: "self" },
   { group: "Catalogue", perm: "manage_products" },
-  { path: "/products", label: "Products", icon: "tag", page: "products", perm: "manage_products" },
+  { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { group: "Administration", perm: "manage_users" },
   { path: "/users", label: "Users & roles", icon: "key", page: "users", perm: "manage_users" },
   { path: "/settings", label: "Settings", icon: "settings", page: "settings", perm: "settings" },
 ];
 const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
-  { re: /^\/hubs\/([\w-]+)$/, page: "hub", nav: "/hubs" },
+  { re: /^\/hubs\/([\w-]+)$/, page: "hub", nav: "/hubs", perm: "read" },
   { re: /^\/account$/, page: "account", nav: null },
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
 const isStaff = () => state.user?.role === "staff";
 // "My page" shows for the staff portal, and for a hub manager whose login is linked to their own employee record.
-const navShown = (n) => (isStaff() ? n.perm === "self" : n.perm === "self" ? !!state.user?.employee_id : !n.perm || can(n.perm));
-const roleText = (r) => (r === "staff" ? "Staff portal" : r);
+const navShown = (n) => {
+  if (n.roles && !n.roles.includes(state.user?.role)) return false;
+  if (isStaff()) return n.perm === "self";
+  if (n.perm === "self") return !!state.user?.employee_id;
+  return !n.perm || can(n.perm);
+};
+const roleText = (r) => ({ staff: "Staff portal", coacher: "Coacher", manager: "Manager" }[r] || r);
 const groupOf = (path) => {
   let g = "";
   for (const n of NAV) { if (n.group) g = n.group; else if (n.path === path) return g; }
@@ -97,11 +104,12 @@ export async function navigate(path, replace = false) {
 }
 
 function resolve(pathname) {
+  if (pathname === "/" && !can("read") && can("read_team")) return { page: "team", nav: "/team", params: [], perm: "read_team" }; // a manager lands on their team
   const n = NAV.find((x) => x.path === pathname && x.page);
   if (n) return { page: n.page, nav: n.path, params: [], perm: n.perm };
   for (const r of EXTRA_ROUTES) {
     const m = r.re.exec(pathname);
-    if (m) return { page: r.page, nav: r.nav, params: m.slice(1) };
+    if (m) return { page: r.page, nav: r.nav, params: m.slice(1), perm: r.perm };
   }
   return { page: null, nav: null, params: [] };
 }
@@ -127,7 +135,14 @@ function periodPicker() {
 
 // The five things people open most, as a bar at the bottom of a phone. "More" opens the full menu.
 function bottomNav() {
-  const items = [["/", "Home", "dashboard"], can("enter_data") ? ["/daily", "Daily", "sheet"] : ["/reports", "Reports", "chart"], ["/payroll", "Payroll", "play"], ["/employees", "People", "users"]];
+  const items = [
+    can("read") ? ["/", "Home", "dashboard"] : can("read_team") ? ["/team", "Team", "users"] : null,
+    can("enter_data") ? ["/daily", "Daily", "sheet"] : null,
+    can("stock") ? ["/morning", "Stock", "box"] : null,
+    can(["read", "read_team"]) ? ["/live", "Live", "trend"] : null,
+    can("view_pay") ? ["/payroll", "Payroll", "play"] : null,
+    can(["read", "read_team"]) ? ["/employees", "People", "users"] : null,
+  ].filter(Boolean).slice(0, 4);
   return `<nav class="bottom-nav" id="bnav" aria-label="Main">${items.map(([path, label, ic]) =>
     `<a href="${path}" data-link data-nav="${path}">${icon(ic)}<span>${label}</span></a>`).join("")}
     <button type="button" id="bnav-more" aria-controls="sidebar" aria-haspopup="true">${icon("menu")}<span>More</span><span class="dot" id="more-dot" hidden></span></button></nav>`;

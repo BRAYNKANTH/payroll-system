@@ -44,7 +44,7 @@ The same code also runs on Render, Railway or any Node host: set `DATABASE_URL` 
 (it listens on `PORT`).
 
 **Demo sign-ins** (demo database only): `admin / admin123`,
-`manager1`, `manager2`, `manager3` (all `manager123`, each limited to one Jaffna branch), and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `nila` (supervisor S02), all `staff123`. The demo has three branches, each with a coacher, a promoting manager, a manager,
+`manager1` to `manager4` (all `manager123`: managers who each see only their own people; `manager4` is also a stock keeper), and staff-portal logins `pavan` (distributor D01), `kavin` (supervisor S01) and `nila` (supervisor S02), all `staff123`. The demo has three branches, each with a coacher, a promoting manager, a manager,
 supervisors and distributors, four finalized months and the current month open. Jaffna 03 is small, so its manager is "retaining".
 
 ## What's in it
@@ -73,7 +73,7 @@ supervisors and distributors, four finalized months and the current month open. 
 | Leavers and joiners | Mark as left (last day, reason, and who takes over the people reporting to them, who must hold the same position in the same hub), Re-hire, and a coacher can be added for a branch. Days before someone joined or after they left are not counted as missing |
 | Reports | Hub summary, commission, stock shortfall, branch stock, balances, month history (CSV export) |
 | Audit trail | Every change after first entry: who, when, old → new; filters and export |
-| Users & roles | Three kinds of login: admin, hub manager (one hub; registers their own team) and staff portal |
+| Users & roles | Four kinds of login: admin; coacher (heads one hub and sees all of it); manager (sees only the people who report to them); staff portal. The position of the employee chosen decides the kind of login |
 | Settings | Company, rule thresholds, closed days, session length |
 
 ## Roles
@@ -81,7 +81,8 @@ supervisors and distributors, four finalized months and the current month open. 
 | Role | Can |
 |---|---|
 | Staff portal | A distributor or supervisor signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
-| Hub manager | Enters and confirms the sheets of their own hub, registers their own team, sees sales, money handed in and advances, never pay. Coachers and promoting managers use this login too |
+| Coacher | Heads one hub: sees every person, all stock and all sheets of that hub, enters data, confirms days, registers the team and gives stock out each morning. Never sees pay |
+| Manager | Sees only the people under them (directly or through others): their sales, stock and details, view only, never pay. Promoting managers get this login too. A manager tagged **stock keeper** can also see and give stock to everyone in the hub |
 | Admin | The owner and the secretary: everything, including payroll, approvals, finalizing months, products, users and settings |
 
 ## Monthly workflow

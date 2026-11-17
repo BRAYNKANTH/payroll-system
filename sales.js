@@ -104,12 +104,13 @@ function earnedSoFar(staff, rows) {
   return { gross: r.gross_earnings, food, commission: r.gross_earnings - food };
 }
 
-async function live(db, { period, hub }, canPay) {
+async function live(db, { period, hub, ids }, canPay) {
   svc.assertPeriod(period);
   const [from, to] = monthBounds(period);
   const args = [from, to];
   let hubSql = "";
   if (hub) { hubSql = " AND s.hub = ?"; args.push(hub); }
+  if (ids) { hubSql += " AND d.employee_id = ANY(?::text[])"; args.push(ids); } // a manager sees only their own people
   const rows = await db.all(`SELECT d.id, d.date, d.employee_id, d.business_amount, d.settled_amount, d.personal_minus, d.settle_up_minus, d.notes, d.source,
       d.confirmed_by, d.created_by, d.created_at, s.name, s.hub, s.staff_level, s.role
     FROM daily_log d JOIN staff s USING (employee_id) WHERE d.date >= ? AND d.date < ?${hubSql} ORDER BY d.date, d.id`, ...args);

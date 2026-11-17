@@ -19,8 +19,8 @@ async function setup() {
   await svc.createEntry(d, "staff", { employee_id: "G1", name: "Guy", staff_level: "distributor", hub: "COL", upline_id: "M1", basic_pay: 25000, bank_account_no: "11112222" }, "owner");
   await svc.createEntry(d, "daily", { date: "2026-09-02", employee_id: "G1", business_amount: 120000, settled_amount: 110000 }, "owner");
   await svc.runPeriod(d, "2026-09", "owner");
-  await auth.createUser(d, admin, { username: "mgr", full_name: "Hub manager", role: "manager", hub: "COL", password: PW });
-  await auth.createUser(d, admin, { username: "mgr2", full_name: "Second manager", role: "manager", hub: "COL", password: PW });
+  await auth.createUser(d, admin, { username: "mgr", full_name: "Hub manager", role: "coacher", hub: "COL", password: PW });
+  await auth.createUser(d, admin, { username: "mgr2", full_name: "Second manager", role: "coacher", hub: "COL", password: PW });
   return { d, admin };
 }
 async function serve(d) {

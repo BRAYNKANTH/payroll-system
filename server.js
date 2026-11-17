@@ -12,6 +12,7 @@ const loans = require("./loans");
 const products = require("./products");
 const sales = require("./sales");
 const pos = require("./pos");
+const team = require("./team");
 const exporter = require("./export");
 const people = require("./people");
 const auth = require("./auth");
@@ -81,6 +82,10 @@ function hidePay(d) {
 }
 
 // Those who may not see pay do not receive the pay defaults either.
+// A manager may open only the people under them (and themselves). Everyone else is limited by hub, as before.
+function assertInTeam(user, employeeId) {
+  if (user.teamIds && !user.teamIds.includes(String(employeeId))) throw svc.httpError(403, "That person is not in your team");
+}
 const visibleSettings = (user, settings) => (auth.can(user, "view_pay") ? settings : { ...settings, position_defaults: "{}" });
 
 // A hub manager registers and edits their own team without seeing or setting pay: a new person gets the position's usual pay terms
@@ -106,7 +111,7 @@ function createHandler(dbReady) {
       const settings = await db.getSettings(database);
       const out = { needs_setup: !(await auth.hasUsers(database)), user, company_name: settings.company_name };
       // Everything the shell needs to draw itself, so start-up is one round trip instead of three.
-      if (user && auth.can(user, "read")) {
+      if (user && (auth.can(user, "read") || auth.can(user, "read_team"))) {
         out.hubs = await svc.listEntries(database, "hubs", { hub: user.hub || undefined });
         out.settings = visibleSettings(user, settings);
       }
@@ -137,7 +142,8 @@ function createHandler(dbReady) {
       return { download: f.data, type: f.type, filename: f.filename };
     }],
     // One person's report: the admin sees pay; a hub manager sees sales only, and only their own hub.
-    ["GET", /^\/api\/staff\/([\w.-]+)\/report\.pdf$/, "read", async ({ m, user, q }) => {
+    ["GET", /^\/api\/staff\/([\w.-]+)\/report\.pdf$/, ["read", "read_team"], async ({ m, user, q }) => {
+      assertInTeam(user, m[1]);
       const d = await portal.forEmployee(database, m[1], q.get("period") || new Date().toISOString().slice(0, 7), user.hub);
       const f = exporter.personReportPdf(d, { canPay: auth.can(user, "view_pay"), company: (await db.getSettings(database)).company_name || "" });
       return { download: f.data, type: f.type, filename: f.filename };
@@ -148,9 +154,9 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/me\/pos\/sale\/(\d+)$/, "self", ({ user, m }) => pos.undo(database, user, m[1])],
     ["POST", /^\/api\/me\/pos\/day$/, "self", ({ user, body }) => pos.endOfDay(database, user, body)],
     // The office gives each seller their stock for the day.
-    ["GET", /^\/api\/stock-issues$/, "enter_data", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
-    ["POST", /^\/api\/stock-issues$/, "enter_data", ({ user, body }) => pos.give(database, user, body, user.hub)],
-    ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "enter_data", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],
+    ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
+    ["POST", /^\/api\/stock-issues$/, "stock", ({ user, body }) => pos.give(database, user, body, user.hub)],
+    ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "stock", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],
     ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],
     ["DELETE", /^\/api\/me\/sales\/(\d{4}-\d{2}-\d{2})$/, "self", ({ user, m }) => sales.removeSale(database, user, m[1])],
     ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],
@@ -164,7 +170,7 @@ function createHandler(dbReady) {
     ["POST", /^\/api\/users$/, "manage_users", ({ user, body }) => auth.createUser(database, user, body)],
     ["PUT", /^\/api\/users\/([\w.-]+)$/, "manage_users", ({ user, body, m }) => auth.updateUser(database, user, m[1], body)],
 
-    ["GET", /^\/api\/settings$/, "read", async ({ user }) => visibleSettings(user, await db.getSettings(database))],
+    ["GET", /^\/api\/settings$/, ["read", "read_team"], async ({ user }) => visibleSettings(user, await db.getSettings(database))],
     ["PUT", /^\/api\/settings$/, "settings", ({ user, body }) => svc.updateSettings(database, body, user.username)],
     ["GET", /^\/api\/backup$/, "settings", async ({ user }) => {
       const out = { exported_at: new Date().toISOString(), exported_by: user.username, schema: db.SCHEMA_VERSION, tables: {} };
@@ -175,7 +181,12 @@ function createHandler(dbReady) {
       return { download: JSON.stringify(out), filename: `payroll-backup-${out.exported_at.slice(0, 10)}.json`, type: "application/json; charset=utf-8" };
     }],
 
-    ["GET", /^\/api\/(hubs|staff|daily|weekly|stock|hubstock|allowances)$/, "read", ({ user, m, q }) =>
+    ["GET", /^\/api\/(hubs|staff)$/, ["read", "read_team"], ({ user, m, q }) =>
+      svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
+        hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })
+        .then((rows) => (m[1] === "staff" && user.teamIds ? rows.filter((r) => user.teamIds.includes(r.employee_id)) : rows))
+        .then((rows) => (m[1] === "staff" && !auth.can(user, "view_pay") ? rows.map(svc.withoutPayFields) : rows))],
+    ["GET", /^\/api\/(daily|weekly|stock|hubstock|allowances)$/, "read", ({ user, m, q }) =>
       svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
         hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })
         .then((rows) => (m[1] === "staff" && !auth.can(user, "view_pay") ? rows.map(svc.withoutPayFields) : rows))],
@@ -183,7 +194,8 @@ function createHandler(dbReady) {
     ["PUT", /^\/api\/hubs\/([\w-]+)$/, "manage_hubs", ({ user, body, m }) => svc.updateEntry(database, "hubs", m[1], body, user.username)],
     ["POST", /^\/api\/staff$/, ["manage_staff", "manage_team"], async ({ user, body }) => svc.createEntry(database, "staff", await staffBody(database, user, body, true), user.username, user.hub)],
     ["PUT", /^\/api\/staff\/([\w.-]+)$/, ["manage_staff", "manage_team"], async ({ user, body, m }) => svc.updateEntry(database, "staff", m[1], await staffBody(database, user, body, false), user.username, user.hub)],
-    ["GET", /^\/api\/staff\/([\w.-]+)\/profile$/, "read", async ({ m, user }) => {
+    ["GET", /^\/api\/staff\/([\w.-]+)\/profile$/, ["read", "read_team"], async ({ m, user }) => {
+      assertInTeam(user, m[1]);
       const p = await svc.employeeProfile(database, m[1]);
       if (user.hub && p.staff.hub !== user.hub) throw svc.httpError(403, "Outside your hub");
       return auth.can(user, "view_pay") ? p : { ...p, staff: svc.withoutPayFields(p.staff), history: [], security_held: null }; // no pay terms or pay history for those who may not see pay
@@ -201,7 +213,9 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
 
     // Live sales: everyone who can read sees the sales; only those who may see pay get the commission and pay-so-far columns.
-    ["GET", /^\/api\/live$/, "read", ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined }, auth.can(user, "view_pay"))],
+    ["GET", /^\/api\/live$/, ["read", "read_team"], ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined, ids: user.teamIds }, auth.can(user, "view_pay"))],
+    // A manager's own people: their sales, today's sales and the stock they hold.
+    ["GET", /^\/api\/team$/, "read_team", ({ user, q }) => team.overview(database, user, q.get("period") || new Date().toISOString().slice(0, 7))],
     ["POST", /^\/api\/sales\/confirm$/, "enter_data", ({ user, body }) => sales.confirm(database, user, body, user.hub)],
     ["GET", /^\/api\/products\/names$/, "enter_data", () => products.names(database)],
     ["GET", /^\/api\/products$/, "manage_products", () => products.list(database)],

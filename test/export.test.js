@@ -141,7 +141,7 @@ test("the download route sends the file as an attachment, and refuses pay and pr
   const d = await setup();
   await auth.setup(d, { username: "owner", full_name: "Owner", password: "password-12345" });
   const admin = await auth.userFromToken(d, (await auth.login(d, "owner", "password-12345")).token);
-  await auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "manager", hub: "H1", password: "password-12345" });
+  await auth.createUser(d, admin, { username: "mgr", full_name: "Mgr", role: "coacher", hub: "H1", password: "password-12345" });
   const srv = createServer(d).listen(0, "127.0.0.1");
   await new Promise((r) => srv.once("listening", r));
   const base = `http://127.0.0.1:${srv.address().port}`;

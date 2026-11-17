@@ -42,6 +42,7 @@ const ENTITIES = {
       leave_date: { type: "date" },   // set by "mark as left" (people.js); cleared when re-hired
       leave_reason: { type: "text" },
       staff_level: { type: "enum", values: ["distributor", "supervisor", "manager", "promoting_manager", "coacher"] },
+      stock_keeper: { type: "bool" }, // a manager who may handle the stock of the whole hub
       opening_balance: { type: "money" }, // balance brought forward when payroll starts; negative = money owed
       upline_id: { type: "text" },
       manager_id: { type: "text" },
@@ -124,6 +125,7 @@ const ENTITIES = {
 
 function coerce(name, spec, raw) {
   if (raw === undefined) return undefined;
+  if (spec.type === "bool") return raw === true || raw === 1 || raw === "1" || raw === "true" || raw === "on"; // a yes/no tick box: anything else is no
   if (raw === null || raw === "") {
     if (spec.required) throw httpError(400, `${name} is required`);
     return spec.type === "text" ? null : ["rate", "money", "int"].includes(spec.type) ? 0 : null;

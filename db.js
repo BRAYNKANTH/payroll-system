@@ -145,7 +145,11 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS team_commission_rate double precision
 -- The accountant, clerk and viewer roles no longer exist: their logins are removed (the admin does that work), then the check is narrowed.
 DELETE FROM users WHERE role IN ('accountant','clerk','viewer');
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','manager','staff'));
+-- Roles: admin; coacher (the head of a hub: sees and handles the whole hub); manager (sees only the people under them); staff (own portal).
+-- A hub-manager login made before this split saw a whole hub, so it becomes a coacher login. A manager login is always tied to a manager's own record.
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','coacher','manager','staff'));
+-- A manager tagged as stock keeper can handle the stock of everyone in the hub, not only their own people.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS stock_keeper boolean NOT NULL DEFAULT false;
 
 -- Balance brought forward from the old spreadsheets. Only used until the person has a first calculated month.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS opening_balance bigint NOT NULL DEFAULT 0;
@@ -160,6 +164,8 @@ UPDATE staff SET staff_level = 'manager' WHERE role = 'manager' AND staff_level 
 -- A staff-portal login belongs to one employee (a distributor or supervisor) and only ever sees that person's own figures.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id text REFERENCES staff(employee_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_employee_id ON users (employee_id) WHERE employee_id IS NOT NULL;
+-- (see the role check above) a login made as a hub manager before the coacher/manager split saw a whole hub, so it becomes a coacher login.
+UPDATE users SET role = 'coacher' WHERE role = 'manager' AND (employee_id IS NULL OR employee_id IN (SELECT employee_id FROM staff WHERE staff_level = 'coacher'));
 -- The group manager position no longer exists. Anyone who was one becomes a supervisor (a seller), and the people who reported to a
 -- group manager now report to that group manager's own upline. Safe to run again: it does nothing once no group managers are left.
 UPDATE staff SET upline_id = (SELECT g.upline_id FROM staff g WHERE g.employee_id = staff.upline_id)

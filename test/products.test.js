@@ -17,7 +17,7 @@ const add = (d, id, level, extra = {}) => svc.createEntry(d, "staff", { employee
 
 test("only the admin may manage products", () => {
   assert.ok(auth.can({ role: "admin" }, "manage_products"));
-  for (const role of ["manager", "staff"]) assert.ok(!auth.can({ role }, "manage_products"), role);
+  for (const role of ["coacher", "manager", "staff"]) assert.ok(!auth.can({ role }, "manage_products"), role);
 });
 
 test("a product shows the workers' 45% and the profit left after the purchase price", async () => {
@@ -151,5 +151,5 @@ test("the stock sheets get active product names and selling prices, never the pu
   await products.update(d, old.id, { status: "inactive" }, "admin");
   await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "admin");
   assert.deepEqual(await products.names(d), [{ name: "Shine", list_price: 85000 }, { name: "Vim", list_price: 50000 }]);
-  for (const role of ["admin", "manager"]) assert.ok(auth.can({ role }, "enter_data"), role);
+  for (const role of ["admin", "coacher"]) assert.ok(auth.can({ role }, "enter_data"), role);
 });

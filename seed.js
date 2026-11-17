@@ -44,10 +44,13 @@ const add = (kind, row, user = "admin") => svc.createEntry(d, kind, row, user);
 // Demo sign-ins (demo database only — change or remove before real use)
 const DEMO_USERS = [
   ["admin", "Owner Admin", "admin", null, "admin123"],
-  ["manager1", "Arun Selvam (Jaffna 01 manager)", "manager", "J1", "manager123"],
-  ["manager2", "Ravi Shankar (Jaffna 02 manager)", "manager", "J2", "manager123"],
-  ["manager3", "Selvi Anand (Jaffna 03 manager)", "manager", "J3", "manager123"],
+  ["manager1", "Arun Selvam", "manager", "J1", "manager123"],
+  ["manager2", "Ravi Shankar", "manager", "J2", "manager123"],
+  ["manager3", "Selvi Anand", "manager", "J3", "manager123"],
+  ["manager4", "Dev Anand", "manager", "J1", "manager123"],
 ];
+// Each manager login belongs to that manager's own employee record. Manager 4 is a stock keeper: Jaffna 01 has two managers.
+const MANAGER_RECORD = { manager1: "M01", manager2: "M02", manager3: "M03", manager4: "M04" };
 // A hosted database is reachable from the internet, so it never gets the well-known demo passwords.
 if (remote && !demoPw) for (const u of DEMO_USERS) u[4] = "Pw" + crypto.randomBytes(6).toString("base64url") + "7";
 // A hosted database already has its owner's admin account: keep it, and do not create another.
@@ -82,11 +85,6 @@ for (const [code, name, location] of HUBS) await add("hubs", { code, name, locat
 // The catalogue: selling price and the price the company pays to buy each product. The stock counts below sell these two.
 await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "admin");
 await products.create(d, { name: "Vim", list_price: 500, cost_price: 190 }, "admin");
-for (const [username, full_name, role, hub, password] of DEMO_USERS.slice(1)) {
-  if (await d.get("SELECT 1 AS x FROM users WHERE lower(username) = lower(?)", username)) continue; // keep an existing account as it is
-  await auth.createUser(d, adminUser, { username, full_name, role, hub, password });
-  created.push(username);
-}
 
 // The month that carries the exceptions (default: the current month) and a helper for the months around it.
 const openArg = (process.argv.find((a) => a.startsWith("--open=")) || "").slice(7);
@@ -104,6 +102,7 @@ const TEAM = [
   ["S01", "Kavin Thirumal", "J1", "supervisor", "M01", 6800, 0.97], ["S02", "Nila Sivakumar", "J1", "supervisor", "M01", 6000, 0.95],
   ["D01", "Pavan Kumar", "J1", "distributor", "M01", 4600, 0.97], ["D02", "Thevi Ganesh", "J1", "distributor", "M01", 4000, 0.95],
   ["D03", "Sharan Raj", "J1", "distributor", "M01", 3300, 0.95], ["D04", "Anitha Jegan", "J1", "distributor", "M01", 2800, 0.7],
+  ["M04", "Dev Anand", "J1", "manager", "PM01", 2200, 0.9], ["D12", "Mani Raj", "J1", "distributor", "M04", 3000, 0.95], ["D13", "Latha Sri", "J1", "distributor", "M04", 2600, 0.9],
   ["C02", "Mala Krishnan", "J2", "coacher", null, 0, 0], ["PM02", "Ganesan Pillai", "J2", "promoting_manager", "C02", 0, 0], ["M02", "Ravi Shankar", "J2", "manager", "PM02", 3000, 0.9],
   ["S03", "Dinesh Prabu", "J2", "supervisor", "M02", 6400, 0.97], ["S04", "Janani Vel", "J2", "supervisor", "M02", 4200, 0.9],
   ["D05", "Kavya Nathan", "J2", "distributor", "M02", 4400, 0.97], ["D06", "Mohan Das", "J2", "distributor", "M02", 3800, 0.95],
@@ -125,13 +124,20 @@ for (const [i, [id, name, hub, position, upline]] of TEAM.entries()) {
 await add("staff", { employee_id: "D11", name: "Kumar Vel", hub: "J1", staff_level: "distributor", upline_id: "M01", ...PAY.distributor,
   phone: "077 200 3003", join_date: open + "-12" });
 // Staff-portal logins: a distributor and two supervisors can sign in and see their own figures.
-const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"], ["coacher1", "Jegan Muthiah", "C01"], ["promo1", "Hari Prasath", "PM01"], ["mgrme1", "Arun Selvam", "M01"],
-  ["coacher2", "Mala Krishnan", "C02"], ["coacher3", "Rajan Thevar", "C03"], ["promo2", "Ganesan Pillai", "PM02"], ["mgrme2", "Ravi Shankar", "M02"],
-  ["mgrme3", "Selvi Anand", "M03"], ["anitha", "Anitha Jegan", "D04"], ["sutha", "Sutha Pillai", "D07"], ["dinesh", "Dinesh Prabu", "S03"], ["kumar", "Kumar Vel", "D11"]]
+const PORTAL_USERS = [["pavan", "Pavan Kumar", "D01"], ["kavin", "Kavin Thirumal", "S01"], ["nila", "Nila Sivakumar", "S02"], ["coacher1", "Jegan Muthiah", "C01"], ["promo1", "Hari Prasath", "PM01"],
+  ["coacher2", "Mala Krishnan", "C02"], ["coacher3", "Rajan Thevar", "C03"], ["promo2", "Ganesan Pillai", "PM02"],
+  ["anitha", "Anitha Jegan", "D04"], ["sutha", "Sutha Pillai", "D07"], ["dinesh", "Dinesh Prabu", "S03"], ["kumar", "Kumar Vel", "D11"]]
   .map(([username, full_name, employee_id]) => [username, full_name, employee_id, remote && !demoPw ? "Pw" + crypto.randomBytes(6).toString("base64url") + "7" : "staff123"]);
 for (const [username, full_name, employee_id, password] of PORTAL_USERS) {
   await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id, password });
 }
+// The manager logins: the position decides the kind of login, so choosing a manager's record gives the manager login (their own people only).
+for (const [username, full_name, , , password] of DEMO_USERS.slice(1)) {
+  if (await d.get("SELECT 1 AS x FROM users WHERE lower(username) = lower(?)", username)) continue; // keep an existing account as it is
+  await auth.createUser(d, adminUser, { username, full_name, role: "staff", employee_id: MANAGER_RECORD[username], password });
+  created.push(username);
+}
+await svc.updateEntry(d, "staff", "M04", { stock_keeper: true }, "admin");
 const sellers = TEAM.filter((t) => t[5] > 0); // everyone who sells, managers included
 const todaySL = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10); // today in Sri Lanka
 

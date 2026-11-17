@@ -4,9 +4,10 @@ import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago, LE
 const LV = Object.fromEntries(LEVELS);
 
 const ROLES = [
-  ["staff", "Staff portal", "Any employee (distributor, supervisor, manager, promoting manager or coacher) who signs in to see their own sales, pay and payslips. Seniors also see the sales of their team. A coacher is the head of the hub, so their login also opens the office pages of that hub (never anyone's pay)"],
+  ["staff", "Staff portal", "A distributor or supervisor signs in to see their own sales, pay and payslips, and to record their sales. A coacher or a manager who is chosen here automatically gets the coacher or manager login below"],
+  ["coacher", "Coacher (hub head)", "Heads one hub and sees all of it: every person, all stock and sheets. Gives stock out, marks and confirms the days, registers the team. Never sees pay"],
+  ["manager", "Manager", "Sees only the people who report to them: their sales, stock and details, view only. Never sees pay. A manager tagged as stock keeper can also handle the stock of the whole hub"],
   ["admin", "Admin", "Everything, including finalizing months, users and settings"],
-  ["manager", "Hub manager", "Enter sheets, confirm sales and register the team of their own hub. Sees sales, the money handed in and advances, never pay"],
 ];
 const roleBadge = (r) => badge(r === "admin" ? "admin" : "green", ROLES.find((x) => x[0] === r)?.[1] || r);
 
@@ -35,21 +36,21 @@ export default {
         body: html`<form id="uf" class="form-grid" autocomplete="off">
           <div class="field"><label>Username</label><input class="input" name="username" value="${u?.username || ""}" ${u ? "disabled" : ""} autocomplete="off"></div>
           <div class="field"><label>Full name</label><input class="input" name="full_name" value="${u?.full_name || ""}"></div>
-          ${u?.role === "staff" ? html`<div class="field full"><span class="lbl">Role</span>
-            <div class="alert info">${icon("info")}<div><b>Staff portal</b> for ${byId[u.employee_id]?.name || u.employee_id} (${u.employee_id}). The role and the employee cannot be changed; create a new user for a different person.</div></div></div>`
+          ${u && (u.role === "staff" || u.role === "manager") ? html`<div class="field full"><span class="lbl">Role</span>
+            <div class="alert info">${icon("info")}<div><b>${ROLES.find((x) => x[0] === u.role)[1]}</b> for ${byId[u.employee_id]?.name || u.employee_id} (${u.employee_id}). The role and the employee cannot be changed; create a new user for a different person.</div></div></div>`
           : html`<div class="field full"><span class="lbl">Role</span>
-            <div class="grid halves" style="gap:8px;margin-top:4px">${ROLES.map(([k, l, desc]) => html`
+            <div class="grid halves" style="gap:8px;margin-top:4px">${ROLES.filter(([k]) => k !== "manager").map(([k, l, desc]) => html`
               <label class="card" style="padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;box-shadow:none">
                 <input type="radio" name="role" value="${k}" ${(u?.role || "staff") === k ? "checked" : ""} ${self ? "disabled" : ""} style="margin-top:3px">
                 <span><b style="color:var(--text)">${l}</b><br><span class="faint" style="font-weight:400">${desc}</span></span></label>`)}</div>
             ${self ? html`<span class="hint">You can't change your own role.</span>` : ""}</div>
           <div class="field full" id="emp-wrap" hidden><label for="emp-sel" id="emp-lbl">Employee</label>
             <select class="input" id="emp-sel" name="employee_id"><option value="">Choose the person this login is for</option>
-              ${free.map((s) => html`<option value="${s.employee_id}">${s.name} · ${LV[s.staff_level] || s.staff_level} · ${s.employee_id} · ${s.hub}`)}</select>
-            <span class="hint">Every active employee without a login is listed: distributors, supervisors, managers, promoting managers and coachers. For a staff portal the login gets that person's hub. For a hub manager, link a coacher, promoting manager or manager so they also get My page; their hub must be the one chosen below.</span></div>`}
-          <div class="field" id="hub-wrap" ${u?.role === "staff" ? "hidden" : ""}><label>Hub access</label><select class="input" name="hub"><option value="">All hubs</option>
+              ${free.map((s) => html`<option value="${s.employee_id}" data-level="${s.staff_level}">${s.name} · ${LV[s.staff_level] || s.staff_level} · ${s.employee_id} · ${s.hub}`)}</select>
+            <span class="hint" id="emp-hint">Every active employee without a login is listed. The login takes that person's hub and shows their own page. Choosing a coacher gives the coacher login; choosing a manager or promoting manager gives the manager login.</span></div>`}
+          <div class="field" id="hub-wrap" ${u && (u.role === "staff" || u.role === "manager") ? "hidden" : ""}><label>Hub access</label><select class="input" name="hub"><option value="">All hubs</option>
             ${state.hubs.map((h) => html`<option value="${h.code}" ${u?.hub === h.code ? "selected" : ""}>${h.name} only</option>`)}</select>
-            <span class="hint">Required for a hub manager: they see only that hub.</span></div>
+            <span class="hint">Required for a coacher: they see only that hub. An admin can see all hubs.</span></div>
           ${u ? html`<div class="field"><label>Status</label><select class="input" name="status" ${self ? "disabled" : ""}><option value="active">Active</option><option value="disabled" ${u.status === "disabled" ? "selected" : ""}>Disabled</option></select></div>` : ""}
           <div class="field full"><label>${u ? "Set a new password" : "Initial password"}</label><input class="input" type="password" name="password" autocomplete="new-password" placeholder="${u ? "Leave blank to keep the current one" : ""}">
             <span class="hint">At least 8 characters with letters and numbers.${u ? " Setting a new one signs the user out everywhere." : ""}</span></div>
@@ -59,9 +60,18 @@ export default {
       const syncRole = () => {
         const r = $("#uf", d.panel).querySelector("input[name=role]:checked")?.value;
         const ew = $("#emp-wrap", d.panel);
-        if (ew) { ew.hidden = !(r === "staff" || (r === "manager" && !u)); const o = ew.querySelector("option"); if (o) o.textContent = r === "manager" ? "Not linked (no My page)" : "Choose the person this login is for"; $("#emp-lbl", d.panel).textContent = r === "manager" ? "Employee record (optional)" : "Employee"; }
+        if (ew) {
+          ew.hidden = !(r === "staff" || (r === "coacher" && !u));
+          const o = ew.querySelector("option");
+          if (o) o.textContent = r === "coacher" ? "Not linked (no My page)" : "Choose the person this login is for";
+          $("#emp-lbl", d.panel).textContent = r === "coacher" ? "Coacher's own record (optional)" : "Employee";
+          // a coacher login can only be linked to a coacher
+          ew.querySelectorAll("option[data-level]").forEach((x) => { x.hidden = r === "coacher" && x.dataset.level !== "coacher"; x.disabled = x.hidden; });
+          const sel = $("#emp-sel", d.panel);
+          if (sel.selectedOptions[0]?.disabled) sel.value = "";
+        }
         const hw = $("#hub-wrap", d.panel);
-        if (hw) hw.hidden = r === "staff" || u?.role === "staff";
+        if (hw) hw.hidden = r === "staff" || (u && (u.role === "staff" || u.role === "manager"));
       };
       $("#uf", d.panel).addEventListener("change", (ev) => {
         if (ev.target.name === "role") syncRole();
@@ -74,7 +84,7 @@ export default {
       syncRole();
       $("#uf-save", d.panel).onclick = (e) => busy(e.currentTarget, async () => {
         const v = Object.fromEntries(new FormData($("#uf", d.panel)));
-        if (v.role === "staff" && !u) v.full_name = v.full_name || byId[v.employee_id]?.name || "";
+        if (!u && v.employee_id) v.full_name = v.full_name || byId[v.employee_id]?.name || "";
         if (u) {
           const body = { full_name: v.full_name, hub: v.hub };
           if (!self) { body.role = v.role; body.status = v.status; }
@@ -88,12 +98,12 @@ export default {
     $("#list").innerHTML = dataTable({
       rows: users,
       onRow: (u) => open(u),
-      card: (u) => html`<span class="mc-main"><b>${u.full_name}</b><span class="mc-sub">${u.username}${u.role === "staff" ? ` · ${u.employee_id}` : u.hub ? ` · ${u.hub} only` : " · all hubs"} · last sign-in ${ago(u.last_login_at)}</span></span>
+      card: (u) => html`<span class="mc-main"><b>${u.full_name}</b><span class="mc-sub">${u.username}${u.role === "staff" || u.role === "manager" ? ` · ${u.employee_id}` : u.hub ? ` · ${u.hub} only` : " · all hubs"} · last sign-in ${ago(u.last_login_at)}</span></span>
         <span class="mc-end">${roleBadge(u.role)}<br>${badge(u.status)}</span>`,
       cols: [
         { key: "full_name", label: "User", render: (u) => html`<div class="who"><div class="avatar">${initials(u.full_name)}</div><div><b>${u.full_name}</b><span>${u.username}</span></div></div>` },
-        { key: "role", label: "Role", render: (u) => (u.role === "manager" && byId[u.employee_id]?.staff_level === "coacher" ? badge("green", "Coacher · hub head") : roleBadge(u.role)) },
-        { key: "hub", label: "Hub access", render: (u) => (u.role === "staff" ? html`<span class="badge plain">${u.employee_id}</span>` : u.hub ? html`<span class="badge plain">${u.hub} only</span>` : html`<span class="faint">All hubs</span>`) },
+        { key: "role", label: "Role", render: (u) => html`${roleBadge(u.role)}${u.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}` },
+        { key: "hub", label: "Hub access", render: (u) => (u.role === "staff" || u.role === "manager" ? html`<span class="badge plain">${u.employee_id}</span>` : u.hub ? html`<span class="badge plain">${u.hub} only</span>` : html`<span class="faint">All hubs</span>`) },
         { key: "last_login_at", label: "Last sign-in", render: (u) => ago(u.last_login_at) },
         { key: "status", label: "Status", render: (u) => badge(u.status) },
       ],
@@ -111,7 +121,7 @@ export default {
         title: "Create logins for employees",
         body: html`<div id="bk">
           ${cands.length ? html`
-          <p class="muted" style="margin-top:0">Each person signs in with their <b>mobile number</b> as the username. A coacher is the head of the hub, so their login also opens the office pages for that hub. Tick who should get a login, choose how passwords are set, then create.</p>
+          <p class="muted" style="margin-top:0">Each person signs in with their <b>mobile number</b> as the username. A coacher gets the whole hub; a manager or promoting manager sees only their own people. Tick who should get a login, choose how passwords are set, then create.</p>
           <div class="field"><label>Passwords</label>
             <select class="input" id="bk-mode"><option value="gen">A different random password for each person</option><option value="same">The same starting password for everyone</option></select></div>
           <div class="field" id="bk-same-wrap" hidden><label>Starting password</label><input class="input" id="bk-same" type="text" autocomplete="off" placeholder="At least 8 characters, letters and numbers"></div>
