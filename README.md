@@ -57,7 +57,7 @@ supervisors and distributors, four finalized months and the current month open. 
 | Stock count | Per guy per product, live shortfall, carry over last month's count as opening stock |
 | Branch stock | Per branch per product: opening, received, given out, counted; difference and stock value; open a month from last month's count |
 | Allowances | Extra earnings per month |
-| Payroll run | Step-by-step: data check → calculate → review → finalize → pay; full breakdown per person |
+| Salaries | View only: every person's pay for the month, worked out from the sheets, with a full breakdown per person |
 | Approvals | Queue of flagged entries only; approve / reject with notes |
 | Advances & loans | Give an advance (back in one month) or a loan (monthly instalments). The payroll run takes each instalment from pay; balances come from finalized months |
 | Payslips | Per person or all, printable |

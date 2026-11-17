@@ -335,9 +335,9 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 @keyframes slide { from { transform: translateX(40px); opacity: 0; } }
 
 .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
-.toast { display: flex; gap: 10px; align-items: flex-start; min-width: 280px; max-width: 460px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--success); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-lg); animation: slide .2s; font-size: 13.5px; }
-.toast.err { border-left-color: var(--danger); }
-.toast.warn { border-left-color: var(--warning); }
+.toast { display: flex; gap: 10px; align-items: flex-start; min-width: 280px; max-width: 460px; background: var(--surface); border: 1px solid var(--success); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-lg); animation: slide .2s; font-size: 13.5px; }
+.toast.err { border-color: var(--danger); }
+.toast.warn { border-color: var(--warning); }
 .toast svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
 .toast.ok svg { color: var(--success); } .toast.err svg { color: var(--danger); } .toast.warn svg { color: var(--warning); }
 
@@ -859,7 +859,7 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .stepper-foot { display: flex; gap: 8px; }
 .stepper-foot .btn.primary { flex: 1; }
 .stepper-foot [data-close] { margin-right: auto; }
-.m-card .chev, .fold-btn .chev { width: 9px; height: 9px; border-right: 2px solid var(--text-3); border-top: 2px solid var(--text-3); transform: rotate(45deg); flex-shrink: 0; }
+.m-card .chev, .fold-btn .chev { width: 12px; height: 12px; background: var(--text-3); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 1.5 8.5 6 4 10.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 1.5 8.5 6 4 10.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; flex-shrink: 0; }
 .sec-menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .sec-menu .m-card { width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-height: 64px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); font: inherit; color: var(--text); cursor: pointer; }
@@ -868,8 +868,8 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .sec-bar { margin: 0 0 14px; }
 .fold-head { cursor: pointer; }
 .fold-btn { margin-left: auto; width: 44px; height: 44px; border: 0; background: none; border-radius: var(--radius); display: grid; place-items: center; cursor: pointer; color: var(--text-2); }
-.fold-btn .chev { transform: rotate(135deg); transition: transform .15s; }
-.is-open > .fold-head .fold-btn .chev { transform: rotate(-45deg); }
+.fold-btn .chev { transform: rotate(90deg); transition: transform .15s; }
+.is-open > .fold-head .fold-btn .chev { transform: rotate(-90deg); }
 .fold-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
 @media (max-width: 860px) {
@@ -1090,3 +1090,34 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .hub-go { margin-top: auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--primary); min-height: 24px; }
 .hub-go svg { width: 16px; height: 16px; }
 @media (max-width: 860px) { .hub-go { min-height: 44px; } }
+
+/* ---------- Critique fixes (Nov 2026) ---------- */
+/* Icon buttons never shrink below a usable target, even inside a crowded top bar. */
+.btn.icon { flex-shrink: 0; min-width: 36px; }
+.btn.sm.icon { min-width: 30px; }
+.topbar { min-width: 0; }
+.topbar .spacer { min-width: 0; }
+.main { min-width: 0; }
+/* Salaries: how the bank total adds up, and the grouped secondary views. */
+.reconcile { margin: 0 0 var(--sp-4); color: var(--text-2); font-size: 14px; max-width: 70ch; }
+.more-menu { position: relative; }
+.more-menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; }
+.more-menu > summary::-webkit-details-marker { display: none; }
+.more-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 240px; display: grid; gap: 2px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+.more-list a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text); text-decoration: none; font-size: 14px; }
+.more-list a:hover { background: var(--surface-3); }
+/* Dashboard: secondary figures stay folded until asked for. */
+.more-figures > summary { list-style: none; cursor: pointer; display: inline-flex; }
+.more-figures > summary::-webkit-details-marker { display: none; }
+.mt-3 { margin-top: var(--sp-3); }
+/* Phones: header export buttons keep their words so two download icons are never ambiguous. */
+@media (max-width: 860px) {
+  .page-head .actions .lbl-sm { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .page-head .actions .btn:has(> .lbl-sm) { min-width: 0; }
+}
+/* Laptop widths: the top bar wraps instead of pushing the user menu off the page. */
+@media (max-width: 1240px) and (min-width: 861px) {
+  .topbar { flex-wrap: wrap; row-gap: 8px; }
+  .topbar .gsearch { flex: 1 1 200px; min-width: 160px; max-width: 320px; }
+  .topbar .filters { flex-wrap: wrap; }
+}

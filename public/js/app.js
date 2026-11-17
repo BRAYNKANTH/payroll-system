@@ -30,7 +30,7 @@ const NAV = [
   { path: "/branch-stock", label: "Hub stock", icon: "store", page: "hubstock" },
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances" },
   { group: "Payroll" },
-  { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
+  { path: "/payroll", label: "Salaries", icon: "wallet", page: "payroll", perm: "view_pay" },
   { path: "/approvals", label: "Approvals", icon: "shield", page: "approvals", badge: true, perm: "view_pay" },
   { path: "/loans", label: "Advances & loans", icon: "wallet", page: "loans" },
   { path: "/payslips", label: "Payslips", icon: "file", page: "payslips", perm: "view_pay" },

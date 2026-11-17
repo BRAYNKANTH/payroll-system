@@ -1,14 +1,13 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, confirmDialog, dataTable, monthName, dateTime, emptyState, modal, levelLabel } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel } from "../ui.js";
 import { openBreakdown } from "./breakdown.js";
-import { isPhone, compactSteps } from "../phone.js";
 
 let filter = "all";
 let search = "";
 
 export default {
-  title: "Payroll run",
+  title: "Salaries",
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
@@ -21,40 +20,30 @@ export default {
     const calculated = all.length > 0;
     const sum = (k, rows = all) => rows.reduce((t, r) => t + r[k], 0);
     const k = dash.kpis;
-
-    // Stepper state
-    const dataOk = k.missing_days === 0;
-    const steps = [
-      { t: "Enter data", d: dataOk ? "All daily sheets complete" : `${k.missing_days} day entries missing`, s: dataOk ? "done" : calculated ? "warn" : "current" },
-      { t: "Calculate", d: calculated ? `Last run ${dateTime(data.last_run_at)}` : "Not run yet", s: calculated ? "done" : dataOk ? "current" : "" },
-      { t: "Review exceptions", d: !calculated ? "After calculating" : pending + rejected ? `${pending + rejected} to resolve` : "Nothing to review", s: !calculated ? "" : pending + rejected ? "current" : "done" },
-      { t: "Finalize", d: finalized ? `By ${data.finalized_by}` : "Locks the month", s: finalized ? "done" : calculated && !(pending + rejected) ? "current" : "" },
-      { t: "Pay", d: finalized ? `Rs ${money(sum("disbursed_amount"))} to bank` : "Bank file after finalizing", s: finalized ? "current" : "" },
-    ];
+    const sellers = all.filter((r) => r.role === "guy"), managers = all.filter((r) => r.role === "manager");
+    const bankSellers = sum("disbursed_amount", sellers), bankManagers = sum("disbursed_amount", managers);
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Payroll — ${monthName(p)}</h1><p>Every figure is calculated from the sheets. Opening balances come from last month's closing balances.</p></div>
+        <div><h1>Salaries — ${monthName(p)}</h1><p>What each person earns this month, worked out from the daily, weekly and stock sheets. This page is for viewing only.</p></div>
         <div class="actions">
-          ${calculated ? html`${exportButtons("register", { period: p })}<a class="btn" href="/api/payroll/${p}/payslips.pdf" download>${icon("file")} <span class="lbl-sm">Payslips PDF</span></a>` : ""}
+          ${calculated ? exportButtons("register", { period: p }) : ""}
           ${badge(data.status)}
-          ${can("run_payroll") && !finalized ? html`<button class="btn ${calculated ? "" : "primary"}" id="run">${icon("refresh")} ${calculated ? "Recalculate" : "Calculate payroll"}</button>` : ""}
-          ${can("finalize") && !finalized && calculated ? html`<button class="btn primary" id="finalize" ${pending + rejected ? "disabled" : ""}>${icon("lock")} Finalize month</button>` : ""}
+          ${can("run_payroll") && !finalized ? html`<button class="btn ${calculated ? "" : "primary"}" id="run">${icon("refresh")} ${calculated ? "Update salary figures" : "Work out salaries"}</button>` : ""}
         </div>
       </div>
-
-      <div class="card mb-4"><div class="steps">${steps.map((s, i) => html`
-        <div class="step ${s.s}"><div class="dot">${s.s === "done" ? icon("check") : i + 1}</div><div><div class="t">${s.t}</div><div class="d">${s.d}</div></div></div>`)}</div></div>
 
       ${calculated ? html`
       <div class="grid kpis mb-4">
         <div class="card kpi"><div class="label"><span class="icon">${icon("users")}</span>Employees</div><div class="value">${all.length}</div>
           <div class="foot">${count("auto_approved")} auto · ${count("approved")} approved · <span class="${pending ? "neg" : ""}">${pending} pending</span>${rejected ? ` · ${rejected} rejected` : ""}</div></div>
-        <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Gross earnings</div><div class="value"><small>Rs</small>${compact(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</b> · Guys & supervisors</div></div>
-        <div class="card kpi"><div class="label"><span class="icon amber">${icon("coins")}</span>Deductions</div><div class="value"><small>Rs</small>${compact(sum("total_deductions", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("total_deductions", all.filter((r) => r.role === "guy")))}</b> · Settle-up, stock, personal, security</div></div>
-        <div class="card kpi"><div class="label"><span class="icon green">${icon("bank")}</span>To bank</div><div class="value"><small>Rs</small>${compact(sum("disbursed_amount"))}</div><div class="foot"><b class="num">Rs ${money(sum("disbursed_amount"))}</b> · ${all.filter((r) => r.disbursed_amount > 0).length} payments</div></div>
+        <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Sellers' gross earnings</div><div class="value"><small>Rs</small>${compact(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</b> · Sellers, distributors and supervisors. Managers are paid through their own account.</div></div>
+        <div class="card kpi"><div class="label"><span class="icon amber">${icon("coins")}</span>Sellers' deductions</div><div class="value"><small>Rs</small>${compact(sum("total_deductions", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("total_deductions", all.filter((r) => r.role === "guy")))}</b> · Money to settle up, stock shortfall, personal deductions, security</div></div>
+        <div class="card kpi"><div class="label"><span class="icon green">${icon("bank")}</span>To bank (everyone)</div><div class="value"><small>Rs</small>${compact(sum("disbursed_amount"))}</div><div class="foot"><b class="num">Rs ${money(sum("disbursed_amount"))}</b> · ${all.filter((r) => r.disbursed_amount > 0).length} payments</div></div>
         <div class="card kpi"><div class="label"><span class="icon blue">${icon("trend")}</span>Managers' closing</div><div class="value"><small>Rs</small>${compact(sum("closing_balance", all.filter((r) => r.role === "manager")))}</div><div class="foot"><b class="num">Rs ${money(sum("closing_balance", all.filter((r) => r.role === "manager")))}</b> · Running account with the company</div></div>
       </div>
+
+      <p class="reconcile" id="reconcile"><b>How the bank total adds up:</b> sellers Rs <span class="num">${money(bankSellers)}</span> + managers Rs <span class="num">${money(bankManagers)}</span> = <b class="num">Rs ${money(bankSellers + bankManagers)}</b> to bank. Sellers' net pay before the opening balance is Rs <span class="num">${money(sum("net_pay", sellers))}</span>.</p>
 
       <div class="card">
         <div class="card-head">
@@ -62,19 +51,17 @@ export default {
             <div class="seg" id="pay-filters">${[["all", "All"], ["review", `Needs review (${pending + rejected})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button data-f="${f}" class="${filter === f ? "on" : ""}">${l}</button>`)}</div>
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name or ID" value="${search}" style="width:220px"></div>
           </div>
-          <div class="row">
-            <a class="btn sm" href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Register</a>
-            ${can("export") ? html`<a class="btn sm" href="/api/payroll/${p}/register.csv">${icon("download")} CSV</a>` : ""}
-            <a class="btn sm" href="/api/payroll/${p}/payslips" target="_blank" rel="noopener">${icon("printer")} All payslips</a>
-            ${can("export") && finalized ? html`<button class="btn sm primary" id="bank">${icon("bank")} Bank file</button>` : ""}
-          </div>
+          <details class="more-menu"><summary class="btn sm">More views and downloads</summary><div class="more-list">
+            <a href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Register (print view)</a>
+            ${can("export") ? html`<a href="/api/payroll/${p}/register.csv">${icon("download")} Register as CSV</a>` : ""}
+            <a href="/api/payroll/${p}/payslips" target="_blank" rel="noopener">${icon("printer")} All payslips (print view)</a>
+          </div></details>
         </div>
         <div class="card-body flush" id="table"></div>
-      </div>` : html`<div class="card">${emptyState("Not calculated yet",
-        can("run_payroll") ? "When the sheets are in, press “Calculate payroll”. You can recalculate as often as you like until the month is finalized." : "The admin needs to run the payroll for this month.", "play",
-        can("run_payroll") && !finalized ? `<button class="btn primary" id="run2">Calculate payroll</button>` : "")}</div>`}`;
+      </div>` : html`<div class="card">${emptyState("Salaries not worked out yet",
+        can("run_payroll") ? "When the sheets are in, press “Work out salaries”. You can update the figures as often as you like." : "The admin needs to work out the salaries for this month.", "play",
+        can("run_payroll") && !finalized ? `<button class="btn primary" id="run2">Work out salaries</button>` : "")}</div>`}`;
 
-    if (isPhone()) compactSteps(el.querySelector(".steps"), { actions: { 0: ["/daily", "Open the daily sheet"], 2: ["/approvals", "Open approvals"] } });
     const drawTable = () => {
       const q = search.toLowerCase();
       const rows = all.filter((r) =>
@@ -108,41 +95,11 @@ export default {
 
     const run = (e) => busy(e.currentTarget, async () => {
       const r = await post(`/api/payroll/${p}/run`);
-      toast(`Calculated ${r.employees} employees — ${r.auto_approved} auto-approved, ${r.pending_review} need review`, r.pending_review ? "warn" : "ok");
+      toast(`Worked out ${r.employees} people — ${r.auto_approved} auto-approved, ${r.pending_review} need review`, r.pending_review ? "warn" : "ok");
       refreshPending();
       this.render(ctx);
     });
     $("#run")?.addEventListener("click", run);
     $("#run2")?.addEventListener("click", run);
-    $("#finalize")?.addEventListener("click", async (e) => {
-      const ok = await confirmDialog({
-        title: `Finalize ${monthName(p)}?`, confirmText: "Finalize",
-        message: `Payroll is recalculated one last time, then every entry for ${monthName(p)} is locked. Closing balances become next month's opening balances. This cannot be undone.`,
-      });
-      if (!ok) return;
-      await busy(e.target.closest("button"), async () => { await post(`/api/payroll/${p}/finalize`); toast(`${monthName(p)} finalized`); this.render(ctx); });
-    });
-    $("#bank")?.addEventListener("click", () => {
-      const payees = all.filter((r) => r.disbursed_amount > 0);
-      const m = modal({
-        title: "Bank disbursement file",
-        body: html`<div class="alert warn mb-3">${icon("alert")}<div><b>Check the file format with your bank before the first upload.</b>
-          The current layout is a generic CSV, not a confirmed SLIPS specification.</div></div>
-          <p style="margin:0 0 10px"><b>${payees.length}</b> payments totalling <b>Rs ${money(sum("disbursed_amount", payees))}</b>.</p>
-          <div class="table-wrap" style="max-height:280px"><table class="table compact"><thead><tr><th>Employee</th><th>Bank</th><th>Account</th><th class="r">Amount</th></tr></thead>
-          <tbody>${payees.map((r) => html`<tr><td>${r.name}</td><td>${r.bank_name || "—"}</td><td class="mono">…${(r.bank_account_no || "").slice(-4)}</td><td class="r">${money(r.disbursed_amount)}</td></tr>`)}</tbody></table></div>`.toString(),
-        foot: `<button class="btn" data-close>Close</button><button class="btn primary" id="dl">${icon("download")} Download</button>`,
-      });
-      m.panel.querySelector("#dl").addEventListener("click", (e) => busy(e.currentTarget, async () => {
-        const res = await fetch(`/api/payroll/${p}/bank-file`, { credentials: "same-origin" });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Download failed");
-        const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") || "")?.[1] || `salary-${p}.csv`;
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(await res.blob());
-        a.download = name;
-        a.click();
-        toast("Bank file downloaded — the download is recorded in the audit trail");
-      }));
-    });
   },
 };

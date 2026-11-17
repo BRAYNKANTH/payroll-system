@@ -17,15 +17,15 @@ function greeting() {
 function monthCard(d, k) {
   const done = d.status === "finalized";
   let say, go;
-  if (done) { say = "This month is finalized. The bank file and payslips are ready."; go = ["/payslips", "Open payslips", "sheet"]; }
-  else if (k.pending) { say = `${k.pending} ${k.pending === 1 ? "entry needs" : "entries need"} review before this month can be finalized.`; go = can("review") ? ["/approvals", "Open approvals", "checkCircle"] : null; }
-  else if (!k.calculated) { say = "Payroll has not been calculated yet. Finish the daily sheets, then calculate."; go = can("run_payroll") ? ["/payroll", "Open payroll run", "play"] : can("enter_data") ? ["/daily", "Open the daily sheet", "sheet"] : null; }
-  else { say = "Everything passed the checks. The month is ready to finalize."; go = can("run_payroll") ? ["/payroll", "Open payroll run", "play"] : null; }
+  if (done) { say = "This month is closed. Salaries and payslips are ready to view."; go = ["/payroll", "View salaries", "wallet"]; }
+  else if (k.pending) { say = `${k.pending} ${k.pending === 1 ? "entry needs" : "entries need"} a look before the salaries can be trusted.`; go = can("review") ? ["/approvals", "Open approvals", "checkCircle"] : null; }
+  else if (!k.calculated) { say = "Salaries have not been worked out yet. Finish the daily sheets, then work them out."; go = can("run_payroll") ? ["/payroll", "Work out salaries", "wallet"] : can("enter_data") ? ["/daily", "Open the daily sheet", "sheet"] : null; }
+  else { say = "Everything passed the checks. Salaries are ready to view."; go = can("view_pay") ? ["/payroll", "View salaries", "wallet"] : null; }
   return html`<section class="card month-card" aria-label="Where this month stands">
     <div class="mc-left"><h2>${monthName(d.period)}</h2><p>${say}</p>
       ${go ? html`<a class="btn primary" href="${go[0]}" data-link>${icon(go[2])} ${go[1]}</a>` : ""}</div>
-    <dl class="mc-right"><div><dt>Paid to bank</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.to_bank)}` : "Not calculated"}</dd></div>
-      <div><dt>Net pay</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.net_pay)}` : "—"}</dd></div></dl>
+    <dl class="mc-right"><div><dt>To bank (everyone)</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.to_bank)}` : "Not calculated"}</dd></div>
+      <div><dt>Sellers' net pay</dt><dd>${k.calculated ? html`<small>Rs</small>${money(k.net_pay)}` : "—"}</dd></div></dl>
   </section>`;
 }
 
@@ -46,7 +46,7 @@ export default {
         <span class="hub-count">${plural(x.active.length, "person", "people")}</span>
         <span class="muted hub-head">${x.head ? `Head: ${x.head.name}` : "No coacher yet"}</span>
         <span class="hub-nums"><span><small>Sales</small><b class="num">${compact(x.sales)}</b></span>
-          ${pay ? html`<span><small>Gross pay</small><b class="num">${compact(st.gross_pay || 0)}</b></span><span><small>Mgr balance</small><b class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</b></span>` : ""}</span>
+          ${pay ? html`<span><small>Gross pay</small><b class="num">${compact(st.gross_pay || 0)}</b></span><span><small>Manager account</small><b class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</b></span>` : ""}</span>
         <span class="hub-chips">${x.attention.length ? x.attention.map(([tone, text]) => html`<span class="badge ${tone}">${text}</span>`) : html`<span class="badge green">All clear</span>`}</span>
         <span class="hub-go">Open hub ${icon("right")}</span></a>`;
     };
@@ -58,11 +58,19 @@ export default {
           <p>${monthName(d.period)} · ${badge(d.status)} ${!can("view_pay") ? "" : d.last_run_at ? `· payroll last calculated ${new Date(d.last_run_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "· payroll not calculated yet"}</p></div>
         <div class="actions">
           ${can("enter_data") ? html`<a class="btn" href="/daily" data-link>${icon("sheet")} Daily sheet</a>` : ""}
-          ${can("run_payroll") ? html`<a class="btn primary" href="/payroll" data-link>${icon("play")} Payroll run</a>` : ""}
+          ${can("view_pay") ? html`<a class="btn primary" href="/payroll" data-link>${icon("wallet")} Salaries</a>` : ""}
         </div>
       </div>
 
       ${pay ? monthCard(d, k) : ""}
+
+      <div class="grid kpis">
+        ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
+        ${!pay ? "" : kpi("Sellers' gross pay", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "seller" : "sellers"}. Managers are paid through their own account.` : "Run payroll to calculate")}
+        ${!pay ? "" : kpi("To bank (everyone)", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Sellers and managers together. Sellers' net pay is Rs ${compact(k.net_pay)}` : "&nbsp;")}
+        ${kpi("Cash short + stock short", compact(k.settle_up + k.stock_shortfall), "coins", "amber", `Stock Rs ${compact(k.stock_shortfall)}`)}
+        ${!pay ? "" : kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
+      </div>
 
       <section class="mt-4" aria-labelledby="hubs-h">
         <div class="row between" style="margin-bottom:10px"><h2 id="hubs-h" class="section-title">${scopeHub() ? "Your hub" : "Hubs"}</h2>
@@ -71,24 +79,17 @@ export default {
           : html`<div class="card">${emptyState("No hubs yet", "Add your first hub to start adding people.", "store", can("manage_hubs") ? `<a class="btn primary" href="/hubs" data-link>Add a hub</a>` : "")}</div>`}
       </section>
 
-      <div class="grid kpis mt-4">
-        ${kpi("Hub business", compact(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${compact(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${compact(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
-        ${!pay ? "" : kpi("Gross payroll (guys)", k.calculated ? compact(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "guy" : "guys"} · ${k.active_managers} ${k.active_managers === 1 ? "manager" : "managers"}` : "Run payroll to calculate")}
-        ${!pay ? "" : kpi("To bank", k.calculated ? compact(k.to_bank) : "—", "bank", "green", k.calculated ? `Net pay Rs ${compact(k.net_pay)}` : "&nbsp;")}
-        ${kpi("Settle-up + stock short", compact(k.settle_up + k.stock_shortfall), "coins", "amber", `Stock Rs ${compact(k.stock_shortfall)}`)}
-        ${!pay ? "" : kpi("Managers' balance", k.calculated ? compact(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
-      </div>
-
       <div class="grid halves mt-4">
         ${pay ? html`<div class="card"><div class="card-head"><div><h2>Exceptions</h2><div class="sub">Flagged by the payroll rules</div></div>
           ${d.exceptions.length ? html`<a class="btn sm" href="/approvals" data-link>Review</a>` : ""}</div>
           <div class="card-body flush" id="exceptions"></div></div>` : ""}
-        <div class="card"><div class="card-head"><div><h2>Top performers</h2><div class="sub">Business vs monthly target</div></div></div>
-          <div class="card-body flush" id="top"></div></div>
         <div class="card"><div class="card-head"><div><h2>Daily sheet completeness</h2><div class="sub">Working days without an entry</div></div>
           ${can("enter_data") ? html`<a class="btn sm" href="/daily" data-link>Fill in</a>` : ""}</div>
           <div class="card-body flush" id="complete"></div></div>
-      </div>`;
+      </div>
+      <details class="more-figures mt-4"><summary class="btn sm">More figures: top performers against target</summary>
+        <div class="card mt-3"><div class="card-head"><div><h2>Top performers</h2><div class="sub">Business vs monthly target</div></div></div>
+          <div class="card-body flush" id="top"></div></div></details>`;
 
     if (pay) $("#exceptions").innerHTML = d.exceptions.length
       ? d.exceptions.slice(0, 7).map((x) => html`
@@ -104,10 +105,10 @@ export default {
           <div class="row" style="gap:8px;margin-top:4px"><div class="progress ${a >= 1 ? "green" : a >= 0.7 ? "" : "amber"}" style="flex:1"><span style="width:${Math.min(100, a * 100)}%"></span></div>
           <span style="font-size:12px;font-weight:600;min-width:44px;text-align:right">${t.attainment == null ? "—" : pct(a, 0)}</span></div></div>
         <div style="text-align:right"><b class="num">${compact(t.business)}</b><div class="faint" style="font-size:11px">of ${compact(t.target)}</div></div></div>`;
-    }).join("") : emptyState("No guys yet", "", "users").toString();
+    }).join("") : emptyState("No sellers yet", "", "users").toString();
 
     const incomplete = d.completeness.filter((c) => c.missing.length).sort((a, b) => b.missing.length - a.missing.length);
-    $("#complete").innerHTML = !d.completeness.length ? emptyState("No active guys", "", "users").toString()
+    $("#complete").innerHTML = !d.completeness.length ? emptyState("No active sellers", "", "users").toString()
       : !incomplete.length ? emptyState("All caught up", "Every working day so far has an entry.", "checkCircle").toString()
       : incomplete.slice(0, 7).map((c) => html`<div class="list-item">
           <div class="grow"><b>${c.name}</b><span>${c.hub} · missing ${c.missing.slice(0, 4).map((m) => m.slice(8)).join(", ")}${c.missing.length > 4 ? "…" : ""}</span></div>
