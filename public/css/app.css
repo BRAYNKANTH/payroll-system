@@ -1037,3 +1037,19 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .group-link { margin-left: 10px; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; min-height: 24px; }
 @media (max-width: 860px) { .group-link { min-height: 44px; } }
 .m-list li.m-group { list-style: none; padding: 10px 14px 4px; font-size: 14px; color: var(--text); background: var(--surface-3); position: sticky; top: 0; z-index: 1; }
+
+/* Global search in the top bar */
+.gsearch { position: relative; flex: 0 1 340px; min-width: 180px; }
+.gsearch .input { width: 100%; padding-left: 34px; padding-right: 30px; }
+.gsearch .gs-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); display: grid; color: var(--text-3); pointer-events: none; }
+.gsearch .gs-ico svg { width: 16px; height: 16px; }
+.gsearch .gs-key { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font: 600 11px var(--font); color: var(--text-2); border: 1px solid var(--border-strong); border-radius: 4px; padding: 1px 6px; background: var(--surface); pointer-events: none; }
+.gsearch input:focus ~ .gs-key, .gsearch input:not(:placeholder-shown) ~ .gs-key { display: none; }
+#gs-list { position: absolute; left: 0; top: calc(100% + 6px); width: max(100%, 380px); max-height: min(60vh, 440px); overflow: auto; z-index: 40; margin: 0; padding: 6px; list-style: none;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.14)); }
+#gs-list .gs-head { padding: 8px 10px 4px; font: 700 11.5px var(--font); letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+#gs-list .gs-opt { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; min-height: 44px; border-radius: var(--radius-sm); cursor: pointer; border-left: 3px solid transparent; }
+#gs-list .gs-opt span { font-size: 12.5px; color: var(--text-2); }
+#gs-list .gs-opt[aria-selected="true"], #gs-list .gs-opt:hover { background: var(--surface-3); border-left-color: var(--primary); }
+#gs-list .gs-none { padding: 14px 12px; color: var(--text-2); font-size: 13.5px; }
+@media (max-width: 860px) { .topbar { flex-wrap: wrap; } .gsearch { order: 10; flex: 1 1 100%; min-width: 0; } #gs-list { width: 100%; } .gsearch .gs-key { display: none; } }

@@ -1,6 +1,7 @@
 // App shell: auth gate, router, sidebar/topbar layout and shared state.
 import { get, post, setUnauthorizedHandler } from "./api.js";
 import { $, $$, esc, icon, initials, monthName, toast, announce, confirmDialog } from "./ui.js";
+import { mountSearch } from "./search.js";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -151,6 +152,7 @@ function shell() {
       <header class="topbar">
         <button type="button" class="btn ghost icon menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
         <div class="crumbs" id="crumbs"></div>
+        ${isStaff() ? "" : `<div class="gsearch" id="gsearch" role="search" aria-label="Search"></div>`}
         <div class="spacer"></div>
         <div class="filters" id="filters">
           ${isStaff() ? "" : u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
@@ -201,6 +203,7 @@ function shell() {
     state.hub = e.target.value; store.set("pr.hub", state.hub); render();
   });
   $("#theme-btn").onclick = toggleTheme;
+  if (!isStaff()) mountSearch($("#gsearch"), { navigate, state, scopeHub });
   setupUserMenu();
   applyTheme();
 }
