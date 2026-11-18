@@ -322,6 +322,18 @@ CREATE TABLE IF NOT EXISTS hub_issues (
 );
 CREATE INDEX IF NOT EXISTS hub_issues_hub ON hub_issues (hub, date);
 
+-- Stock the company receives (bought or made). The office holds everything received minus everything it sent to hubs.
+CREATE TABLE IF NOT EXISTS product_receipts (
+  id         bigserial PRIMARY KEY,
+  date       text NOT NULL ${DATE_CHECK("date")},
+  product_id bigint NOT NULL REFERENCES products(id),
+  qty        integer NOT NULL CHECK (qty > 0),
+  note       text,
+  created_by text NOT NULL,
+  created_at text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS product_receipts_product ON product_receipts (product_id, date);
+
 -- One row per sale a seller records on their phone: a product, a quantity and the list price at that moment. A day's business total is the sum of these.
 CREATE TABLE IF NOT EXISTS sale_lines (
   id          bigserial PRIMARY KEY,
@@ -486,6 +498,7 @@ const AUDITED = {
   products:    { key: "id", period: null },
   stock_issues: { key: "id", period: "date" },
   hub_issues:  { key: "id", period: "date" },
+  product_receipts: { key: "id", period: "date" },
   sale_lines:  { key: "id", period: "date" },
 };
 
@@ -616,6 +629,13 @@ async function migrate(db) {
       if (v?.value === SCHEMA_VERSION) return;
     }
     await t.exec(FULL_SCHEMA);
+    // A database that sent stock to hubs before the office's own stock was tracked gets one opening line per product, so the office does not start below zero.
+    await t.query("SAVEPOINT opening_stock");
+    try {
+      await t.query(`INSERT INTO product_receipts (date, product_id, qty, note, created_by)
+        SELECT to_char(now() AT TIME ZONE 'Asia/Colombo', 'YYYY-MM-DD'), product_id, SUM(qty), 'Opening balance: stock sent to hubs before office stock was tracked', 'system'
+        FROM hub_issues WHERE NOT EXISTS (SELECT 1 FROM product_receipts) GROUP BY product_id`);
+    } catch { await t.query("ROLLBACK TO SAVEPOINT opening_stock"); }
     await t.query("INSERT INTO schema_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [SCHEMA_VERSION]);
     for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
       await t.query("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING", [k, v]);

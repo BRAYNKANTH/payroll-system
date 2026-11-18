@@ -278,7 +278,8 @@ async function hubSupply(db, { hub } = {}) {
       stock: products.map((p) => { const x = pool.get(key(p.id)) || { received: 0, given: 0, left: 0 }; return { product_id: Number(p.id), product: p.name, price: num(p.list_price), received: x.received, given: x.given, left: Math.max(0, x.left) }; }),
       recent: recent.map((r) => ({ id: Number(r.id), date: r.date, product: pname.get(key(r.product_id)), qty: r.qty, note: r.note, by: r.created_by })) });
   }
-  return { hubs: out };
+  const office = await require("./products").officeStock(db);
+  return { hubs: out, office: products.map((p) => ({ product_id: Number(p.id), left: Math.max(0, office.get(key(p.id))?.left || 0) })) };
 }
 
 // The admin sends stock to a hub. `lines` is a list of { product_id, qty }.
@@ -294,12 +295,23 @@ async function giveToHub(db, user, body) {
   const note = String(body.note || "").trim().slice(0, 200) || null;
   await withUser(db, user.username, async (t) => {
     if (await svc.isFinalized(t, date.slice(0, 7))) throw httpError(409, "That month is closed");
+    // The office can send only what it holds: all lines of one product together cannot be more than the office has.
+    const want = new Map(), pname = new Map();
     for (const l of lines) {
-      const p = await t.get("SELECT id, status FROM products WHERE id = ?", Number(l.product_id));
+      const p = await t.get("SELECT id, name, status FROM products WHERE id = ?", Number(l.product_id));
       if (!p || p.status !== "active") throw httpError(400, "Choose products from the list");
+      want.set(key(p.id), (want.get(key(p.id)) || 0) + qty(l.qty)); pname.set(key(p.id), p.name);
+    }
+    const office = await require("./products").officeStock(t);
+    for (const [pid, n] of want) {
+      const left = Math.max(0, office.get(pid)?.left || 0);
+      if (n > left) throw httpError(409, left ? `The office has only ${left} ${pname.get(pid)} left. Add stock to the product first` : `The office has no ${pname.get(pid)} left. Add stock to the product first`);
+    }
+    for (const l of lines) {
+      const p = { id: Number(l.product_id) };
       await t.run("INSERT INTO hub_issues (date, hub, product_id, qty, note, created_by) VALUES (?,?,?,?,?,?)", date, hub.code, p.id, qty(l.qty), note, user.username);
     }
-  }, { lockKey: "hub:" + hub.code });
+  }, { lockKey: "office-stock" });
   return { sent: lines.length, hub: hub.code, date };
 }
 

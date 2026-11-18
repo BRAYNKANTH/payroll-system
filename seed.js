@@ -257,7 +257,8 @@ for (let o = 1; ym(o) <= currentMonth; o++) {
 const pos = require("./pos");
 const idOf = async (name) => Number((await d.get("SELECT id FROM products WHERE name = ?", name)).id);
 const [shineId, vimId] = [await idOf("Shine"), await idOf("Vim")];
-// The office sends stock to each hub first; the coacher then gives it out to the sellers.
+// The office receives stock first, then sends it to each hub; the coacher then gives it out to the sellers.
+for (const id of [shineId, vimId]) await products.addStock(d, id, { qty: 5000, note: "Opening stock" }, "admin");
 for (const [code] of HUBS) await pos.giveToHub(d, adminUser, { hub: code, lines: [{ product_id: shineId, qty: 400 }, { product_id: vimId, qty: 300 }], note: "Delivery from the office" });
 for (const [id, , , , , usual] of sellers) {
   if ((await d.get("SELECT status FROM staff WHERE employee_id = ?", id)).status !== "active") continue; // someone who has left gets none

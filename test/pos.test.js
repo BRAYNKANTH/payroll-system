@@ -20,6 +20,7 @@ async function setup({ hubStock = true } = {}) {
   await products.create(d, { name: "Vim", list_price: 500, cost_price: 190 }, "admin");
   const shine = (await d.get("SELECT id FROM products WHERE name = 'Shine'")).id;
   const vim = (await d.get("SELECT id FROM products WHERE name = 'Vim'")).id;
+  for (const id of [shine, vim]) await products.addStock(d, Number(id), { qty: 100000, note: "Delivery" }, "admin"); // the office holds stock before it can send any
   if (hubStock) for (const hub of ["H1", "H2"]) await pos.giveToHub(d, ADMIN, { hub, lines: [{ product_id: Number(shine), qty: 1000 }, { product_id: Number(vim), qty: 1000 }] });
   const seller = { username: "seller-d1", employee_id: "D1" };
   const hubHead = { username: "head-h1", hub: "H1" };
@@ -231,4 +232,33 @@ test("giving to several sellers at once: one save, all or nothing, capped by wha
   await assert.rejects(() => pos.giveMany(d, hubHead, { rows: [{ employee_id: "D2", lines: [{ product_id: shine, qty: 1 }] }] }, "H1"));
   const m = await pos.morning(d, { date: sales.today(), hub: "H1" });
   assert.ok(m.sellers.every((s) => s.team && s.team.id));
+});
+
+test("the office can send only the stock it holds; adding stock first, an undo that is refused once the stock is sent", async () => {
+  const d = await db.open(":memory:");
+  await auth.setup(d, { username: "admin", full_name: "Admin", password: "admin12345" });
+  await svc.createEntry(d, "hubs", { code: "H1", name: "Hub 1" }, "admin");
+  await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "admin");
+  const shine = Number((await d.get("SELECT id FROM products WHERE name = 'Shine'")).id);
+  // nothing received yet: nothing can be sent
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 1 }] }), /The office has no Shine left. Add stock to the product first/);
+  await assert.rejects(() => products.addStock(d, shine, { qty: 0 }, "admin"), /whole number/);
+  await assert.rejects(() => products.addStock(d, shine, { qty: 5, date: sales.addDays(sales.today(), 1) }, "admin"), /not happened yet/);
+  const r = await products.addStock(d, shine, { qty: 50, note: "First delivery" }, "admin");
+  assert.equal(r.office_stock, 50);
+  assert.equal(r.date, sales.today(), "the date is today unless another is given");
+  // two lines of one product are checked together
+  await assert.rejects(() => pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 30 }, { product_id: shine, qty: 30 }] }), /only 50 Shine left/);
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 40 }] });
+  assert.equal((await products.list(d))[0].office_stock, 10);
+  assert.equal((await pos.hubSupply(d)).office[0].left, 10);
+  const h = await products.stockHistory(d, shine);
+  assert.equal(h.receipts.length, 1);
+  await assert.rejects(() => products.removeStock(d, h.receipts[0].id, "admin"), /already been sent to hubs/);
+  // taking the stock back from the hub returns it to the office, and then the line can be removed
+  const issue = (await d.get("SELECT id FROM hub_issues")).id;
+  await pos.takeFromHub(d, ADMIN, issue);
+  assert.equal((await products.list(d))[0].office_stock, 50);
+  await products.removeStock(d, h.receipts[0].id, "admin");
+  assert.equal((await products.list(d))[0].office_stock, 0);
 });

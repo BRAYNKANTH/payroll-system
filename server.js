@@ -26,7 +26,7 @@ const BASE_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "
 const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "font-src 'self'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'";
 const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:; base-uri 'none'";
-const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "loans", "loan_repayments", "products", "periods", "pay_period_summary", "audit_log"];
+const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "loans", "loan_repayments", "products", "product_receipts", "periods", "pay_period_summary", "audit_log"];
 
 function send(res, status, body, type = "application/json; charset=utf-8", extra = {}) {
   res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", ...BASE_HEADERS, ...extra });
@@ -225,6 +225,9 @@ function createHandler(dbReady) {
     ["GET", /^\/api\/products\/names$/, "enter_data", () => products.names(database)],
     ["GET", /^\/api\/products$/, "manage_products", () => products.list(database)],
     ["POST", /^\/api\/products$/, "manage_products", ({ user, body }) => products.create(database, body, user.username)],
+    ["GET", /^\/api\/products\/(\d+)\/stock$/, "manage_products", ({ m }) => products.stockHistory(database, m[1])],
+    ["POST", /^\/api\/products\/(\d+)\/stock$/, "manage_products", ({ user, body, m }) => products.addStock(database, m[1], body, user.username)],
+    ["DELETE", /^\/api\/product-stock\/(\d+)$/, "manage_products", ({ user, m }) => products.removeStock(database, m[1], user.username)],
     ["PUT", /^\/api\/products\/(\d+)$/, "manage_products", ({ user, body, m }) => products.update(database, m[1], body, user.username)],
     ["GET", /^\/api\/reports\/product-profit$/, "manage_products", ({ q }) => products.profitReport(database, q.get("period"))],
     ["POST", /^\/api\/staff\/([\w.-]+)\/leave$/, ["manage_staff", "manage_team"], ({ user, body, m }) => people.leave(database, m[1], body, user.username, user.hub)],

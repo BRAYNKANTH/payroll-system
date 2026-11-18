@@ -27,6 +27,7 @@ const NAV = [
   { path: "/", label: "Dashboard", icon: "dashboard", page: "dashboard", perm: "read" },
   { path: "/team", label: "My team", icon: "users", page: "team", perm: "read_team", roles: ["manager"] },
   { group: "Data entry" },
+  { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { path: "/hub-stock", label: "Stock to hubs", icon: "warehouse", page: "hubsupply", perm: "manage_products" },
   { path: "/morning", label: "Morning stock", icon: "box", page: "morning", perm: "stock" },
   { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily", perm: "read" },
@@ -48,8 +49,6 @@ const NAV = [
   { path: "/audit", label: "Audit trail", icon: "history", page: "audit", perm: "read" },
   { group: "My account", perm: "self" },
   { path: "/me", label: "My page", icon: "users", page: "portal", perm: "self" },
-  { group: "Catalogue", perm: "manage_products" },
-  { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { group: "Administration", perm: "manage_users" },
   { path: "/users", label: "Users & roles", icon: "key", page: "users", perm: "manage_users" },
   { path: "/settings", label: "Settings", icon: "settings", page: "settings", perm: "settings" },
@@ -72,7 +71,7 @@ const WS_TABS = [
 ];
 const SECTIONS = {
   payroll: { label: "Payroll", tabs: [["/payroll", "Payroll run"], ["/approvals", "Approvals"], ["/payslips", "Payslips"]] },
-  setup: { label: "Setup", tabs: [["/users", "Users & roles"], ["/products", "Products"], ["/settings", "Settings"], ["/audit", "Audit trail"]] },
+  setup: { label: "Setup", tabs: [["/users", "Users & roles"], ["/settings", "Settings"], ["/audit", "Audit trail"]] },
 };
 const WS_RE = /^\/hubs\/([\w-]+)(?:\/(people|sales|stock|money))?(?:\/([\w-]+))?$/;
 const permOfPage = (page) => NAV.find((n) => n.page === page)?.perm;
@@ -86,14 +85,22 @@ function menuItems() {
   if (!u) return out; // before anyone has signed in
   const add = (path, label, ic, extra = {}) => out.push({ path, label, icon: ic, ...extra });
   if (isStaff()) { add("/me", "My page", "users"); return out; }
-  if (can("read")) { // the admin and a coacher
+  if (can("read") && !u.hub) { // the admin: every page is in the menu, in groups
+    const ok = (perm) => !perm || (Array.isArray(perm) ? perm.some((x) => can(x)) : can(perm));
+    let heading = null;
+    for (const n of NAV) {
+      if (n.group) { heading = n.group; continue; }
+      if (n.roles || n.path === "/team" || !ok(n.perm) || (n.path === "/me" && !u.employee_id)) continue;
+      if (n.path === "/morning") continue; // the admin sees the hubs' stock on Stock to hubs; the coachers give it out
+      out.push({ path: n.path, label: n.path === "/" ? "Home" : n.label, icon: n.icon, ...(n.badge ? { badge: true } : {}), ...(heading ? { heading } : {}) });
+      heading = null;
+    }
+    return out;
+  }
+  if (can("read")) { // a coacher
     add("/", "Home", "dashboard");
-    if (u.hub) add(hubEntry(), "My hub", "store");
-    else { add("/hubs", "Hubs", "store"); add("/employees", "Employees", "users", { short: "People" }); }
-    if (can("manage_products")) add("/hub-stock", "Stock to hubs", "warehouse", { short: "Stock" });
-    if (can("view_pay")) add("/payroll", "Payroll", "play", { badge: true });
+    add(hubEntry(), "My hub", "store");
     add("/reports", "Reports", "chart");
-    if (can("manage_users")) add("/users", "Setup", "settings");
   } else if (can("read_team")) { // a manager
     add("/team", "My team", "users", { short: "Team" });
     add("/live", "Live sales", "trend", { short: "Live" });
@@ -106,6 +113,7 @@ function menuItems() {
 // Which side-menu item lights up for a page.
 function navFor(path) {
   const inMenu = menuItems().map((m) => m.path);
+  if (inMenu.includes(path) && !state.user?.hub && !isStaff() && can("read")) return path;
   const sec = sectionOf(path);
   const want = sec === "payroll" ? ["/payroll"] : sec === "setup" ? ["/users"]
     : path.startsWith("/hubs") ? [hubEntry()] : path.startsWith("/employees") ? ["/employees", hubEntry()] : [path, hubEntry(), "/hubs", "/"];
@@ -185,7 +193,9 @@ function periodPicker() {
 
 // The five things people open most, as a bar at the bottom of a phone. "More" opens the full menu.
 function bottomNav() {
-  const items = menuItems().slice(0, 4).map((m) => [m.path, m.short || m.label, m.icon]);
+  const all = menuItems();
+  const four = !state.user?.hub && can("read") ? ["/", "/hubs", "/employees", "/payroll"].map((p) => all.find((m) => m.path === p)).filter(Boolean) : all.slice(0, 4);
+  const items = four.map((m) => [m.path, ({ "/hubs": "Hubs", "/employees": "People" })[m.path] || m.short || m.label, m.icon]);
   return `<nav class="bottom-nav" id="bnav" aria-label="Main">${items.map(([path, label, ic]) =>
     `<a href="${path}" data-link data-nav="${path}">${icon(ic)}<span>${label}</span></a>`).join("")}
     <button type="button" id="bnav-more" aria-controls="sidebar" aria-haspopup="true">${icon("menu")}<span>More</span><span class="dot" id="more-dot" hidden></span></button></nav>`;
@@ -201,7 +211,7 @@ function shell() {
       <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
       <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
       <nav class="nav" id="nav" aria-label="Main">${menuItems().map((m) =>
-        `<a href="${m.path}" data-link data-nav="${m.path}" title="${esc(m.label)}">${icon(m.icon)}<span>${esc(m.label)}</span>${m.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
+        `${m.heading ? `<div class="nav-group">${esc(m.heading)}</div>` : ""}<a href="${m.path}" data-link data-nav="${m.path}" title="${esc(m.label)}">${icon(m.icon)}<span>${esc(m.label)}</span>${m.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
       </nav>
       <div class="sidebar-foot">Signed in as <b>${esc(u.username)}</b><br>${esc(roleText(u.role))}${u.hub ? ` · hub ${esc(u.hub)}` : ""}</div>
     </aside>

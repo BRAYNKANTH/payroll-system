@@ -1597,3 +1597,27 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .till-steps { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin: 0 0 14px; padding: 0; font-size: 15px; color: var(--text-2); }
 .till-steps li { display: inline-flex; align-items: center; gap: 8px; }
 .till-steps b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: 14px; }
+
+/* Add product: the profit preview keeps one shape; only its numbers change as you type */
+.pprev { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2, var(--surface)); padding: 16px 18px; }
+.pprev h3 { font-size: 15px; margin: 0 0 10px; }
+.pprev dl { margin: 0; display: grid; gap: 2px; }
+.pprev dl > div { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.pprev dl > div:first-child { border-top: 0; }
+.pprev dt { color: var(--text-2); font-size: 15px; }
+.pprev dd { margin: 0; text-align: right; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pprev dd.sub { grid-column: 1 / -1; font-size: 14px; font-weight: 400; color: var(--text-3); text-align: right; min-height: 20px; }
+.pprev .total dd:not(.sub) { font-size: 20px; }
+.pprev .neg { color: var(--danger); }
+.pprev .alert { margin-top: 10px; }
+
+/* Product form: stock in the office */
+.ostock { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; background: var(--surface); }
+.ostock h3 { font-size: 15px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ostock-now { font-weight: 400; font-size: 14px; color: var(--text-2); }
+.ostock-now b { font-size: 20px; color: var(--text); font-variant-numeric: tabular-nums; }
+.ostock-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ostock-form .full { grid-column: 1 / -1; }
+.os-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.os-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 15px; }
+.os-list .mc-x { min-width: 44px; min-height: 44px; }

@@ -24,6 +24,7 @@ async function setup() {
   await products.create(d, { name: "Shine", list_price: 850, cost_price: 300 }, "owner");
   const shine = Number((await d.get("SELECT id FROM products WHERE name = 'Shine'")).id);
   const pos = require("../pos");
+  await products.addStock(d, shine, { qty: 100000 }, "owner");
   for (const hub of ["H1", "H2"]) await pos.giveToHub(d, { username: "owner" }, { hub, lines: [{ product_id: shine, qty: 500 }] }); // the office sends stock to each hub
   const login = (username, employee_id, role = "staff") => auth.createUser(d, admin, { username, full_name: username, role, employee_id, password: PW });
   await login("coach", "C1"); await login("man1", "M1"); await login("man2", "M2"); await login("promo", "PM1"); await login("seller", "D1"); await login("coach2", "C2");

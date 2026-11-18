@@ -26,10 +26,58 @@ function economics(price, cost, settings) {
   return { seller_share: seller, manager_share: manager, workers_share: workers, company_share: company, profit, margin: price ? profit / price : 0 };
 }
 
+// What the office holds of each product: everything received minus everything sent to hubs. `db` can be a transaction.
+async function officeStock(db) {
+  const rows = await db.all(`SELECT p.id,
+    COALESCE((SELECT SUM(qty) FROM product_receipts r WHERE r.product_id = p.id), 0)::bigint AS received,
+    COALESCE((SELECT SUM(qty) FROM hub_issues h WHERE h.product_id = p.id), 0)::bigint AS sent FROM products p`);
+  return new Map(rows.map((r) => [String(r.id), { received: Number(r.received), sent: Number(r.sent), left: Number(r.received) - Number(r.sent) }]));
+}
+
 async function list(db) {
   const settings = await getSettings(db);
   const rows = await db.all("SELECT * FROM products ORDER BY (status = 'active') DESC, lower(name)");
-  return rows.map((p) => ({ ...p, ...economics(p.list_price, p.cost_price, settings) }));
+  const office = await officeStock(db);
+  return rows.map((p) => { const o = office.get(String(p.id)) || { received: 0, sent: 0, left: 0 }; return { ...p, ...economics(p.list_price, p.cost_price, settings), office_stock: o.left, received: o.received, sent: o.sent }; });
+}
+
+const slToday = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+
+// The office receives stock of a product (the date is today unless another day, not in the future, is given).
+async function addStock(db, id, body, user) {
+  const p = await db.get("SELECT id, name FROM products WHERE id = ?", Number(id));
+  if (!p) throw httpError(404, "Product not found");
+  const qty = Number(String(body.qty ?? "").replace(/,/g, ""));
+  if (!Number.isInteger(qty) || qty < 1 || qty > 1000000) throw httpError(400, "Enter how many pieces were added, as a whole number");
+  const today = slToday();
+  const date = body.date ? String(body.date) : today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) throw httpError(400, "The date must look like 2026-11-18");
+  if (date > today) throw httpError(400, "You cannot add stock for a day that has not happened yet");
+  const note = String(body.note || "").trim().slice(0, 200) || null;
+  await withUser(db, user, (t) => t.run("INSERT INTO product_receipts (date, product_id, qty, note, created_by) VALUES (?,?,?,?,?)", date, p.id, qty, note, user));
+  const o = (await officeStock(db)).get(String(p.id));
+  return { product: p.name, added: qty, date, office_stock: o.left };
+}
+
+// A product's office stock and its latest additions.
+async function stockHistory(db, id) {
+  const p = await db.get("SELECT id, name FROM products WHERE id = ?", Number(id));
+  if (!p) throw httpError(404, "Product not found");
+  const o = (await officeStock(db)).get(String(p.id));
+  const rows = await db.all("SELECT id, date, qty, note, created_by FROM product_receipts WHERE product_id = ? ORDER BY date DESC, id DESC LIMIT 15", p.id);
+  return { product: p.name, ...o, receipts: rows.map((r) => ({ id: Number(r.id), date: r.date, qty: r.qty, note: r.note, by: r.created_by })) };
+}
+
+// Take back a line added by mistake. Refused when part of it has already been sent to hubs.
+async function removeStock(db, rid, user) {
+  const r = await db.get("SELECT id, product_id, qty FROM product_receipts WHERE id = ?", Number(rid));
+  if (!r) throw httpError(404, "That stock line was not found");
+  await withUser(db, user, async (t) => {
+    const left = (await officeStock(t)).get(String(r.product_id))?.left || 0;
+    if (left < r.qty) throw httpError(409, "Part of this stock has already been sent to hubs, so it cannot be removed");
+    await t.run("DELETE FROM product_receipts WHERE id = ?", r.id);
+  }, { lockKey: "office-stock" });
+  return { deleted: true };
 }
 
 // Active product names and selling prices for the stock sheets. Anyone who enters data may see these; the purchase price and profit stay admin-only.
@@ -91,4 +139,4 @@ async function profitReport(db, period) {
   return { period, workers_rate: share, rows, totals: { revenue: sum("revenue"), workers: sum("workers"), cost: sum("cost"), profit: sum("profit"), unmatched: rows.filter((r) => !r.matched).length } };
 }
 
-module.exports = { list, names, create, update, profitReport, economics };
+module.exports = { list, names, create, update, profitReport, economics, officeStock, addStock, stockHistory, removeStock };

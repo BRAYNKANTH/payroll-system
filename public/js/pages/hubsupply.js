@@ -36,11 +36,13 @@ export default {
 
     $$("[data-send]", el).forEach((b) => (b.onclick = () => {
       const h = d.hubs.find((x) => x.code === b.dataset.send);
+      const office = Object.fromEntries((d.office || []).map((o) => [o.product_id, o.left])); // what the office holds
       const cart = new Map(); // product id -> qty
       const dr = drawer({
         title: `Send stock to ${h.name}`,
         body: html`<div class="give">
-          <p class="muted" style="margin-top:0">Search a product and tap it to add it, then set how many you are sending.</p>
+          <p class="muted" style="margin-top:0">Search a product and tap it to add it, then set how many you are sending. You can send only what the office holds.</p>
+          ${(d.office || []).every((o) => o.left < 1) ? html`<div class="alert warn mb-3">${icon("box")}<div><b>The office has no stock.</b> Add stock to a product first: Products, choose the product, then Add stock.</div></div>` : ""}
           <div class="till-search"><span aria-hidden="true">${icon("search")}</span><input id="sq" class="input" type="search" autocomplete="off" placeholder="Search products" aria-label="Search products"></div>
           <ul class="give-list" id="s-results" role="list" aria-label="Products"></ul>
           <h3 class="section-title" style="margin:16px 0 8px">To send <span class="muted" id="s-count"></span></h3>
@@ -54,10 +56,10 @@ export default {
       const drawResults = () => {
         const t = q.value.trim().toLowerCase();
         const list = h.stock.filter((x) => !cart.has(x.product_id) && (!t || x.product.toLowerCase().includes(t))).slice(0, 8);
-        res.innerHTML = list.length ? list.map((x) => html`<li><button type="button" class="give-pick" data-add="${x.product_id}"><span><b>${x.product}</b><span class="muted"> ${rs(x.price)} · ${x.left} in the hub now</span></span><span class="btn sm">Add</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
+        res.innerHTML = list.length ? list.map((x) => html`<li><button type="button" class="give-pick" data-add="${x.product_id}" ${office[x.product_id] ? "" : "disabled"}><span><b>${x.product}</b><span class="muted"> ${rs(x.price)} · ${office[x.product_id] || 0} in the office · ${x.left} in the hub</span></span><span class="btn sm">${office[x.product_id] ? "Add" : "None in the office"}</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
       };
       const drawCart = () => {
-        cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).product}</b><span class="muted">${prod(id).left} in the hub now</span></label>
+        cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).product}</b><span class="muted">${office[id] || 0} in the office</span></label>
           <input class="input" id="c${id}" data-cid="${id}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" value="${n}" aria-label="Quantity of ${prod(id).product} to send">
           <button type="button" class="mc-x" data-rm="${id}" aria-label="Remove ${prod(id).product}">${icon("x")}</button></li>`).join("") : `<li class="muted" style="padding:8px 2px">Nothing added yet</li>`;
         $("#s-count", dr.panel).textContent = cart.size ? `· ${total()} pieces` : "";
@@ -72,6 +74,8 @@ export default {
       save.onclick = (e) => busy(e.currentTarget, async () => {
         const lines = [...cart].map(([product_id, qty]) => ({ product_id, qty })).filter((l) => l.qty > 0);
         if (!lines.length) throw new Error("Enter a quantity for at least one product");
+        const over = lines.find((l) => l.qty > (office[l.product_id] || 0));
+        if (over) throw new Error(`The office has only ${office[over.product_id] || 0} ${prod(over.product_id).product}. Add stock to the product first`);
         await post("/api/hub-stock", { hub: h.code, lines, note: $("#s-note", dr.panel).value });
         toast(`Stock sent to ${h.name}`);
         dr.close();
