@@ -103,7 +103,7 @@ export default {
           <td>${editable ? html`<button type="button" class="btn sm icon danger-ghost" data-del="${i}" aria-label="Remove ${product || "new line"} for ${person}">${icon("trash")}</button>` : ""}</td>
         </tr>`;
         })}</tbody>
-        <tfoot><tr><td colspan="8">Total shortfall</td><td class="r" id="tot"></td><td></td></tr></tfoot></table></div>
+        <tfoot><tr><td colspan="8" style="overflow:visible;white-space:nowrap">Total shortfall</td><td class="r" id="tot"></td><td></td></tr></tfoot></table></div>
         ${!find && rows.some((r, i) => r._state !== "deleted" && !visible(r, i)) ? html`<div class="more-rows"><span class="muted" role="status">Showing ${rows.filter(visible).length} of ${rows.length} lines</span>
           <button type="button" class="btn" id="more-lines">Show ${Math.min(150, rows.length - shown)} more</button></div>` : ""}`.toString();
       const live = rows.filter((r) => r._state !== "deleted" && r._state !== "gone");

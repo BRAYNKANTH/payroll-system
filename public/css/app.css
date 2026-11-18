@@ -1631,3 +1631,23 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* Give stock: a plain day row, and a calm "Nothing" tag */
 .daybar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .mc-chip.out { background: var(--warning-soft); color: var(--warning); }
+
+/* Seller's phone: the bottom tabs keep their small labels, and "My stock today" reads as cards instead of a cramped table */
+.ts-sub { display: none; }
+@media (max-width: 860px) {
+  #view[data-page] .portal-tabs button { font-size: 12px; min-height: 56px; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; }
+  #view[data-page] .portal-tabs .tab-lb { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+}
+@media (max-width: 560px) {
+  .till-stock thead, .till-stock td:not(.left) { display: none; }
+  .till-stock, .till-stock tbody { display: block; width: 100%; }
+  .till-stock tr { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .till-stock tbody th { display: block; padding: 0; border: 0; text-align: left; font-size: 17px; }
+  .till-stock .ts-sub { display: block; font-size: 14px; font-weight: 400; color: var(--text-3); margin-top: 2px; }
+  .till-stock td.left { display: block; grid-column: 2; grid-row: 1; padding: 0; border: 0; font-size: 24px; text-align: right; }
+}
+
+/* Colour contrast: found by the mobile audit tool. Light theme only; these keep small coloured text at 4.5:1 or better on its tinted background. */
+:root:not([data-theme="dark"]) { --text-3: #586579; --success: #17702f; --warning: #8a4a00; --info: #0369a1; --primary: #0066cc; }
+.mc-x { min-width: 44px; flex: none; }
+.stockc-page .sheet td, .stockc-page .sheet tfoot th { overflow: visible; text-overflow: clip; }

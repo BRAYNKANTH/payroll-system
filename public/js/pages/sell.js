@@ -16,12 +16,13 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
   let st = await get("/api/me/pos");
   let query = "", picked = null, qty = 1;
 
-  const stockRow = (p) => html`<tr class="${p.left === 0 ? "none" : ""}"><th scope="row">${p.name}</th>
+  const stockRow = (p) => html`<tr class="${p.left === 0 ? "none" : ""}"><th scope="row">${p.name}<span class="ts-sub">Carried ${p.carried} · Given ${p.issued} · Sold ${p.sold}</span></th>
     <td>${p.carried}</td><td>${p.issued}</td><td>${p.sold}</td>
     <td class="left ${p.left > 0 && p.left <= LOW ? "low" : ""}"><b>${p.left}</b>${p.left > 0 && p.left <= LOW ? html`<span class="tag">Low</span>` : ""}</td></tr>`;
 
   const draw = () => {
-    const visible = st.products.filter((p) => p.active && (!query || p.name.toLowerCase().includes(query.toLowerCase())));
+    // Without a search only the products the seller still has are shown, so a long product list does not push the till down; searching finds any product.
+    const visible = st.products.filter((p) => p.active && (query ? p.name.toLowerCase().includes(query.toLowerCase()) : p.left > 0));
     const inHand = st.products.filter((p) => p.carried || p.issued || p.sold || p.left);
     const sel = picked ? st.products.find((p) => p.id === picked) : null;
     if (picked && (!sel || sel.left < 1)) { picked = null; }
@@ -46,10 +47,10 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
           ${st.products.length && st.products.every((p) => p.left < 1) ? html`<div class="alert warn mb-3">${icon("box")}<div><b>You have no stock to sell yet.</b> Your coacher gives you stock in the morning. It appears here as soon as it is recorded.</div></div>` : ""}
           <div class="till-search"><span aria-hidden="true">${icon("search")}</span>
             <input id="ts" class="input" type="search" inputmode="search" autocomplete="off" placeholder="Search products" aria-label="Search products" value="${query}"></div>
-          ${visible.length ? html`<div class="till-grid" role="list">${visible.map((p) => html`<button type="button" role="listitem" class="till-prod ${picked === p.id ? "on" : ""} ${p.left < 1 ? "out" : ""}" data-p="${p.id}" aria-pressed="${picked === p.id}" ${p.left < 1 ? "disabled" : ""}>
+          ${visible.length ? html`<div class="till-grid" role="group" aria-label="Products">${visible.map((p) => html`<button type="button" class="till-prod ${picked === p.id ? "on" : ""} ${p.left < 1 ? "out" : ""}" data-p="${p.id}" aria-pressed="${picked === p.id}" ${p.left < 1 ? "disabled" : ""}>
             <span class="tp-name">${p.name}</span><span class="tp-price">${rs(p.price)}</span>
             <span class="tp-left ${p.left < 1 ? "none" : p.left <= LOW ? "low" : ""}">${p.left < 1 ? "None left" : `${p.left} left`}</span></button>`)}</div>`
-            : html`<p class="muted" style="margin:14px 0 0">${st.products.some((p) => p.active) ? `No product matches “${query}”.` : "There are no products yet. Ask the office to add them."}</p>`}
+            : html`<p class="muted" style="margin:14px 0 0">${!st.products.some((p) => p.active) ? "There are no products yet. Ask the office to add them." : query ? `No product matches “${query}”.` : "You have nothing left to sell. Search to see all products."}</p>`}
         </div>
       </section>`}
 

@@ -24,7 +24,7 @@ export default {
       </div>
       ${h.recent.length ? html`<div class="card-body"><div class="mc-label" style="margin-bottom:8px">Latest stock sent</div>
         <ul class="till-lines" role="list" style="margin:0 -18px -16px">${h.recent.slice(0, 5).map((r) => html`<li><div class="tl-main"><b>${r.qty} × ${r.product}</b><span class="muted">${dayLabel(r.date)} · by ${r.by}${r.note ? ` · ${r.note}` : ""}</span></div><span></span>
-          <button type="button" class="btn sm ghost" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">${icon("x")}</button></li>`)}</ul></div>` : ""}
+          <button type="button" class="btn sm ghost icon" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">${icon("x")}</button></li>`)}</ul></div>` : ""}
     </article>`;
 
     el.innerHTML = html`<div class="hsup-page">

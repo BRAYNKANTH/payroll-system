@@ -149,7 +149,7 @@ export default {
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[...(me.sells ? [["sell", "Sell", "Sell", "bag", ""]] : []), ["month", "This month", "Month", "chart", ""],
         ...(d.team ? [["team", "My team", "Team", "users", d.team.length]] : []), ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
         ...(d.loans.length ? [["loans", "Advances & loans", "Loans", "coins", d.loans.filter((l) => l.state !== "paid").length]] : []),
-        ["documents", "My documents", "Documents", "file", ""], ["details", "My details", "Details", "user", ""]]
+        ["documents", "My documents", "Docs", "file", ""], ["details", "My details", "Profile", "user", ""]]
         .map(([k, long, short, ic, n]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}"><span class="tab-ic">${icon(ic)}</span><span class="tab-lb"><span class="lg">${long}</span><span class="sm">${short}</span></span>${n !== "" ? html`<span class="cnt">(${n})</span>` : ""}</button>`)}</div>
       <div id="pane"></div>`;
 

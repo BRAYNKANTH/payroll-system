@@ -95,7 +95,7 @@ export default {
 
     if (pay) $("#exceptions").innerHTML = d.exceptions.length
       ? d.exceptions.slice(0, 7).map((x) => html`
-        <div class="list-item"><div class="avatar" style="background:var(--accent)">${initials(x.name)}</div>
+        <div class="list-item"><div class="avatar" style="background:var(--warning)">${initials(x.name)}</div>
           <div class="grow"><b>${x.name}</b><span>${x.hub} · ${x.flags.map((f) => f.code.replace(/_/g, " ").toLowerCase()).join(", ")}</span></div>
           ${badge(x.status)}</div>`).join("")
       : emptyState(k.calculated ? "No exceptions" : "Not calculated yet", k.calculated ? "Everything passed the payroll checks." : "Run payroll to check this period.", "checkCircle").toString();

@@ -232,7 +232,7 @@ function shell() {
         </div>
         <button type="button" class="btn ghost icon" id="theme-btn" aria-label="Switch to dark theme">${icon("moon")}</button>
         <div class="user-wrap" style="position:relative">
-          <button type="button" class="user-chip" id="user-chip" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu">
+          <button type="button" class="user-chip" id="user-chip" aria-label="${esc(initials(u.full_name))} ${esc(u.full_name)}, account menu" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu">
             <span class="avatar" aria-hidden="true">${esc(initials(u.full_name))}</span>
             <span class="who"><b>${esc(u.full_name)}</b><span>${esc(roleText(u.role))}</span></span>
           </button>

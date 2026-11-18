@@ -18,7 +18,7 @@ export default {
       <div class="page-head">
         <div><h1>My team</h1><p>The people who report to you. Sales and stock for ${monthName(d.period)}.</p></div>
       </div>
-      ${keeper ? html`<div class="alert info mb-4">${icon("box")}<div><b>You are a stock keeper.</b> You can give stock to everyone in the hub, not only your own people. <a href="/morning" data-link>Open Morning stock</a></div></div>` : ""}
+      ${keeper ? html`<div class="alert info mb-4">${icon("box")}<div><b>You are a stock keeper.</b> You can give stock to everyone in the hub, not only your own people. <a class="btn sm" href="/morning" data-link>Open Give stock</a></div></div>` : ""}
       <div class="grid kpis mb-4">
         <div class="card kpi"><div class="label">People</div><div class="value">${t.people}</div><div class="foot">Reporting to you</div></div>
         <div class="card kpi"><div class="label">Sold today</div><div class="value"><small>Rs</small>${compact(t.today_business)}</div><div class="foot">By your people</div></div>
