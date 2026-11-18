@@ -29,6 +29,7 @@ const NAV = [
   { group: "Data entry" },
   { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { path: "/hub-stock", label: "Stock to hubs", icon: "warehouse", page: "hubsupply", perm: "manage_products" },
+  { path: "/stock-overview", label: "Stock overview", icon: "warehouse", page: "stockview", perm: "stock", hubOnly: true },
   { path: "/morning", label: "Morning stock", icon: "box", page: "morning", perm: "stock" },
   { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily", perm: "read" },
   { path: "/live", label: "Live sales", icon: "trend", page: "live", perm: ["read", "read_team"] },
@@ -66,7 +67,7 @@ const WS_TABS = [
   { key: "overview", label: "Overview", page: "hub", perm: "read" },
   { key: "people", label: "People", page: "employees", perm: "read" },
   { key: "sales", label: "Sales", subs: [["", "Live sales", "live"], ["daily", "Daily sheet", "daily"]] },
-  { key: "stock", label: "Stock", subs: [["", "Morning stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub stock sheet", "hubstock"]] },
+  { key: "stock", label: "Stock", subs: [["", "Morning stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub stock sheet", "hubstock"], ["view", "Stock overview", "stockview"]] },
   { key: "money", label: "Money", subs: [["", "Weekly sheet", "weekly"], ["loans", "Advances & loans", "loans"], ["allowances", "Allowances", "allowances"]] },
 ];
 const SECTIONS = {
@@ -91,7 +92,7 @@ function menuItems() {
     for (const n of NAV) {
       if (n.group) { heading = n.group; continue; }
       if (n.roles || n.path === "/team" || !ok(n.perm) || (n.path === "/me" && !u.employee_id)) continue;
-      if (n.path === "/morning") continue; // the admin sees the hubs' stock on Stock to hubs; the coachers give it out
+      if (n.path === "/morning" || n.hubOnly) continue; // the admin sees the hubs' stock on Stock to hubs; the coachers give it out
       out.push({ path: n.path, label: n.path === "/" ? "Home" : n.label, icon: n.icon, ...(n.badge ? { badge: true } : {}), ...(heading ? { heading } : {}) });
       heading = null;
     }
@@ -100,12 +101,13 @@ function menuItems() {
   if (can("read")) { // a coacher
     add("/", "Home", "dashboard");
     add(hubEntry(), "My hub", "store");
+    if (can("stock")) add("/stock-overview", "Stock", "warehouse");
     add("/reports", "Reports", "chart");
   } else if (can("read_team")) { // a manager
     add("/team", "My team", "users", { short: "Team" });
     add("/live", "Live sales", "trend", { short: "Live" });
     add("/employees", "Employees", "users", { short: "People" });
-    if (can("stock")) add("/morning", "Morning stock", "box", { short: "Stock" });
+    if (can("stock")) { add("/stock-overview", "Stock overview", "warehouse", { short: "Stock" }); add("/morning", "Morning stock", "box", { short: "Give" }); }
   }
   if (u.employee_id) add("/me", "My page", "user");
   return out;

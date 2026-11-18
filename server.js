@@ -156,6 +156,7 @@ function createHandler(dbReady) {
     // The office gives each seller their stock for the day.
     // The office sends stock to a hub (admin); a coacher or stock keeper sees what their own hub holds.
     ["GET", /^\/api\/hub-stock$/, "stock", ({ user, q }) => pos.hubSupply(database, { hub: user.hub || q.get("hub") || undefined })],
+    ["GET", /^\/api\/stock-overview$/, "stock", ({ user, q }) => pos.stockOverview(database, { hub: user.hub || q.get("hub"), date: q.get("date") })],
     ["POST", /^\/api\/hub-stock$/, "manage_products", ({ user, body }) => pos.giveToHub(database, user, body)],
     ["DELETE", /^\/api\/hub-stock\/(\d+)$/, "manage_products", ({ user, m }) => pos.takeFromHub(database, user, m[1])],
     ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],

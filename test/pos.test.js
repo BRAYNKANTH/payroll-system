@@ -262,3 +262,20 @@ test("the office can send only the stock it holds; adding stock first, an undo t
   await products.removeStock(d, h.receipts[0].id, "admin");
   assert.equal((await products.list(d))[0].office_stock, 0);
 });
+
+test("the stock overview adds up: received, given out, in the hub, with the sellers and sold today", async () => {
+  const { d, shine, hubHead, seller } = await setup({ hubStock: false });
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 100 }], note: "Delivery" });
+  await give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 30 }] }, "H1");
+  await give(d, hubHead, { employee_id: "D3", lines: [{ product_id: shine, qty: 20 }] }, "H1");
+  await pos.sell(d, seller, { product_id: shine, qty: 4 });
+  const o = await pos.stockOverview(d, { hub: "H1" });
+  assert.deepEqual(o.totals, { received: 100, given: 50, in_hub: 50, with_sellers: 46, sold_today: 4, given_today: 50 });
+  const row = o.products.find((p) => p.product === "Shine");
+  assert.equal(row.in_hub, 50); assert.equal(row.sold_today, 4); assert.equal(row.with_sellers, 46);
+  assert.equal(o.sellers.find((s) => s.employee_id === "D1").left, 26);
+  assert.equal(o.received[0].note, "Delivery");
+  assert.equal(o.gave.length, 2);
+  assert.ok(o.products.every((p) => p.product !== "Vim"), "a product with no stock movement is left out");
+  await assert.rejects(() => pos.stockOverview(d, { hub: "NOPE" }), /Choose a hub/);
+});

@@ -265,6 +265,53 @@ async function poolOf(db, hub) {
   return pool;
 }
 
+// One hub's stock in detail, for its coacher or stock keeper: per product what came from the office, what was given out, what the hub and the sellers
+// hold and what sold today; per seller what they hold; and the latest stock received and given out.
+async function stockOverview(db, { hub, date } = {}) {
+  const h = await db.get("SELECT code, name, status FROM hubs WHERE code = ?", String(hub || ""));
+  if (!h) throw httpError(400, "Choose a hub");
+  const day = String(date || sales.today());
+  const products = await db.all("SELECT id, name, list_price, status FROM products ORDER BY lower(name)");
+  const pname = new Map(products.map((p) => [key(p.id), p.name]));
+  const pool = await poolOf(db, h.code);
+  const people = await db.all(`SELECT s.employee_id, s.name, s.staff_level, s.upline_id FROM staff s WHERE ${sellersWhere} AND s.hub = ? ORDER BY s.name`, h.code);
+  const everyone = new Map((await db.all("SELECT employee_id, name, staff_level, upline_id FROM staff WHERE hub = ?", h.code)).map((x) => [x.employee_id, x]));
+  const ids = people.map((p) => p.employee_id);
+  // every seller's stock: given minus sold, up to today (carried over) plus what moved today
+  const per = new Map();
+  for (const p of people) per.set(p.employee_id, await stockOf(db, p.employee_id, day));
+  const soldAll = await db.all("SELECT l.product_id, SUM(l.qty) AS n FROM sale_lines l JOIN staff s ON s.employee_id = l.employee_id WHERE s.hub = ? AND l.date <= ? GROUP BY l.product_id", h.code, day);
+  const soldMonth = await db.all("SELECT l.product_id, SUM(l.qty) AS n FROM sale_lines l JOIN staff s ON s.employee_id = l.employee_id WHERE s.hub = ? AND l.date >= ? AND l.date <= ? GROUP BY l.product_id", h.code, day.slice(0, 7) + "-01", day);
+  const sold = new Map(soldAll.map((r) => [key(r.product_id), num(r.n)]));
+  const month = new Map(soldMonth.map((r) => [key(r.product_id), num(r.n)]));
+  const rows = products.map((p) => {
+    const x = pool.get(key(p.id)) || { received: 0, given: 0, left: 0 };
+    let withSellers = 0, today = 0, givenToday = 0;
+    for (const m of per.values()) { const s = m.get(key(p.id)); if (s) { withSellers += s.left; today += s.sold; givenToday += s.issued; } }
+    return { product_id: Number(p.id), product: p.name, price: num(p.list_price), status: p.status, received: x.received, given: x.given, in_hub: x.left, with_sellers: withSellers,
+      given_today: givenToday, sold_today: today, sold_month: month.get(key(p.id)) || 0, sold_total: sold.get(key(p.id)) || 0 };
+  }).filter((r) => r.received || r.given || r.with_sellers); // products with no stock movement here are left out, so the list stays short
+  const sellers = people.map((p) => {
+    const m = per.get(p.employee_id);
+    let carried = 0, givenToday = 0, soldToday = 0, left = 0;
+    const items = [];
+    for (const [pid, s] of m) { carried += s.carried; givenToday += s.issued; soldToday += s.sold; left += s.left; if (s.left > 0) items.push({ product: pname.get(key(pid)), left: s.left }); }
+    items.sort((a, b) => b.left - a.left);
+    return { employee_id: p.employee_id, name: p.name, staff_level: p.staff_level, team: teamOf(p, everyone), carried, given_today: givenToday, sold_today: soldToday, left, items };
+  });
+  const received = await db.all("SELECT id, date, product_id, qty, note, created_by FROM hub_issues WHERE hub = ? ORDER BY date DESC, id DESC LIMIT 20", h.code);
+  const gave = ids.length ? await db.all(`SELECT i.id, i.date, i.employee_id, i.product_id, i.qty, i.created_by FROM stock_issues i WHERE i.employee_id = ANY(?::text[]) ORDER BY i.date DESC, i.id DESC LIMIT 20`, ids) : [];
+  const nameOf = new Map(people.map((p) => [p.employee_id, p.name]));
+  const sum = (f) => rows.reduce((t, r) => t + f(r), 0);
+  return {
+    hub: { code: h.code, name: h.name }, date: day,
+    totals: { received: sum((r) => r.received), given: sum((r) => r.given), in_hub: sum((r) => r.in_hub), with_sellers: sum((r) => r.with_sellers), sold_today: sum((r) => r.sold_today), given_today: sum((r) => r.given_today) },
+    products: rows, sellers,
+    received: received.map((r) => ({ id: Number(r.id), date: r.date, product: pname.get(key(r.product_id)), qty: r.qty, note: r.note, by: r.created_by })),
+    gave: gave.map((r) => ({ id: Number(r.id), date: r.date, seller: nameOf.get(r.employee_id) || r.employee_id, product: pname.get(key(r.product_id)), qty: r.qty, by: r.created_by })),
+  };
+}
+
 // The office's view: for every hub (or only the signed-in user's hub) the stock it holds and the latest stock sent to it.
 async function hubSupply(db, { hub } = {}) {
   const hubs = await db.all(`SELECT code, name, status FROM hubs ${hub ? "WHERE code = ?" : ""} ORDER BY code`, ...(hub ? [hub] : []));
@@ -328,4 +375,4 @@ async function takeFromHub(db, user, id) {
   return { deleted: true };
 }
 
-module.exports = { state, sell, undo, endOfDay, morning, give, giveMany, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };
+module.exports = { state, sell, undo, endOfDay, morning, give, giveMany, stockOverview, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };
