@@ -1651,3 +1651,4 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 :root:not([data-theme="dark"]) { --text-3: #586579; --success: #17702f; --warning: #8a4a00; --info: #0369a1; --primary: #0066cc; }
 .mc-x { min-width: 44px; flex: none; }
 .stockc-page .sheet td, .stockc-page .sheet tfoot th { overflow: visible; text-overflow: clip; }
+.mc-chip .mc-x { min-height: 44px; margin-block: -6px; }
