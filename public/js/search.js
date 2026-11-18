@@ -8,7 +8,23 @@ const MAX_PEOPLE = 8;
 const MAX_HUBS = 3;
 const FRESH_MS = 60_000; // the people list is fetched when the box is first used, then reused for a minute
 
+const MAX_RECENT = 5;
+// Edit distance that counts a swap of two neighbouring letters as one slip ("jgean" -> "jegan"), so small typos still find people.
+function slips(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[a.length][b.length];
+}
+
 export function mountSearch(host, { navigate, state, scopeHub }) {
+  const recentKey = () => `pr.recent.${state.user?.username || ""}`;
+  const getRecent = () => { try { return JSON.parse(localStorage.getItem(recentKey()) || "[]"); } catch { return []; } };
+  const addRecent = (it) => { try { const r = [{ kind: it.kind, id: it.id, label: it.label, sub: it.sub, href: it.href }, ...getRecent().filter((x) => x.href !== it.href)].slice(0, MAX_RECENT); localStorage.setItem(recentKey(), JSON.stringify(r)); } catch { /* private mode */ } };
+  let showingRecent = false, fuzzy = false;
   host.innerHTML = `
     <label class="sr-only" for="gs-input">Search people and hubs</label>
     <span class="gs-ico" aria-hidden="true">${icon("search")}</span>
@@ -52,24 +68,39 @@ export function mountSearch(host, { navigate, state, scopeHub }) {
     const hubName = (c) => (state.hubs || []).find((h) => h.code === c)?.name || c;
     const folks = scored.slice(0, MAX_PEOPLE).map(([, s]) => ({ kind: "person", id: s.employee_id, label: s.name,
       sub: `${s.employee_id} · ${levelLabel(s.staff_level)} · ${hubName(s.hub)}${s.status === "active" ? "" : " · inactive"}`, href: `/employees/${encodeURIComponent(s.employee_id)}` }));
+    fuzzy = false;
+    if (!hubs.length && !folks.length && q.length >= 3) { // nothing matched exactly: offer the closest names
+      const near = [];
+      for (const s of people) {
+        const words = norm(s.name).split(/\s+/);
+        const best = Math.min(...tokens.flatMap((t) => [...words, norm(s.employee_id)].map((w) => (Math.abs(w.length - t.length) > 2 ? 9 : Math.min(slips(t, w), slips(t, w.slice(0, t.length)))))));
+        if (best <= (q.length >= 6 ? 2 : 1)) near.push([best + (s.status === "active" ? 0 : 5), s]);
+      }
+      near.sort((a, b) => a[0] - b[0] || a[1].name.localeCompare(b[1].name));
+      const hn = (c) => (state.hubs || []).find((h) => h.code === c)?.name || c;
+      const close = near.slice(0, MAX_PEOPLE).map(([, s]) => ({ kind: "person", id: s.employee_id, label: s.name, sub: `${s.employee_id} · ${levelLabel(s.staff_level)} · ${hn(s.hub)}${s.status === "active" ? "" : " · inactive"}`, href: `/employees/${encodeURIComponent(s.employee_id)}` }));
+      if (close.length) { fuzzy = true; return close; }
+    }
     return [...hubs, ...folks];
   }
 
   function draw(query) {
-    items = search(query);
+    showingRecent = !query.trim();
+    items = showingRecent ? getRecent() : search(query);
     active = items.length ? 0 : -1;
-    if (!query.trim()) return close();
+    if (showingRecent && !items.length) return close();
     let html = "", lastKind = "";
     items.forEach((it, i) => {
-      if (it.kind !== lastKind) { html += `<li role="presentation" class="gs-head">${it.kind === "hub" ? "Hubs" : "People"}</li>`; lastKind = it.kind; }
+      const head = showingRecent ? "Recent" : fuzzy ? "Did you mean" : it.kind === "hub" ? "Hubs" : "People";
+      if (head !== lastKind) { html += `<li role="presentation" class="gs-head">${head}</li>`; lastKind = head; }
       html += `<li role="option" id="gs-o${i}" class="gs-opt" data-i="${i}" aria-selected="${i === active}"><b>${esc(it.label)}</b><span>${esc(it.sub)}</span></li>`;
     });
-    if (!items.length) html = `<li role="presentation" class="gs-none">${loading ? "Searching…" : `No people or hubs match “${esc(query.trim())}”`}</li>`;
+    if (!items.length && !showingRecent) html = `<li role="presentation" class="gs-none">${loading ? "Searching…" : `No people or hubs match “${esc(query.trim())}”`}</li>`;
     list.innerHTML = html;
     list.hidden = false;
     input.setAttribute("aria-expanded", "true");
     mark();
-    announce(items.length ? `${items.length} result${items.length === 1 ? "" : "s"}` : "No results");
+    announce(items.length ? `${items.length} ${showingRecent ? "recent" : fuzzy ? "close" : ""} result${items.length === 1 ? "" : "s"}`.replace("  ", " ") : "No results");
   }
 
   function mark() {
@@ -85,11 +116,12 @@ export function mountSearch(host, { navigate, state, scopeHub }) {
 
   function open(it) {
     if (!it) return;
+    addRecent(it);
     close(); input.value = ""; input.blur();
     navigate(it.href);
   }
 
-  input.addEventListener("focus", () => { load().then(() => { if (input.value.trim() && document.activeElement === input) draw(input.value); }); });
+  input.addEventListener("focus", () => { draw(input.value); load().then(() => { if (input.value.trim() && document.activeElement === input) draw(input.value); }); });
   input.addEventListener("input", () => { load().then(() => { if (document.activeElement === input) draw(input.value); }); draw(input.value); });
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); if (list.hidden) draw(input.value); else { active = items.length ? (active + 1) % items.length : -1; mark(); } }

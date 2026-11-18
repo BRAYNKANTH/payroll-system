@@ -2,9 +2,10 @@ import { get, post, put, qs } from "../api.js";
 import { state, can, scopeHub, navigate } from "../app.js";
 import { isPhone, stepForm } from "../phone.js";
 import { managerGroupOf, teamOrder } from "./shared.js";
-import { exportButtons, $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
+import { readQuery, writeQuery, exportButtons, $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
 let filters = { q: "", role: "", status: "active", group: "hub" };
+const FILTER_DEFAULTS = { q: "", role: "", status: "active", group: "hub" };
 // The list starts with the columns people look for most. The rest are one tap away in "Columns" and the choice is remembered.
 const COLS_KEY = "emp.hiddenCols";
 const DEFAULT_HIDDEN = ["basic_pay", "target", "commission_rate", "bank_account_no"];
@@ -194,6 +195,7 @@ export default {
   title: "Employees",
   async render(ctx) {
     const { el } = ctx;
+    if (!ctx.refresh) readQuery(filters);
     const staff = await get("/api/staff" + qs({ hub: scopeHub() }));
     const byId = Object.fromEntries(staff.map((s) => [s.employee_id, s]));
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
@@ -235,6 +237,7 @@ export default {
       </div>`;
 
     const draw = () => {
+      writeQuery(filters, FILTER_DEFAULTS);
       const q = filters.q.toLowerCase();
       const rows = staff.filter((s) => (!filters.role || s.staff_level === filters.role) && (!filters.status || s.status === filters.status) &&
         (!q || [s.name, s.employee_id, s.phone || "", s.nic || ""].some((x) => x.toLowerCase().includes(q))));

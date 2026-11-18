@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce, confirmDialog } from "../ui.js";
+import { readQuery, writeQuery, exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce, confirmDialog } from "../ui.js";
 import { openBreakdown } from "./breakdown.js";
 
 let filter = "all";
@@ -11,6 +11,7 @@ export default {
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
+    { const o = readQuery({ filter, q: search }); filter = o.filter; search = o.q; }
     const p = state.period;
     const [data, dash] = await Promise.all([get(`/api/payroll/${p}?slim=1`), get("/api/dashboard" + qs({ period: p, hub: scopeHub() }))]);
     const all = data.rows.filter((r) => !scopeHub() || r.hub === scopeHub());
@@ -97,11 +98,13 @@ export default {
       drawTable();
       $$("#pay-filters button", el).forEach((b) => (b.onclick = () => {
         filter = b.dataset.f;
+        writeQuery({ filter, q: search }, { filter: "all", q: "" });
         $$("#pay-filters button", el).forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
         announce(shownText(drawTable()));
       }));
       $("#q").oninput = (e) => {
         search = e.target.value;
+        writeQuery({ filter, q: search }, { filter: "all", q: "" });
         const n = drawTable();
         clearTimeout(typing);
         typing = setTimeout(() => announce(shownText(n)), 600);

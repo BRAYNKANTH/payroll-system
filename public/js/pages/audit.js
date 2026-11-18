@@ -1,6 +1,6 @@
 import { get, qs } from "../api.js";
 import { can } from "../app.js";
-import { exportButtons, $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
+import { readQuery, writeQuery, exportButtons, $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
 
 const MONEY = new Set(["business_amount", "settled_amount", "settle_up_minus", "personal_minus", "business_total", "rent", "hub_fee", "security_cost",
   "personal_draw", "unit_price", "shortfall_value", "amount", "basic_pay", "target", "food_per_day"]);
@@ -53,10 +53,12 @@ const ACTIONS = [["", "Any action"], ["create", "Added"], ["update", "Changed"],
   ["export", "Downloaded"], ["view", "Opened"], ["approve", "Approved"], ["reject", "Rejected"], ["finalize", "Finalized"], ["password_change", "Password changed"], ["denied", "Refused"]];
 const ACCESS = new Set(["session", "export", "view", "backup"]);
 let f = { table: "", action: "", user: "", from: "", to: "", key: "" };
+const AUDIT_BLANK = { table: "", action: "", user: "", from: "", to: "", key: "" };
 
 export default {
   title: "Audit trail",
   async render({ el }) {
+    readQuery(f); writeQuery(f, AUDIT_BLANK);
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Audit trail</h1><p>Who signed in, added, changed, uploaded, downloaded or opened what, when, and from where. Nothing here can be edited or deleted.${can("manage_users") ? "" : " You see your own actions" + (can("view_pay") ? "" : ", without pay") + "."}</p></div>
@@ -91,8 +93,8 @@ export default {
         ],
       }).toString();
     };
-    $("#af").onsubmit = (e) => { e.preventDefault(); f = Object.fromEntries(new FormData(e.target)); load(); };
-    $("#clear").onclick = () => { f = { table: "", action: "", user: "", from: "", to: "", key: "" }; $("#af").reset(); $$reset(); load(); };
+    $("#af").onsubmit = (e) => { e.preventDefault(); f = Object.fromEntries(new FormData(e.target)); writeQuery(f, AUDIT_BLANK); load(); };
+    $("#clear").onclick = () => { f = { ...AUDIT_BLANK }; writeQuery(f, AUDIT_BLANK); $("#af").reset(); $$reset(); load(); };
     const $$reset = () => [...$("#af").elements].forEach((i) => { if (i.name) i.value = ""; });
     $("#csv").onclick = () => downloadCsv("audit-trail.csv", ["when", "who", "area", "record", "action", "old_value", "new_value", "address", "browser"],
       rows.map((a) => [a.changed_at, a.changed_by, a.table_name, a.row_key, a.action, a.old_value || "", a.new_value || "", a.ip || "", a.agent || ""]));

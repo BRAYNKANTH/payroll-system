@@ -1,6 +1,6 @@
 import { get } from "../api.js";
 import { state, scopeHub } from "../app.js";
-import { $, html, icon, money, badge, dataTable, emptyState, monthName, levelLabel, announce } from "../ui.js";
+import { readQuery, writeQuery, $, html, icon, money, badge, dataTable, emptyState, monthName, levelLabel, announce } from "../ui.js";
 import { openPayslip } from "./breakdown.js";
 
 let q = "";
@@ -9,6 +9,7 @@ export default {
   title: "Payslips",
   periodic: true,
   async render({ el }) {
+    q = readQuery({ q }).q;
     const p = state.period;
     const data = await get(`/api/payroll/${p}?slim=1`);
     const rows = data.rows.filter((r) => !scopeHub() || r.hub === scopeHub());
@@ -47,6 +48,7 @@ export default {
     let typing;
     $("#q")?.addEventListener("input", (e) => {
       q = e.target.value;
+      writeQuery({ q }, { q: "" });
       const n = draw();
       clearTimeout(typing);
       typing = setTimeout(() => announce(`${n} payslip${n === 1 ? "" : "s"} shown`), 600);

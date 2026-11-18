@@ -271,6 +271,14 @@ export function modal({ title, body, foot = "", wide = false, onClose }) {
 // ---- form labels
 // Pages write `<div class="field"><label>Name</label><input …></div>`; this links each label to its
 // control (for/id) so screen readers announce it and clicking the label focuses the field.
+// Filters live in the address (?q=…&status=…), so Back, bookmarks and shared links show the same view.
+export function readQuery(obj) { const sp = new URLSearchParams(location.search); for (const k of Object.keys(obj)) if (sp.has(k)) obj[k] = sp.get(k); return obj; }
+export function writeQuery(obj, defaults = {}) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(obj)) if (v !== (defaults[k] ?? "")) sp.set(k, v);
+  const s = sp.toString();
+  history.replaceState(history.state, "", location.pathname + (s ? "?" + s : ""));
+}
 export function linkLabels(root = document) {
   root.querySelectorAll(".field").forEach((f) => {
     const label = f.querySelector(":scope > label");

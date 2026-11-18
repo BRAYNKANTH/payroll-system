@@ -57,10 +57,11 @@ const NAV = [
 const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
   { re: /^\/account$/, page: "account", nav: null },
+  { re: /^\/help$/, page: "help", nav: null },
   { re: /^\/me\/payslips\/(\d{4}-\d{2})$/, page: "payslip", nav: null, perm: "self" },
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
-const isStaff = () => state.user?.role === "staff";
+export const isStaff = () => state.user?.role === "staff";
 // ---------------------------------------------------------------- hub-first navigation
 // The company menu is short and depends on who signed in. Opening a hub opens that hub's workspace: five sections, each with its own pages,
 // all showing that hub only. Pages that already existed are reused: the hub is fixed by the address (see scopeHub).
@@ -240,6 +241,7 @@ function shell() {
           </button>
           <div class="menu" id="user-menu" hidden>
             <div style="padding:8px 10px"><b>${esc(u.full_name)}</b><div class="faint text-sm">${esc(u.username)} · ${esc(roleText(u.role))}</div></div><hr>
+            <a href="/help" data-link id="menu-help">${icon("info")} Help</a>
             <a href="/account" data-link id="menu-account">${icon("lock")} Change password</a>
             <button type="button" id="logout">${icon("logout")} Sign out</button>
           </div>
@@ -477,10 +479,10 @@ function drawBar(route) {
   } else bar.innerHTML = "";
 }
 
-export async function render({ moveFocus = false } = {}) {
+export async function render({ moveFocus = false, restoreY = 0 } = {}) {
   const seq = ++renderSeq;
   dirtyCheck = null;
-  if (isStaff() && !["/me", "/account"].includes(location.pathname) && !/^\/me\/payslips\/\d{4}-\d{2}$/.test(location.pathname)) history.replaceState({}, "", "/me");
+  if (isStaff() && !["/me", "/account", "/help"].includes(location.pathname) && !/^\/me\/payslips\/\d{4}-\d{2}$/.test(location.pathname)) { const was = location.pathname; history.replaceState({}, "", "/me"); if (was !== "/") toast("That page isn't available to you, so here is your page.", "warn"); }
   const route = resolve(location.pathname);
   const { page, nav, params, perm, ws } = route;
   state.routeHub = ws ? ws.hub : "";
@@ -514,7 +516,7 @@ export async function render({ moveFocus = false } = {}) {
     if (seq !== renderSeq) return;
     drawBar(route);
     $("#crumbs").innerHTML = crumbsFor(route, mod);
-    document.title = `${mod.title} · ${state.settings.company_name || "Payroll"}`;
+    document.title = `${ws ? `${ws.subLabel} · ${state.hubs.find((h) => h.code === ws.hub)?.name || ws.hub}` : mod.title} · ${state.settings.company_name || "Payroll"}`;
     view.dataset.page = page; // lets the styles treat every page the same way
     document.body.dataset.page = page;
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
@@ -528,7 +530,7 @@ export async function render({ moveFocus = false } = {}) {
       // Move focus to the new page's heading so screen readers announce it and Tab starts at the content.
       const h1 = view.querySelector("h1");
       if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); } else view.focus({ preventScroll: true });
-      window.scrollTo(0, 0);
+      window.scrollTo(0, restoreY);
     }
   } catch (err) {
     if (seq !== renderSeq) return;
@@ -548,19 +550,25 @@ document.addEventListener("click", (e) => {
   navigate(a.getAttribute("href"));
 });
 // Back/forward: if the page has unsaved edits, stay put unless the user confirms.
-let currentPath = location.pathname;
+let currentPath = location.pathname + location.search;
 const _push = history.pushState.bind(history);
-history.pushState = (s, t, url) => { _push(s, t, url); currentPath = location.pathname; };
+// Back returns to where you were on the page: remember the scroll position of each address as you leave it.
+history.scrollRestoration = "manual";
+const scrollAt = new Map();
+history.pushState = (s, t, url) => { scrollAt.set(currentPath, window.scrollY); _push(s, t, url); currentPath = location.pathname + location.search; };
+const _replace = history.replaceState.bind(history);
+history.replaceState = (s, t, url) => { _replace(s, t, url); currentPath = location.pathname + location.search; };
 window.addEventListener("popstate", async () => {
   if (!state.user) return;
-  const target = location.pathname;
+  const target = location.pathname + location.search;
+  scrollAt.set(currentPath, window.scrollY);
   if (dirtyCount()) {
     _push({}, "", currentPath);              // undo the URL change while we ask
     if (!(await confirmLeave())) return;
     history.pushState({}, "", target);
   }
-  currentPath = location.pathname;
-  render({ moveFocus: true });
+  currentPath = location.pathname + location.search;
+  render({ moveFocus: true, restoreY: scrollAt.get(currentPath) || 0 });
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sidebarOpen) setSidebar(false); });
 setUnauthorizedHandler(() => { if (state.user) { toast("Your session ended — please sign in again", "warn"); state.user = null; boot(); } });

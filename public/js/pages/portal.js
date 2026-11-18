@@ -66,7 +66,7 @@ const plain = (label) => {
 };
 
 // Short, plain meanings for the words on this page.
-const GLOSSARY = [
+export const GLOSSARY = [
   ["Estimate", "A guess made from the days entered so far. It can change until the office closes the month."],
   ["Target", "The amount of sales you are asked to reach in a month."],
   ["Extra pay above target", "Extra money for the sales you make above your target."],
@@ -137,6 +137,8 @@ export default {
     const d = await get("/api/me/portal?period=" + state.period);
     const me = d.me, m = d.month;
     if (!tabInit) { tabInit = true; tab = me.sells ? "sell" : "month"; }
+    // The section is in the address (?tab=payslips), so Back moves between sections and a section can be bookmarked or shared.
+    if (!ctx.refresh) { const q = new URLSearchParams(location.search).get("tab") || history.state?.tab; if (q) tab = q; else if (location.pathname === "/me") history.replaceState({ tab }, "", location.href); }
     const attain = m.target ? m.business / m.target : 0;
     const pay = d.official || d.estimate;
     const final = !!d.official;
@@ -323,6 +325,7 @@ export default {
       if (tab === b.dataset.t) return;
       buzz(6);
       const was = tab; tab = b.dataset.t;
+      history.pushState({ tab }, "", `${location.pathname}?tab=${tab}`);
       if (was === "sell" && dirty) { dirty = false; this.render({ ...ctx, refresh: true }); } else show();
     }));
     if (!panes[tab] || (tab === "loans" && !d.loans.length)) tab = "month";
