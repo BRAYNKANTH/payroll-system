@@ -1444,3 +1444,151 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 @media (max-width: 860px) { .hubc-head, .hubc-body, .hubc-foot { padding-inline: 16px; } }
 .hubc-foot .btn, .hubc .hub-link { min-height: 44px; }
 .hubc .hub-link { display: inline-flex; align-items: center; }
+
+/* ---------- Hub overview: the chain and the member list ---------- */
+.hubpage .btn, .page-head .btn { min-height: 44px; }
+.cn-root, .cn-kids { list-style: none; margin: 0; padding: 0; }
+.cn-kids { margin-left: 20px; padding-left: 14px; border-left: 2px solid var(--border); }
+.cn-item { margin: 8px 0; }
+.cn { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); text-decoration: none; color: inherit; }
+.cn:hover { border-color: var(--primary); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.08)); }
+.cn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.cn-av { width: 36px; height: 36px; font-size: 13px; flex: none; }
+.cn-who { flex: 1; min-width: 0; font-size: 15px; }
+.cn-sub { display: block; font-size: 14px; color: var(--text-3); }
+.cn-sales { text-align: right; display: flex; flex-direction: column; font-size: 14px; color: var(--text-3); }
+.cn-sales b { font-size: 17px; color: var(--text); font-variant-numeric: tabular-nums; }
+.hubpage .table-wrap { max-height: 70vh; overflow: auto; }
+.hubpage .table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-2, var(--surface)); }
+.hubpage .table td .btn.sm, .hubpage .table td a.btn { min-height: 44px; }
+@media (max-width: 860px) { .cn-kids { margin-left: 10px; padding-left: 8px; } .cn { padding: 10px; } }
+
+/* ---------- Employees: touch-size filters and row actions, readable small text ---------- */
+.emp-page .btn, .emp-page .btn.sm, .emp-page .input.sm, .emp-page .seg button, .emp-page .colpick summary { min-height: 44px; }
+.emp-page .seg button { padding-inline: 14px; }
+.emp-page .group-link { display: inline-flex; align-items: center; min-height: 44px; }
+.emp-page .colpick-menu label { min-height: 44px; display: flex; align-items: center; gap: 10px; }
+.emp-page .table .who span, .emp-page .mc-sub, .emp-page .badge { font-size: 14px; }
+.emp-page .table td .btn { padding-inline: 12px; }
+
+/* ---------- Employee profile: touch-size actions and tabs, readable detail text ---------- */
+.emp-profile .btn, .emp-profile .btn.sm { min-height: 44px; }
+.emp-profile .mb-3 > a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 15px; }
+.emp-profile .tabs button { min-height: 44px; font-size: 15px; }
+.emp-profile .kv dt, .emp-profile .kv dd, .emp-profile .faint.text-sm, .emp-profile .card-head .sub { font-size: 14.5px; }
+.emp-profile .kv a { display: inline-block; padding: 12px 0; margin: -12px 0; }
+.emp-profile .stat-lg { font-variant-numeric: tabular-nums; }
+.emp-profile .profile-head { gap: 16px 28px; }
+
+/* ---------- Daily sheet: roomy entry cells, touch-size controls, readable small text ---------- */
+.daily-page .btn, .daily-page .btn.sm, .daily-page .seg button, .daily-page .input, .daily-page .sheet input.text { min-height: 44px; }
+.daily-page .sheet td, .daily-page .sheet th.name { padding-block: 6px; }
+.daily-page .sheet td input { font-variant-numeric: tabular-nums; }
+.daily-page .dstat span, .daily-page .dg-title small, .daily-page .dg-nums small, .daily-page .sheet .faint, .daily-page .badge, .daily-page .dg-prog { font-size: 14px; }
+.daily-page .dg-nums b, .daily-page .dstat b { font-variant-numeric: tabular-nums; }
+.daily-page details.dgrp > summary { min-height: 56px; }
+.daily-page .savebar .btn { min-width: 120px; }
+.daily-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); }
+.daily-page .sheet input:disabled { background: transparent; border-color: transparent; }
+.daily-page .sheet input:focus { border-color: var(--primary); }
+.daily-page .seg button { padding-inline: 14px; }
+
+/* ---------- Live sales: names stay on one line, touch-size controls, readable small text ---------- */
+.live-page .btn, .live-page .btn.sm, .live-page .tabs button { min-height: 44px; }
+.live-page .tabs button { font-size: 15px; }
+.live-page .table td:first-child { min-width: 150px; white-space: nowrap; }
+.live-page .table td:nth-child(2) { min-width: 220px; }
+.live-page .table .text-sm, .live-page .table .faint, .live-page .badge { font-size: 14px; }
+.live-page .table td .num, .live-page .table td b { font-variant-numeric: tabular-nums; }
+.live-page .pager .btn, .live-page .table-more .btn { min-height: 44px; }
+
+/* ---------- Weekly sheet: roomy entry cells, touch-size week buttons, readable small text ---------- */
+.weekly-page .btn, .weekly-page .btn.sm, .weekly-page .seg button, .weekly-page .tabs button { min-height: 44px; }
+.weekly-page .seg button { padding-inline: 14px; font-size: 15px; }
+.weekly-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
+.weekly-page .sheet input:disabled { background: transparent; border-color: transparent; }
+.weekly-page .sheet input:focus { border-color: var(--primary); }
+.weekly-page .faint, .weekly-page .text-sm, .weekly-page .badge, .weekly-page .card-head .sub, .weekly-page .seg small { font-size: 14px; }
+.weekly-page .table td, .weekly-page .table th { font-variant-numeric: tabular-nums; }
+
+/* ---------- Stock count: roomy entry cells, touch-size controls, readable small text ---------- */
+.stockc-page .btn, .stockc-page .btn.sm, .stockc-page .btn.icon, .stockc-page .input { min-height: 44px; }
+.stockc-page .btn.icon { min-width: 44px; }
+.stockc-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
+.stockc-page .sheet input:disabled { background: transparent; border-color: transparent; }
+.stockc-page .sheet input:focus { border-color: var(--primary); }
+.stockc-page .sheet th { white-space: nowrap; }
+.stockc-page .faint, .stockc-page .text-sm, .stockc-page .badge, .stockc-page .muted { font-size: 14px; }
+
+/* ---------- Hub stock sheet: roomy entry cells, touch-size controls, readable small text ---------- */
+.hubsheet-page .btn, .hubsheet-page .btn.sm, .hubsheet-page .btn.icon, .hubsheet-page .input { min-height: 44px; }
+.hubsheet-page .btn.icon { min-width: 44px; }
+.hubsheet-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
+.hubsheet-page .sheet input:disabled { background: transparent; border-color: transparent; }
+.hubsheet-page .sheet input:focus { border-color: var(--primary); }
+.hubsheet-page .sheet th { white-space: nowrap; }
+.hubsheet-page .faint, .hubsheet-page .text-sm, .hubsheet-page .badge, .hubsheet-page .muted { font-size: 14px; }
+
+/* ---------- Allowances: touch-size row actions, readable small text ---------- */
+.allow-page .btn, .allow-page .btn.sm, .allow-page .btn.icon, .allow-page .input { min-height: 44px; }
+.allow-page .btn.icon, .allow-page .btn.sm.ghost { min-width: 44px; }
+.allow-page .table .who span, .allow-page .muted, .allow-page .badge { font-size: 14px; }
+.allow-page .table td, .allow-page .table th { font-variant-numeric: tabular-nums; }
+/* Side panels (add and edit forms) are shared by many pages: touch-size controls everywhere */
+.drawer .btn, .drawer .btn.icon, .drawer .input, .drawer select.input { min-height: 44px; }
+.drawer .btn.icon { min-width: 44px; }
+.drawer .field label { font-size: 15px; }
+.drawer .field .hint, .drawer .field-error { font-size: 14px; }
+.req { font-weight: 400; color: var(--text-3); font-size: 14px; }
+
+/* ---------- Stock to hubs: touch-size actions, readable small text ---------- */
+.hsup-page .btn, .hsup-page .btn.sm, .hsup-page .mc-x { min-height: 44px; }
+.hsup-page .mc-x { min-width: 44px; }
+.hsup-page .muted, .hsup-page .faint, .hsup-page .text-sm, .hsup-page small, .hsup-page th { font-size: 14px; }
+.hsup-page td, .hsup-page th { font-variant-numeric: tabular-nums; }
+.give-list .mc-x { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
+
+/* ---------- Every page: touch-size controls and readable small text (one rule set, so all pages match) ---------- */
+#view[data-page] .btn, #view[data-page] .btn.sm, #view[data-page] .seg button, #view[data-page] .tabs button,
+#view[data-page] select.input, #view[data-page] .input.sm, #view[data-page] .colpick summary, #view[data-page] .more-figures > summary { min-height: 44px; }
+#view[data-page] .btn.icon { min-width: 44px; }
+#view[data-page] .seg button { padding-inline: 14px; }
+#view[data-page] .tabs button { font-size: 15px; }
+#view[data-page] .muted, #view[data-page] .faint, #view[data-page] .text-sm, #view[data-page] .badge, #view[data-page] .card-head .sub,
+#view[data-page] .table .who span, #view[data-page] .hint, #view[data-page] .legend, #view[data-page] .kv dt { font-size: 14px; }
+#view[data-page] .table td a[data-link], #view[data-page] .list-item a[data-link] { display: inline-flex; align-items: center; min-height: 44px; }
+#view[data-page] .table td, #view[data-page] .table th { font-variant-numeric: tabular-nums; }
+#view[data-page] .chip, #view[data-page] .menu a, #view[data-page] .menu button { font-size: 14px; }
+#view[data-page] .menu a, #view[data-page] .menu button, #view[data-page] .dropdown a, #view[data-page] .dropdown button { min-height: 44px; display: flex; align-items: center; }
+#view[data-page] .more-list a, #view[data-page] .more-list button { min-height: 44px; display: flex; align-items: center; font-size: 15px; }
+#view[data-page] input.input, #view[data-page] select.input { min-height: 44px; }
+@media (max-width: 520px) {
+  .grid.kpis .kpi .value, .dash .kpi .value { font-size: 21px; overflow-wrap: normal; white-space: nowrap; }
+  .grid.kpis .kpi .value small { font-size: 13px; }
+}
+/* second pass: table headers, small print and chips read at 14px on every page */
+#view[data-page] .table th, #view[data-page] .sheet th, #view[data-page] small, #view[data-page] .dg-prog, #view[data-page] .seg button,
+#view[data-page] .hub-nums small, #view[data-page] .dg-nums small, #view[data-page] .num.faint, #view[data-page] .faint { font-size: 14px; }
+#view[data-page] .h-chip, #view[data-page] .s-sub, #view[data-page] .g-head, #view[data-page] .hub-top span, #view[data-page] .hub-nums span,
+#view[data-page] .hub-chips .badge, #view[data-page] .list-item .num { font-size: 14px; }
+/* day picker on a phone: previous, the date, next, in one line */
+.daynav { flex-wrap: wrap; width: 100%; }
+.daynav > div { flex: 1 1 140px; min-width: 0; text-align: center; }
+.daynav b { font-size: 16px; }
+@media (min-width: 861px) { .daynav { width: auto; } .daynav > div { flex: none; text-align: left; } }
+.daynav #d-today { flex: none; }
+
+/* Morning stock on a phone: each seller is a card, with the Give stock button always in view */
+@media (max-width: 700px) {
+  .msheet thead { display: none; }
+  .msheet, .msheet tbody, .msheet tr, .msheet td, .msheet th { display: block; width: 100%; }
+  .msheet tr { padding: 14px 16px; border-top: 1px solid var(--border); }
+  .msheet th.name { padding: 0 0 8px; position: static; background: none; }
+  .msheet td { padding: 6px 0; border: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: right; }
+  .msheet td[data-label]::before { content: attr(data-label); color: var(--text-3); font-size: 14px; flex: none; text-align: left; }
+  .msheet td .mc-chips { justify-content: flex-end; }
+  .msheet .give-cell { padding-top: 10px; }
+  .msheet .give-cell .btn { width: 100%; justify-content: center; }
+}
+@media (max-width: 700px) { .msheet th.name { border: 0; box-shadow: none; min-width: 0; } }
+#view[data-page] th, #view[data-page] .tp-left { font-size: 14px; }

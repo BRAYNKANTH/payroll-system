@@ -27,32 +27,57 @@ export default {
           <button type="button" class="btn sm ghost" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">${icon("x")}</button></li>`)}</ul></div>` : ""}
     </article>`;
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="hsup-page">
       <div class="page-head">
         <div><h1>Stock to hubs</h1><p>Send products to a hub. The hub's coacher then gives the stock out to the sellers, and can only give what the hub holds.</p></div>
       </div>
       ${noProducts ? html`<div class="card">${emptyState("No products yet", "Add your products first, then send them to the hubs.", "box", `<a class="btn primary" href="/products" data-link>Add products</a>`)}</div>`
-        : html`<div class="grid three">${d.hubs.map(card)}</div>`}`;
+        : html`<div class="grid three">${d.hubs.map(card)}</div>`}</div>`;
 
     $$("[data-send]", el).forEach((b) => (b.onclick = () => {
       const h = d.hubs.find((x) => x.code === b.dataset.send);
+      const cart = new Map(); // product id -> qty
       const dr = drawer({
         title: `Send stock to ${h.name}`,
         body: html`<div class="give">
-          <p class="muted" style="margin-top:0">Enter how many of each product you are sending. Leave the rest at 0.</p>
-          <ul class="give-list" role="list">${h.stock.map((x) => html`<li><label for="s${x.product_id}"><b>${x.product}</b><span class="muted">${rs(x.price)} · ${x.left} in the hub now</span></label>
-            <input class="input" id="s${x.product_id}" data-pid="${x.product_id}" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" maxlength="5" aria-label="Quantity of ${x.product} to send"></li>`)}</ul>
+          <p class="muted" style="margin-top:0">Search a product and tap it to add it, then set how many you are sending.</p>
+          <div class="till-search"><span aria-hidden="true">${icon("search")}</span><input id="sq" class="input" type="search" autocomplete="off" placeholder="Search products" aria-label="Search products"></div>
+          <ul class="give-list" id="s-results" role="list" aria-label="Products"></ul>
+          <h3 class="section-title" style="margin:16px 0 8px">To send <span class="muted" id="s-count"></span></h3>
+          <ul class="give-list" id="s-cart" role="list" aria-label="Products to send"></ul>
           <div class="field" style="margin-top:14px"><label for="s-note">Note (optional)</label><input class="input" id="s-note" maxlength="200" placeholder="For example: Monday delivery"></div></div>`.toString(),
-        foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="send-save">Send stock</button>`,
+        foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="send-save" disabled>Send stock</button>`,
       });
-      $("#send-save", dr.panel).onclick = (e) => busy(e.currentTarget, async () => {
-        const lines = $$("[data-pid]", dr.panel).map((i) => ({ product_id: Number(i.dataset.pid), qty: Number(i.value) })).filter((l) => l.qty > 0);
+      const q = $("#sq", dr.panel), res = $("#s-results", dr.panel), cartEl = $("#s-cart", dr.panel), save = $("#send-save", dr.panel);
+      const prod = (id) => h.stock.find((x) => x.product_id === Number(id));
+      const total = () => [...cart.values()].reduce((a, n) => a + n, 0);
+      const drawResults = () => {
+        const t = q.value.trim().toLowerCase();
+        const list = h.stock.filter((x) => !cart.has(x.product_id) && (!t || x.product.toLowerCase().includes(t))).slice(0, 8);
+        res.innerHTML = list.length ? list.map((x) => html`<li><button type="button" class="give-pick" data-add="${x.product_id}"><span><b>${x.product}</b><span class="muted"> ${rs(x.price)} · ${x.left} in the hub now</span></span><span class="btn sm">Add</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
+      };
+      const drawCart = () => {
+        cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).product}</b><span class="muted">${prod(id).left} in the hub now</span></label>
+          <input class="input" id="c${id}" data-cid="${id}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" value="${n}" aria-label="Quantity of ${prod(id).product} to send">
+          <button type="button" class="mc-x" data-rm="${id}" aria-label="Remove ${prod(id).product}">${icon("x")}</button></li>`).join("") : `<li class="muted" style="padding:8px 2px">Nothing added yet</li>`;
+        $("#s-count", dr.panel).textContent = cart.size ? `· ${total()} pieces` : "";
+        save.disabled = !cart.size;
+      };
+      const add = (id) => { cart.set(Number(id), 1); drawCart(); drawResults(); $(`#c${id}`, dr.panel)?.select(); };
+      q.oninput = drawResults;
+      q.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); const f = $("[data-add]", res); if (f) { add(f.dataset.add); q.value = ""; drawResults(); } } };
+      res.onclick = (e) => { const bt = e.target.closest("[data-add]"); if (bt) { add(bt.dataset.add); q.focus(); } };
+      cartEl.onclick = (e) => { const bt = e.target.closest("[data-rm]"); if (bt) { cart.delete(Number(bt.dataset.rm)); drawCart(); drawResults(); } };
+      cartEl.oninput = (e) => { const i = e.target.closest("[data-cid]"); if (i) { i.value = i.value.replace(/\D/g, ""); cart.set(Number(i.dataset.cid), Number(i.value) || 0); $("#s-count", dr.panel).textContent = `· ${total()} pieces`; } };
+      save.onclick = (e) => busy(e.currentTarget, async () => {
+        const lines = [...cart].map(([product_id, qty]) => ({ product_id, qty })).filter((l) => l.qty > 0);
         if (!lines.length) throw new Error("Enter a quantity for at least one product");
         await post("/api/hub-stock", { hub: h.code, lines, note: $("#s-note", dr.panel).value });
         toast(`Stock sent to ${h.name}`);
         dr.close();
         await this.render(ctx);
       });
+      drawResults(); drawCart(); q.focus();
     }));
 
     $$("[data-del]", el).forEach((b) => (b.onclick = async () => {

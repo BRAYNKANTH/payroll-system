@@ -29,7 +29,7 @@ export default {
     const editable = can("enter_data") && !locked;
     const threshold = Number(state.settings.stock_shortfall_threshold || 0);
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="stockc-page">
       <div class="page-head">
         <div><h1>Stock count</h1><p>Shortfall = opening + issued − sold − counted. Its value is deducted from the seller's pay as settle-up.</p></div>
         <div class="actions">${editable ? html`
@@ -41,7 +41,7 @@ export default {
       <div class="card">${lines.length && !isPhone() ? html`<div class="card-head">${findBox("Search stock lines", "Search person or product")}<span class="muted" id="find-count"></span></div>` : ""}
         <div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
-          <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save stock count</button></div>` : ""}</div>`;
+          <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save stock count</button></div>` : ""}</div></div>`;
 
     const grid = $("#grid");
     let rows = lines.map((l) => ({ ...l, _state: "saved" }));

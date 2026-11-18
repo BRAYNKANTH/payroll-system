@@ -29,27 +29,27 @@ export default {
 
     const node = (s, depth) => {
       const n = count(s.employee_id), own = sales[s.employee_id]?.business || 0;
-      return html`<li style="margin:6px 0">
-        <a href="/employees/${s.employee_id}" data-link class="row" style="gap:10px;padding:8px 10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;text-decoration:none;color:inherit;flex-wrap:wrap">
-          <div class="avatar" style="width:30px;height:30px;font-size:11px">${initials(s.name)}</div>
-          <div style="flex:1;min-width:140px"><b>${s.name}</b> <span class="faint">${s.employee_id}</span><br><span class="faint" style="font-size:12px">${levelLabel(s.staff_level)}${n ? ` · ${n} below` : ""}</span></div>
-          <div style="text-align:right"><b class="num">${compact(own)}</b><div class="faint" style="font-size:11.5px">${n ? `team ${compact(total(s.employee_id))}` : "own sales"}</div></div>
+      return html`<li class="cn-item">
+        <a href="/employees/${s.employee_id}" data-link class="cn">
+          <span class="avatar cn-av" aria-hidden="true">${initials(s.name)}</span>
+          <span class="cn-who"><b>${s.name}</b> <span class="faint">${s.employee_id}</span><span class="cn-sub">${levelLabel(s.staff_level)}${n ? ` · ${n} below` : ""}</span></span>
+          <span class="cn-sales"><b class="num">${compact(own)}</b><span>${n ? `team ${compact(total(s.employee_id))}` : "own sales"}</span></span>
         </a>
-        ${(kids[s.employee_id] || []).length ? html`<ul style="list-style:none;margin:0 0 0 18px;padding-left:12px;border-left:2px solid var(--border,#e5e7eb)">${(kids[s.employee_id] || []).map((c) => node(c, depth + 1))}</ul>` : ""}
+        ${(kids[s.employee_id] || []).length ? html`<ul class="cn-kids">${(kids[s.employee_id] || []).map((c) => node(c, depth + 1))}</ul>` : ""}
       </li>`;
     };
     const tops = kids[""] || [];
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>${hub.name}</h1><p>${hub.code}${hub.location ? ` · ${hub.location}` : ""} · ${active.length} active ${active.length === 1 ? "member" : "members"} · sales ${compact(live.people.reduce((t, p) => t + p.business, 0))} this month</p></div>
+        <div><h1>Overview</h1><p>${hub.name} · ${hub.code}${hub.location ? ` · ${hub.location}` : ""} · ${active.length} active ${active.length === 1 ? "member" : "members"} · sales ${compact(live.people.reduce((t, p) => t + p.business, 0))} this month</p></div>
         <div class="actions">
           ${can(["manage_staff", "manage_team"]) ? html`<a class="btn primary" href="/hubs/${encodeURIComponent(code)}/people" data-link>${icon("users")} People in this hub</a>` : ""}
         </div>
       </div>
-      <div class="card mb-4"><div class="card-head"><h2>Reporting chain</h2><div class="sub">Top of the chain first. Tap anyone to open their record.</div></div>
-        <div class="card-body">${tops.length ? html`<ul style="list-style:none;margin:0;padding:0">${tops.map((s) => node(s, 0))}</ul>` : emptyState("No members yet", "Add employees to this hub and set who each reports to.", "users")}</div></div>
-      <div class="card"><div class="card-head"><h2>Members</h2></div><div class="card-body flush" id="mem"></div></div>`.toString();
+      <div class="card mb-4 hubpage"><div class="card-head"><div><h2>Reporting chain</h2><div class="sub">Top of the chain first. Tap anyone to open their record.</div></div></div>
+        <div class="card-body">${tops.length ? html`<ul class="cn-root">${tops.map((s) => node(s, 0))}</ul>` : emptyState("No members yet", "Add employees to this hub and set who each reports to.", "users")}</div></div>
+      <div class="card hubpage"><div class="card-head"><div><h2>Members</h2><div class="sub">${members.length} in total, grouped by position</div></div></div><div class="card-body flush" id="mem"></div></div>`.toString();
 
     // Members are grouped by position, in chain order: coacher first, then promoting manager, manager, supervisor, distributor.
     const lvl = (s) => LEVELS.findIndex(([v]) => v === (s.staff_level || (s.role === "manager" ? "manager" : "distributor")));
@@ -66,7 +66,7 @@ export default {
         { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
         { key: "upline_id", label: "Reports to", render: (s) => (up(s) && byId[up(s)] ? byId[up(s)].name : html`<span class="faint">—</span>`) },
         { key: "sales", label: "Sales this month", render: (s) => html`<span class="num">${compact(sales[s.employee_id]?.business || 0)}</span>` },
-        { key: "report", label: "Report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
+        { key: "report", label: "Report", sort: false, render: (s) => html`<a class="btn" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
         { key: "status", label: "Status", render: (s) => badge(s.status) },
       ],
     }).toString();

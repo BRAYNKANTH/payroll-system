@@ -23,7 +23,7 @@ export default {
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
     const editable = can("enter_data") && !locked;
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="hubsheet-page">
       <div class="page-head">
         <div><h1>Hub stock sheet</h1><p>Each hub's stock for the month. Expected = opening + received − given out. Difference = expected − counted.</p></div>
         <div class="actions">${editable ? html`
@@ -35,7 +35,7 @@ export default {
       <div class="card">${lines.length && !isPhone() ? html`<div class="card-head">${findBox("Search hub stock", "Search hub or product")}<span class="muted" id="find-count"></span></div>` : ""}
         <div class="card-body flush" id="grid"></div>
         ${editable ? html`<div class="row between card-foot">
-          <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save hub stock</button></div>` : ""}</div>`;
+          <span class="muted" id="info"></span><button type="button" class="btn primary" id="save">${icon("check")} Save hub stock</button></div>` : ""}</div></div>`;
 
     const grid = $("#grid");
     let rows = lines.map((l) => ({ ...l, _state: "saved" }));

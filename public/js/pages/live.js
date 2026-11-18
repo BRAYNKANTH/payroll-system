@@ -13,13 +13,13 @@ export default {
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="live-page">
       <div class="page-head">
         <div><h1>Live sales</h1><p>Every sale as it is entered, and how far each person is from their target.<span id="pay-note"></span></p></div>
         <div class="actions">${exportButtons("live", { period: state.period, hub: scopeHub() })}<button class="btn" id="refresh">${icon("refresh")} Refresh</button><button class="btn primary" id="confirm-all" hidden>${icon("check")} Confirm all</button></div>
       </div>
       <div class="tabs" id="tabs">${[["feed", "Sales feed"], ["people", "By person"]].map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
-      <div id="pane"><div class="loading-screen"><div class="spinner"></div></div></div>`;
+      <div id="pane"><div class="loading-screen"><div class="spinner"></div></div></div></div>`;
 
     let data = null;
     const load = async () => {

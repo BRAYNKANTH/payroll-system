@@ -499,6 +499,7 @@ export async function render({ moveFocus = false } = {}) {
     drawBar(route);
     $("#crumbs").innerHTML = crumbsFor(route, mod);
     document.title = `${mod.title} · ${state.settings.company_name || "Payroll"}`;
+    view.dataset.page = page; // lets the styles treat every page the same way
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");

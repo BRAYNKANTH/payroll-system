@@ -214,13 +214,13 @@ export default {
     ];
 
     el.innerHTML = html`
-      <div class="page-head">
+      <div class="page-head emp-page">
         <div><h1>Employees</h1><p>${staff.filter((s) => s.status === "active").length} active · ${LEVELS.map(([v]) => [staff.filter((s) => s.staff_level === v && s.status === "active").length, v]).filter(([n]) => n)
           .map(([n, v]) => `${n} ${levelLabel(v, n).toLowerCase()}`).join(" · ")}</p></div>
         <div class="actions">${can("read") ? exportButtons("employees", { hub: scopeHub() }) : ""}${can("manage_staff") || can("manage_team") ? html`<button class="btn primary" id="add" ${state.hubs.length ? "" : "disabled"}>${icon("plus")} Add employee</button>` : ""}</div>
       </div>
       ${!state.hubs.length ? html`<div class="alert warn mb-4">${icon("alert")}<div>Create at least one hub before adding employees. <a href="/hubs" data-link>Go to hubs →</a></div></div>` : ""}
-      <div class="card">
+      <div class="card emp-page">
         <div class="card-head">
           <div class="row">
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>

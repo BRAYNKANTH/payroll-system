@@ -34,7 +34,7 @@ export default {
         <div><h1>Morning stock</h1><p>${overview ? "Each hub's coacher gives the stock out to the sellers. Here you see every hub, its coacher, what the hub holds and how much has been given out." : "Give each seller the stock they take out today. They see it on their phone and can only sell what they have."}</p></div>
       </div>
       <div class="card mb-4"><div class="card-body row between" style="gap:12px;flex-wrap:wrap">
-        <div class="row" style="gap:8px;align-items:center">
+        <div class="row daynav" style="gap:8px;align-items:center">
           <button type="button" class="btn icon" id="d-prev" aria-label="Previous day">${icon("left")}</button>
           <div><b style="font-size:17px">${label(day)}</b>${isToday ? html` <span class="badge green">Today</span>` : ""}</div>
           <button type="button" class="btn icon" id="d-next" aria-label="Next day" ${day >= today ? "disabled" : ""}>${icon("right")}</button>
@@ -63,9 +63,9 @@ export default {
             <thead><tr><th scope="col">Seller</th><th scope="col">Carried over</th><th scope="col">Given ${isToday ? "today" : "this day"}</th><th scope="col" class="r">Sold</th>${canGive ? html`<th scope="col"><span class="sr-only">Give stock</span></th>` : ""}</tr></thead>
             <tbody>${g.people.map((x) => html`<tr data-emp="${x.employee_id}">
               <th scope="row" class="name"><b>${x.name}</b><div class="faint text-sm fw-400">${x.employee_id} · ${levelLabel(x.staff_level)}</div></th>
-              <td>${x.carried.length ? html`<div class="mc-chips">${x.carried.map((c) => html`<span class="mc-chip">${c.qty} × ${c.product}</span>`)}</div>` : html`<span class="muted">Nothing</span>`}</td>
-              <td>${x.given.length ? html`<div class="mc-chips">${x.given.map((y) => html`<span class="mc-chip given">${y.qty} × ${y.product}${canGive ? html`<button type="button" class="mc-x" data-del="${y.id}" aria-label="Take back ${y.qty} ${y.product} from ${x.name}">${icon("x")}</button>` : ""}</span>`)}</div>` : html`<span class="muted">Nothing yet</span>`}</td>
-              <td class="r num">${x.sold_pieces}</td>${canGive ? html`<td class="r"><button type="button" class="btn sm primary" data-give="${x.employee_id}">${icon("plus")} Give stock</button></td>` : ""}</tr>`)}</tbody></table></div>
+              <td data-label="Carried over">${x.carried.length ? html`<div class="mc-chips">${x.carried.map((c) => html`<span class="mc-chip">${c.qty} × ${c.product}</span>`)}</div>` : html`<span class="muted">Nothing</span>`}</td>
+              <td data-label="Given ${isToday ? 'today' : 'this day'}">${x.given.length ? html`<div class="mc-chips">${x.given.map((y) => html`<span class="mc-chip given">${y.qty} × ${y.product}${canGive ? html`<button type="button" class="mc-x" data-del="${y.id}" aria-label="Take back ${y.qty} ${y.product} from ${x.name}">${icon("x")}</button>` : ""}</span>`)}</div>` : html`<span class="muted">Nothing yet</span>`}</td>
+              <td class="r num" data-label="Sold">${x.sold_pieces}</td>${canGive ? html`<td class="r give-cell"><button type="button" class="btn sm primary" data-give="${x.employee_id}">${icon("plus")} Give stock</button></td>` : ""}</tr>`)}</tbody></table></div>
         </details>`)}`
         : html`<div class="card">${emptyState("No sellers here yet", "Add distributors, supervisors or managers to this hub first.", "users")}</div>`}`;
 

@@ -77,7 +77,7 @@ export default {
     const canDocs = can("manage_staff") || can("manage_team");
     const bankState = !s.bank_account_no ? ["amber", "Missing"] : s.bank_account_no !== s.bank_account_verified ? ["red", "Awaiting verification"] : ["green", "Verified"];
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="emp-profile">
       <div class="mb-3"><a href="/employees" data-link class="muted">${icon("left")} All employees</a></div>
       <div class="card mb-4">
         <div class="profile-head">
@@ -99,7 +99,7 @@ export default {
 
       <div class="tabs" id="tabs">${[["overview", "Overview"], ...(can("view_pay") ? [["history", `Pay history (${p.history.length})`]] : []), ...(s.role === "manager" ? [["team", `Team (${p.team.length})`]] : []), ...(canDocs ? [["documents", "Documents"]] : []), ["changes", "Change log"]]
         .map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
-      <div id="pane"></div>`;
+      <div id="pane"></div></div>`;
 
     const panes = {
       overview: () => html`<div class="grid halves">

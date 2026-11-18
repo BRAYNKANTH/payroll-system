@@ -50,7 +50,7 @@ export default {
     if (!currentDate || !currentDate.startsWith(state.period)) currentDate = days.includes(today) ? today : days[0];
     if (!currentEmp || !guys.some((g) => g.employee_id === currentEmp)) currentEmp = guys[0]?.employee_id;
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="daily-page">
       <div class="page-head">
         <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for everyone who sells: distributors, supervisors and managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions">
@@ -64,7 +64,7 @@ export default {
       <div class="card">
         <div class="card-head" id="picker"></div>
         <div class="card-body flush" id="grid"></div>
-      </div>`;
+      </div></div>`;
 
     $$("[data-mode]", el).forEach((b) => (b.onclick = () => { mode = b.dataset.mode; this.render(ctx); }));
     $("#export").onclick = async () => {

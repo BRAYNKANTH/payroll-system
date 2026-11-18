@@ -43,7 +43,7 @@ export default {
       rent: Number(st.manager_rent_default ?? 0), hub: Number(st.manager_hub_fee_default ?? 0), security: Number(st.manager_security_rate ?? 0) };
     if (!weeks.includes(week)) week = weeks.find((w) => w <= new Date().toISOString().slice(0, 10) && addDays(w, 6) >= new Date().toISOString().slice(0, 10)) || weeks[0];
 
-    el.innerHTML = html`
+    el.innerHTML = html`<div class="weekly-page">
       <div class="page-head">
         <div><h1>Weekly sheet</h1><p>One row per manager per week.${can("view_pay") ? " Weekly balance = business × profit % − rent − hub fee − security − personal draw." : ""}
           Business starts as the manager's own sales plus their team's from the daily sheets. Profit is ${+(rule.high * 100).toFixed(2)}% when that reaches the manager's weekly target, otherwise ${+(rule.low * 100).toFixed(2)}%. You can change any figure.</p></div>
@@ -59,7 +59,7 @@ export default {
         <div class="card-body flush" id="grid"></div>
       </div>
       <div class="card"><div class="card-head"><div><h2>Month overview</h2><div class="sub">${can("view_pay") ? "Weekly balances per manager" : "Which weeks are entered"}</div></div></div>
-        <div class="card-body flush" id="overview"></div></div>`;
+        <div class="card-body flush" id="overview"></div></div></div>`;
 
     if (!managers.length) {
       $("#grid").innerHTML = emptyState("No active managers", "Add managers on the Employees page first.", "users").toString();
