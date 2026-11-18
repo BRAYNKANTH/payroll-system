@@ -41,19 +41,18 @@ export default {
             cols: [
               { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b> <span class="faint">${h.code}</span>`, total: () => "All hubs" },
               { key: "staff", label: "Staff", align: "r", total: (r) => r.reduce((t, h) => t + h.staff, 0) },
-              ...[["hub_business", "Hub business"], ["guys_business", "Guys' business"], ["gross_pay", "Gross pay"], ["net_pay", "Net pay"], ["to_bank", "To bank"], ["stock_shortfall", "Stock short"], ["manager_balance", "Mgr balance"]]
-                .filter(([k]) => pay || !["gross_pay", "net_pay", "to_bank", "manager_balance"].includes(k))
+              ...[["hub_business", "Hub business"], ["guys_business", "Guys' business"], ["gross_pay", "Gross pay"], ["net_pay", "Net pay"], ["to_bank", "To bank"], ["stock_shortfall", "Stock short"]] 
+                .filter(([k]) => pay || !["gross_pay", "net_pay", "to_bank"].includes(k))
                 .map(([k, l]) => ({ key: k, label: l, align: "r", render: (h) => html`<span class="${h[k] < 0 ? "neg" : ""}">${money(h[k])}</span>`, total: (r) => money(r.reduce((t, h) => t + h[k], 0)) })),
               ...(pay ? [{ key: "ratio", label: "Payroll / business", align: "r", render: (h) => (h.hub_business ? pct(h.gross_pay / h.hub_business) : "—"), sort: (h) => (h.hub_business ? h.gross_pay / h.hub_business : 0) }] : []),
             ],
           })}</div></div>`.toString();
         barChart($("#c"), { labels: d.by_hub.map((h) => h.name), series: [
           { name: "Hub business", color: PALETTE[1], values: d.by_hub.map((h) => h.hub_business) },
-          ...(pay ? [{ name: "Gross pay", color: PALETTE[0], values: d.by_hub.map((h) => h.gross_pay) },
-            { name: "Manager balance", color: PALETTE[2], values: d.by_hub.map((h) => h.manager_balance) }] : []),
+          ...(pay ? [{ name: "Gross pay", color: PALETTE[0], values: d.by_hub.map((h) => h.gross_pay) }] : []),
         ] });
-        exporter = () => downloadCsv(`hub-summary-${p}.csv`, ["code", "hub", "staff", "hub_business", "guys_business", "gross_pay", "net_pay", "to_bank", "stock_shortfall", "manager_balance"],
-          d.by_hub.map((h) => [h.code, h.name, h.staff, fromCents(h.hub_business), fromCents(h.guys_business), fromCents(h.gross_pay), fromCents(h.net_pay), fromCents(h.to_bank), fromCents(h.stock_shortfall), fromCents(h.manager_balance)]));
+        exporter = () => downloadCsv(`hub-summary-${p}.csv`, ["code", "hub", "staff", "hub_business", "guys_business", "gross_pay", "net_pay", "to_bank", "stock_shortfall"],
+          d.by_hub.map((h) => [h.code, h.name, h.staff, fromCents(h.hub_business), fromCents(h.guys_business), fromCents(h.gross_pay), fromCents(h.net_pay), fromCents(h.to_bank), fromCents(h.stock_shortfall)]));
       },
       async commission() {
         const rows = await get("/api/reports/commission" + qs({ period: p }));

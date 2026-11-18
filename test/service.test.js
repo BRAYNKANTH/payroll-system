@@ -8,7 +8,7 @@ async function setup() {
   const d = await db.open(":memory:");
   await svc.createEntry(d, "hubs", { code: "Colombo", name: "Colombo" }, "admin");
   await svc.createEntry(d, "hubs", { code: "Kandy", name: "Kandy" }, "admin");
-  await svc.createEntry(d, "staff", { employee_id: "M1", name: "Manager One", role: "manager", hub: "Colombo" }, "admin");
+  await svc.createEntry(d, "staff", { employee_id: "M1", name: "Manager One", role: "manager", hub: "Colombo", bank_name: "BOC", bank_code: "7010", branch_code: "001", bank_account_no: "5555666677" }, "admin");
   await svc.createEntry(d, "staff", {
     employee_id: "G1", name: "Guy One", role: "guy", hub: "Colombo", manager_id: "M1", basic_pay: 30000, target: 500000,
     commission_rate: 0.02, security_deduction_rule: "fixed:1000", bank_name: "BOC", bank_code: "7010", branch_code: "001", bank_account_no: "1111222233",
@@ -27,8 +27,9 @@ test("run → auto-approve → finalize → opening balance carries forward", as
   assert.equal(g.status, "auto_approved");
   assert.equal(g.net_pay, 3000000 + 200000 - 100000);
   const m = await row(d, "2026-08", "M1");
-  // weekly 30% of 600,000, less rent and the 15% company return. The guy's own pay is the company's, not charged to the manager.
-  assert.equal(m.net_pay, 18000000 - 1000000 - 9000000);
+  // weekly 30% of 600,000, less rent. No company return: a manager hands no cash to the owner. The guy's own pay is the company's.
+  assert.equal(m.net_pay, 18000000 - 1000000);
+  assert.equal(m.closing_balance, 0);
 
   await svc.finalizePeriod(d, "2026-08", "boss");
   await svc.createEntry(d, "weekly", { week_start: "2026-09-07", week_end: "2026-09-13", manager_id: "M1", business_total: 600000, profit_percent: 0.3 }, "clerk");

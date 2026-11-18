@@ -152,7 +152,7 @@ function managerCommissionRate(businessCents, settings, targetCents) {
 //   Own sales:  a manager sells too, so he also earns the seller's rate (rules.ownRate) on his own sales.
 //   Team extras: what the sellers earn above the company's 25% (the extra on sales over target, and food) is paid out of the manager's
 //               share, so it is charged to his account. The company pays everything else a seller earns.
-// staff.basic_pay is a separate fixed salary: it is paid out to the bank and does not move the running balance.
+// The weeks are worked out from the daily sheets by the service (no manual weekly sheet).
 // team: one row per seller with the extras charged to this manager: [{ employee_id, name, over_target, food }].
 function computeManager({ staff, weekly, team = [], openingBalance, companyReturnRate, teamSales = 0, ownSales = 0, rules = {} }) {
   const { ownRate = 0, retainThreshold = 0, retainRate = 0 } = rules;
@@ -179,12 +179,16 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
     { key: "hub_fee", label: "Hub fee", amount: sum(weeks, "hub_fee") },
     { key: "security_cost", label: "Security cost", amount: sum(weeks, "security_cost") },
     { key: "personal_draw", label: "Money drawn for personal use", amount: sum(weeks, "personal_draw") },
-    { key: "company_return", label: `Share returned to the company (${fmtRate(companyReturnRate)} of business)`, amount: companyReturn },
+    ...(companyReturn ? [{ key: "company_return", label: `Share returned to the company (${fmtRate(companyReturnRate)} of business)`, amount: companyReturn }] : []),
     { key: "team_over_target", label: "Team's extra pay above target (paid from your share)", amount: sum(team, "over_target") },
     { key: "team_food", label: "Team's food allowance", amount: sum(team, "food") },
   ];
   const totalDeductions = sum(deductions, "amount");
   const netPay = gross - totalDeductions;
+  // Like everyone else, a manager is paid to the bank. A manager holds no cash account with the company (only the coacher hands cash
+  // to the owner); a negative month is carried to the next month as money owed.
+  const payable = openingBalance + netPay;
+  const disbursed = Math.max(0, payable);
 
   return {
     role: "manager",
@@ -192,8 +196,8 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
     gross_earnings: gross,
     total_deductions: totalDeductions,
     net_pay: netPay,
-    disbursed_amount: salary, // only the fixed salary is a bank payout; the rest is a running account with the company
-    closing_balance: openingBalance + netPay - salary,
+    disbursed_amount: disbursed,
+    closing_balance: payable - disbursed,
     detail: {
       weeks_logged: weeks.length,
       total_business: totalBusiness,
@@ -207,7 +211,7 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
           ? { label: `Retaining commission (${fmtRate(retainRate)} of Rs ${fmt(monthSales)}: sales below Rs ${fmt(retainThreshold)})`, amount: commission }
           : { label: "Weekly commission (each week's business × that week's profit share)", amount: commission },
         ...(ownSales ? [{ label: `Own sales commission (${fmtRate(ownRate)} of Rs ${fmt(ownSales)})`, amount: ownCommission }] : []),
-        ...(salary ? [{ label: "Basic salary (paid to bank)", amount: salary }] : [])],
+        ...(salary ? [{ label: "Basic salary", amount: salary }] : [])],
       deductions,
     },
   };

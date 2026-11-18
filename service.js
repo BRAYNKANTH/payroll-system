@@ -467,6 +467,51 @@ function hashResult(r, staff) {
 
 const groupBy = (rows, key) => rows.reduce((m, r) => (m.get(r[key]) || m.set(r[key], []).get(r[key])).push(r) && m, new Map());
 
+// A manager's weeks, worked out from the daily sheets: each Monday that falls in the month starts a week of the manager's own sales plus his
+// team's. Rent, hub fee and security come from Settings. A week row someone saved earlier (older data) is used as it is.
+const isoAdd = (iso, n) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+function mondaysIn(period) {
+  const [y, m] = period.split("-").map(Number), out = [];
+  for (let d = new Date(Date.UTC(y, m - 1, 1)); d.getUTCMonth() === m - 1; d.setUTCDate(d.getUTCDate() + 1)) if (d.getUTCDay() === 1) out.push(d.toISOString().slice(0, 10));
+  return out;
+}
+function managerWeeks(period, settings, manager, dailyRows, saved) {
+  const savedBy = new Map(saved.map((w) => [String(w.week_start).slice(0, 10), w]));
+  const out = [];
+  for (const ws of mondaysIn(period)) {
+    if (savedBy.has(ws)) { out.push(savedBy.get(ws)); continue; }
+    const we = isoAdd(ws, 6);
+    const business = dailyRows.reduce((t, r) => (r.date >= ws && r.date <= we ? t + Number(r.business_amount) : t), 0);
+    if (!business) continue;
+    out.push({
+      week_start: ws, week_end: we, business_total: business,
+      profit_percent: engine.managerCommissionRate(business, settings, manager.target),
+      rent: Number(settings.manager_rent_default) || 0, hub_fee: Number(settings.manager_hub_fee_default) || 0,
+      security_cost: Math.round(business * (Number(settings.manager_security_rate) || 0)), personal_draw: 0,
+    });
+  }
+  return out;
+}
+
+// Read-only weekly view for the office: every manager's weeks worked out from the daily sheets (nothing is entered here).
+async function weeklyView(db, period, hub) {
+  assertPeriod(period);
+  const settings = await getSettings(db);
+  const staff = await db.all("SELECT * FROM staff ORDER BY employee_id");
+  const mondays = mondaysIn(period);
+  const [from] = monthBounds(period);
+  const end = mondays.length ? isoAdd(mondays[mondays.length - 1], 7) : from;
+  const dailyAll = mondays.length ? await db.all("SELECT * FROM daily_log WHERE date >= ? AND date < ?", mondays[0], end) : [];
+  const saved = await db.all("SELECT * FROM weekly_log WHERE week_start >= ? AND week_start < ?", ...monthBounds(period));
+  const dBy = groupBy(dailyAll, "employee_id"), sBy = groupBy(saved, "manager_id");
+  return staff.filter((m) => m.staff_level === "manager" && m.status === "active" && (!hub || m.hub === hub)).map((m) => {
+    const rows = [m, ...staff.filter((s) => s.manager_id === m.employee_id)].flatMap((x) => dBy.get(x.employee_id) || []);
+    const weeks = managerWeeks(period, settings, m, rows, sBy.get(m.employee_id) || []);
+    return { manager_id: m.employee_id, name: m.name, hub: m.hub, target: Number(m.target) || Number(settings.manager_commission_threshold),
+      weeks: weeks.map((w) => ({ ...w, week_start: String(w.week_start).slice(0, 10), weekly_balance: Math.round(Number(w.business_total) * Number(w.profit_percent)) - ["rent", "hub_fee", "security_cost", "personal_draw"].reduce((t, k) => t + Number(w[k] || 0), 0) })) };
+  });
+}
+
 // Recalculates every summary for the period from source entries. Safe to run repeatedly.
 async function runPeriod(db, period, user) {
   assertPeriod(period);
@@ -480,6 +525,9 @@ async function runPeriod(db, period, user) {
     const stockAll = await t.all("SELECT * FROM stock_recon WHERE period = ? ORDER BY product", period);
     const allowAll = await t.all("SELECT * FROM allowances WHERE period = ? ORDER BY id", period);
     const weeklyAll = await t.all("SELECT * FROM weekly_log WHERE week_start >= ? AND week_start < ? ORDER BY week_start", from, to);
+    const lastMonday = mondaysIn(period).pop();
+    const spill = lastMonday && isoAdd(lastMonday, 7) > to ? await t.all("SELECT * FROM daily_log WHERE date >= ? AND date < ?", to, isoAdd(lastMonday, 7)) : []; // the last week runs into next month
+    const weekDaily = groupBy([...dailyAll, ...spill], "employee_id");
     const daily = groupBy(dailyAll, "employee_id"), stock = groupBy(stockAll, "employee_id");
     const allow = groupBy(allowAll, "employee_id"), weekly = groupBy(weeklyAll, "manager_id");
     // Latest earlier summary per employee (opening balance + previous net pay) and security held so far.
@@ -536,8 +584,8 @@ async function runPeriod(db, period, user) {
       results.set(m.employee_id, {
         staff: m, prev,
         result: engine.computeManager({
-          staff: m, weekly: weekly.get(m.employee_id) || [], team, openingBalance,
-          companyReturnRate: Number(settings.company_return_rate),
+          staff: m, weekly: managerWeeks(period, settings, m, [m, ...sellers].flatMap((x) => weekDaily.get(x.employee_id) || []), weekly.get(m.employee_id) || []), team, openingBalance,
+          companyReturnRate: 0, // a manager returns no share to the company; only the coacher hands cash to the owner
           teamSales: sellers.reduce((t, g) => t + salesOf(g.employee_id), 0), ownSales: salesOf(m.employee_id), rules,
         }),
       });
@@ -813,7 +861,7 @@ async function dashboard(db, period, hub) {
       code: h.code, name: h.name,
       staff: staff.filter((s) => s.hub === h.code && s.status === "active").length,
       guys_business: sum(daily.filter((r) => inHub(r)), "business"),
-      hub_business: sum(weekly.filter((r) => inHub(r, "manager_id")), "business"),
+      hub_business: sum(daily.filter((r) => inHub(r)), "business"),
       gross_pay: sum(hubGuys, "gross_earnings"),
       net_pay: sum(hubGuys, "net_pay"),
       to_bank: sum(hubGuys, "disbursed_amount"),
@@ -852,7 +900,7 @@ async function dashboard(db, period, hub) {
     period, hub: hub || null, status: info.status, last_run_at: info.last_run_at || null, finalized_at: info.finalized_at || null,
     kpis: {
       guys_business: sum(daily, "business"),
-      hub_business: sum(weekly, "business"),
+      hub_business: sum(daily, "business"),
       settle_up: sum(daily, "settle_up"),
       stock_shortfall: sum(stock, "shortfall"),
       active_guys: activeGuys.length,
@@ -987,6 +1035,7 @@ async function listPeriods(db) {
 }
 
 module.exports = {
+  weeklyView,
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
   runPeriod, getPeriod, getPeriodRow, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
   PAY_FIELDS, withoutPayFields, ACCESS_TABLES, listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,

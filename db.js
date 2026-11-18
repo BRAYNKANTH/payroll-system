@@ -7,7 +7,7 @@ const fs = require("fs");
 const { AsyncLocalStorage } = require("async_hooks");
 
 const DEFAULT_SETTINGS = {
-  company_return_rate: "0.15",         // managers: company_return = total_business * rate
+  company_return_rate: "0",            // no longer used: a manager returns no share to the company
   net_pay_change_threshold: "0.20",    // flag if net pay moves more than 20% vs previous period
   stock_shortfall_threshold: "500000", // cents -> Rs 5,000 per period
   bank_format: "generic_csv",
@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS = {
   manager_commission_low: "0.15",
   manager_rent_default: "400000",      // cents -> Rs 4,000 a week, pre-filled on the weekly sheet
   manager_hub_fee_default: "50000",    // cents -> Rs 500 a week
-  manager_security_rate: "0.01",       // security pre-filled as this share of the week's business
+  manager_security_rate: "0",          // security taken from a manager as this share of the week's business (none by default)
   // A manager whose own + team sales for the month fall below the threshold is "retaining": basic salary + the retain rate on those sales.
   manager_retain_threshold: "25000000", // cents -> Rs 250,000 a month
   manager_retain_rate: "0.10",

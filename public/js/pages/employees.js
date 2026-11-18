@@ -48,7 +48,7 @@ export async function employeeForm(existing, onSaved) {
       <div class="field" data-guy><label>Pay scheme</label><select class="input" name="pay_scheme">
         <option value="over_target" ${e.pay_scheme !== "tiered" ? "selected" : ""}>Basic + commission over target</option>
         <option value="tiered" ${e.pay_scheme === "tiered" ? "selected" : ""}>Tiered (commission under target, fixed basic over it)</option></select></div>
-      <div class="field"><label id="basic-lbl">Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"><span class="hint" id="basic-hint" hidden>A separate fixed salary, paid to the bank each month on top of the weekly account. Leave at 0 for none.</span></div>
+      <div class="field"><label id="basic-lbl">Basic pay (Rs / month)</label><input class="input" name="basic_pay" inputmode="decimal" value="${fromCents(e.basic_pay)}"><span class="hint" id="basic-hint" hidden>A separate fixed salary, paid to the bank each month on top of the commission. Leave at 0 for none.</span></div>
       <div class="field" data-target><label id="target-lbl">Monthly target (Rs)</label><input class="input" name="target" inputmode="decimal" value="${fromCents(e.target)}"></div>
       <div class="field" data-guy data-tiered><label>Commission on all business when target not reached (%)</label><input class="input" name="base_commission_pct" inputmode="decimal" value="${e.base_commission_rate ? +(e.base_commission_rate * 100).toFixed(4) : ""}"></div>
       <div class="field" data-guy><label>Commission on business over target (%)</label><input class="input" name="commission_pct" inputmode="decimal" value="${e.commission_rate ? +(e.commission_rate * 100).toFixed(4) : ""}"></div>

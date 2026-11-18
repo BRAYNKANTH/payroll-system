@@ -112,8 +112,8 @@ test("manager: weekly commission + own sales + basic salary, minus costs and the
   assert.equal(r.total_deductions, 800000 + 100000 + 200000 + 400000 + 150000 + 780000);
   assert.equal(r.net_pay, 5970000);
   assert.equal(r.gross_earnings - r.total_deductions, r.net_pay);
-  assert.equal(r.disbursed_amount, 2700000);               // only the basic salary goes to the bank
-  assert.equal(r.closing_balance, 1000000 + 5970000 - 2700000);
+  assert.equal(r.disbursed_amount, 1000000 + 5970000);     // a manager is paid to the bank like everyone else: no running account
+  assert.equal(r.closing_balance, 0);
 });
 
 test("manager: below Rs 250,000 of sales he is retaining: basic + 10% of those sales, instead of the weekly commission", () => {

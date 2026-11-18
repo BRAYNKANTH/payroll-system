@@ -26,7 +26,7 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Salaries — ${monthName(p)}</h1><p>What each person earns this month, worked out from the daily, weekly and stock sheets. To change a figure, correct the sheet it comes from${can("run_payroll") && !finalized ? ", then press “Update salary figures”" : ""}.</p></div>
+        <div><h1>Salaries — ${monthName(p)}</h1><p>What each person earns this month, worked out from the daily and stock sheets. To change a figure, correct the sheet it comes from${can("run_payroll") && !finalized ? ", then press “Update salary figures”" : ""}.</p></div>
         <div class="actions">
           ${calculated ? exportButtons("register", { period: p }) : ""}
           ${badge(data.status)}
@@ -39,10 +39,9 @@ export default {
       <div class="grid kpis mb-4">
         <div class="card kpi"><div class="label"><span class="icon">${icon("users")}</span>Employees</div><div class="value">${all.length}</div>
           <div class="foot">${count("auto_approved")} auto · ${count("approved")} approved · <span class="${pending ? "neg" : ""}">${pending} pending</span>${rejected ? ` · ${rejected} rejected` : ""}</div></div>
-        <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Sellers' gross earnings</div><div class="value"><small>Rs</small>${compact(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</b><span class="kpi-note"> · Sellers, distributors and supervisors. Managers are paid through their own account.</span></div></div>
+        <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Sellers' gross earnings</div><div class="value"><small>Rs</small>${compact(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</b><span class="kpi-note"> · Sellers, distributors and supervisors. Managers are listed separately.</span></div></div>
         <div class="card kpi"><div class="label"><span class="icon amber">${icon("coins")}</span>Sellers' deductions</div><div class="value"><small>Rs</small>${compact(sum("total_deductions", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("total_deductions", all.filter((r) => r.role === "guy")))}</b><span class="kpi-note"> · Money to settle up, stock shortfall, personal deductions, security</span></div></div>
         <div class="card kpi"><div class="label"><span class="icon green">${icon("bank")}</span>To bank (everyone)</div><div class="value"><small>Rs</small>${compact(sum("disbursed_amount"))}</div><div class="foot"><b class="num">Rs ${money(sum("disbursed_amount"))}</b><span class="kpi-note"> · ${all.filter((r) => r.disbursed_amount > 0).length} payments</span></div></div>
-        <div class="card kpi"><div class="label"><span class="icon blue">${icon("trend")}</span>Managers' closing</div><div class="value"><small>Rs</small>${compact(sum("closing_balance", all.filter((r) => r.role === "manager")))}</div><div class="foot"><b class="num">Rs ${money(sum("closing_balance", all.filter((r) => r.role === "manager")))}</b><span class="kpi-note"> · Running account with the company</span></div></div>
       </div>
 
       <p class="reconcile" id="reconcile"><b>How the bank total adds up:</b> sellers Rs <span class="num">${money(bankSellers)}</span> + managers Rs <span class="num">${money(bankManagers)}</span> = <b class="num">Rs ${money(bankSellers + bankManagers)}</b> to bank. Sellers' net pay before the opening balance is Rs <span class="num">${money(sum("net_pay", sellers))}</span>.</p>
@@ -130,7 +129,7 @@ export default {
         message: `<ul style="margin:0;padding-left:18px;line-height:1.7">
           <li><b>${all.length}</b> people · to the bank <b>Rs ${money(sum("disbursed_amount"))}</b></li>
           <li>Salaries are worked out once more from the latest sheets.</li>
-          <li>The daily, weekly, stock and allowance entries for ${month} are <b>locked</b>. They cannot be changed afterwards.</li>
+          <li>The daily, stock and allowance entries for ${month} are <b>locked</b>. They cannot be changed afterwards.</li>
           <li>Sellers can then open their payslips.</li></ul>
           <p style="margin:12px 0 0"><b>This cannot be undone here.</b></p>`,
         confirmText: `Close ${month}`, danger: true,

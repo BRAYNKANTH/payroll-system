@@ -21,7 +21,6 @@ export default {
         </div></div>
 
         <div class="card"><div class="card-head"><div><h2>Payroll rules</h2><div class="sub">Changes apply the next time a month is calculated</div></div></div><div class="card-body form-grid">
-          <div class="field"><label>Company return (% of manager business)</label><input class="input" name="company_return_rate" inputmode="decimal" value="${+(s.company_return_rate * 100).toFixed(4)}"></div>
           <div class="field"><label>Flag when net pay changes by more than (%)</label><input class="input" name="net_pay_change_threshold" inputmode="decimal" value="${+(s.net_pay_change_threshold * 100).toFixed(4)}"></div>
           <div class="field"><label>Flag stock shortfall above (Rs / month)</label><input class="input" name="stock_shortfall_threshold" inputmode="decimal" value="${s.stock_shortfall_threshold / 100}"></div>
           <div class="field full"><span class="lbl">Days hubs are closed</span><span class="hint">Used to spot missing daily sheets</span>
@@ -41,7 +40,7 @@ export default {
                 <td><div class="row" style="gap:6px;flex-wrap:nowrap"><select class="input sm" data-l="${k}" data-f="sec_kind" aria-label="${l} security type" style="width:auto">${[["none", "None"], ["fixed", "Fixed Rs"], ["pct_gross", "% gross"], ["pct_basic", "% basic"], ["pct_business", "% business"]].map(([v, n]) => html`<option value="${v}" ${(sec[1] || "none") === v ? "selected" : ""}>${n}</option>`)}</select>
                   <input class="input sm" style="width:70px;text-align:right" inputmode="decimal" data-l="${k}" data-f="sec_value" aria-label="${l} security amount" value="${sec[2] || ""}"></div></td></tr>`; })}</tbody></table></div></div></div>
 
-        <div class="card"><div class="card-head"><div><h2>Manager pay</h2><div class="sub">The weekly sheet fills these in for a new week. Every figure can still be changed on the sheet.</div></div></div><div class="card-body form-grid">
+        <div class="card"><div class="card-head"><div><h2>Manager pay</h2><div class="sub">Applied to each manager every week, worked out from the daily sheets.</div></div></div><div class="card-body form-grid">
           <div class="field"><label>Default weekly target when a manager has none (Rs)</label><input class="input" name="manager_commission_threshold" inputmode="decimal" value="${s.manager_commission_threshold / 100}"></div>
           <div class="field"><label>Commission when the week reaches the target (%)</label><input class="input" name="manager_commission_high" inputmode="decimal" value="${+(s.manager_commission_high * 100).toFixed(4)}"></div>
           <div class="field"><label>Commission when the week is below the target (%)</label><input class="input" name="manager_commission_low" inputmode="decimal" value="${+(s.manager_commission_low * 100).toFixed(4)}"></div>
@@ -106,7 +105,6 @@ export default {
         const saved = await put("/api/settings", {
           position_defaults: JSON.stringify(position_defaults),
           company_name: f.get("company_name"), company_account_no: f.get("company_account_no"),
-          company_return_rate: Number(f.get("company_return_rate")) / 100,
           net_pay_change_threshold: Number(f.get("net_pay_change_threshold")) / 100,
           stock_shortfall_threshold: f.get("stock_shortfall_threshold"),
           closed_weekdays: f.getAll("closed").join(","),

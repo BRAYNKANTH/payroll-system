@@ -46,7 +46,7 @@ export default {
           <dl class="hubc-nums ${pay ? "" : "one"}">
             <div><dt>Sales</dt><dd class="num">${compact(x.sales)}</dd></div>
             ${pay ? html`<div><dt>Gross pay</dt><dd class="num">${compact(st.gross_pay || 0)}</dd></div>
-            <div><dt>Manager account</dt><dd class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</dd></div>` : ""}</dl>
+` : ""}</dl>
           <div class="hubc-chips" role="list" aria-label="Needs attention in ${h.name}">${x.attention.length
             ? x.attention.map(([tone, text]) => html`<span role="listitem" class="badge ${tone}">${text}</span>`)
             : html`<span role="listitem" class="badge green">All clear</span>`}</div>

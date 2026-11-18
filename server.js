@@ -193,6 +193,8 @@ function createHandler(dbReady) {
         hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })
         .then((rows) => (m[1] === "staff" && user.teamIds ? rows.filter((r) => user.teamIds.includes(r.employee_id)) : rows))
         .then((rows) => (m[1] === "staff" && !auth.can(user, "view_pay") ? rows.map(svc.withoutPayFields) : rows))],
+    ["GET", /^\/api\/weekly-view$/, "read", ({ user, q }) => svc.weeklyView(database, q.get("period") || "", user.hub || q.get("hub") || undefined)
+      .then((rows) => (auth.can(user, "view_pay") ? rows : rows.map((r) => ({ ...r, weeks: r.weeks.map((w) => ({ week_start: w.week_start, week_end: w.week_end, business_total: w.business_total })) })))) ],
     ["GET", /^\/api\/(daily|weekly|stock|hubstock|allowances)$/, "read", ({ user, m, q }) =>
       svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
         hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })
@@ -214,10 +216,10 @@ function createHandler(dbReady) {
       return { file: d.buffer, type: d.mime, filename: d.file_name };
     }],
     ["DELETE", /^\/api\/documents\/(\d+)$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.deleteDocument(database, m[1], user.username, user.hub)],
-    ["POST", /^\/api\/(daily|weekly|stock|hubstock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, user.hub)],
-    ["POST", /^\/api\/(daily|weekly|stock|hubstock|allowances)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
-    ["PUT", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
-    ["DELETE", /^\/api\/(daily|weekly|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
+    ["POST", /^\/api\/(daily|stock|hubstock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, user.hub)],
+    ["POST", /^\/api\/(daily|stock|hubstock|allowances)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
+    ["PUT", /^\/api\/(daily|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
+    ["DELETE", /^\/api\/(daily|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
 
     // Live sales: everyone who can read sees the sales; only those who may see pay get the commission and pay-so-far columns.
     ["GET", /^\/api\/live$/, ["read", "read_team"], ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined, ids: user.teamIds }, auth.can(user, "view_pay"))],

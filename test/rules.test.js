@@ -83,8 +83,8 @@ test("a month of pay: manager shares, a retaining manager, and the promoting man
   assert.equal(r.M1.gross_earnings, (54000 + 15000 + 27000) * 100);
   assert.equal(r.M1.total_deductions, (4000 + 500 + 2700 + 1500 + 150 + 150) * 100);
   assert.equal(r.M1.net_pay, 87000 * 100);
-  assert.equal(r.M1.disbursed_amount, 27000 * 100);
-  assert.equal(r.M1.closing_balance, 60000 * 100);
+  assert.equal(r.M1.disbursed_amount, 87000 * 100); // all paid to the bank: no running account with the company
+  assert.equal(r.M1.closing_balance, 0);
   assert.deepEqual(r.M1.detail.team.map((t) => [t.employee_id, t.over_target, t.food]), [["D1", 150000, 15000], ["D2", 0, 15000]]);
   // the sellers' own pay is not charged to him: D1 keeps 25,000 + 30% of 30,000 over target (+ food)
   assert.equal(r.D1.gross_earnings, (25000 + 9000 + 150) * 100);
@@ -92,7 +92,8 @@ test("a month of pay: manager shares, a retaining manager, and the promoting man
   // M2: Rs 140,000 is below Rs 250,000, so he is retaining: 10% of it instead of any weekly commission, plus own sales and the basic
   assert.equal(r.M2.detail.retaining, true);
   assert.equal(r.M2.gross_earnings, (14000 + 10000 + 27000) * 100);
-  assert.equal(r.M2.net_pay, (14000 + 10000 + 27000 - 150) * 100);
+  // the week is worked out from his daily sheets, so the weekly rent and hub fee are taken as well
+  assert.equal(r.M2.net_pay, (14000 + 10000 + 27000 - 150 - 4000 - 500) * 100);
   assert.ok(r.M2.detail.earnings[0].label.startsWith("Retaining commission"));
 
   // PM1 and C1: basic salary plus 0.55% of everyone below (the managers' own sales included), paid to the bank
@@ -114,7 +115,7 @@ test("a manager sells like anyone else: he has a daily sheet; a coacher does not
   assert.equal((await svc.bulkUpsert(d, "daily", [{ date: "2026-10-06", employee_id: "M1", business_amount: 500, settled_amount: 500 }], "admin")).created, 1);
 });
 
-test("a manager's basic salary is paid to the bank and leaves the running balance alone", async () => {
+test("a manager holds no cash account: basic salary and commission are all paid to the bank", async () => {
   const d = await setup();
   await svc.updateSettings(d, { company_return_rate: 0 }, "admin");
   await add(d, "M1", "manager", { basic_pay: 27000, bank_account_no: "12345678" });
@@ -127,10 +128,10 @@ test("a manager's basic salary is paid to the bank and leaves the running balanc
   await svc.runPeriod(d, "2026-10", "admin");
   const rows = Object.fromEntries((await svc.getPeriod(d, "2026-10")).rows.map((r) => [r.employee_id, r]));
   const account = 150000 * 0.2 + 300000 * 0.25 - 4000 - 500 - 1500 - 2000; // weekly commission + own sales − costs = 97,000
-  assert.equal(rows.M2.closing_balance, account * 100);
-  assert.equal(rows.M2.disbursed_amount, 0);
-  assert.equal(rows.M1.closing_balance, account * 100, "salary does not change the account balance");
-  assert.equal(rows.M1.disbursed_amount, 2700000);
+  assert.equal(rows.M2.closing_balance, 0);
+  assert.equal(rows.M2.disbursed_amount, account * 100);
+  assert.equal(rows.M1.closing_balance, 0, "nothing is held back as an account with the company");
+  assert.equal(rows.M1.disbursed_amount, (account + 27000) * 100);
   assert.equal(rows.M1.net_pay, (account + 27000) * 100);
   assert.equal(rows.M1.gross_earnings - rows.M1.total_deductions, rows.M1.net_pay);
   assert.ok(rows.M1.detail.earnings.some((e) => /Basic salary/.test(e.label) && e.amount === 2700000));

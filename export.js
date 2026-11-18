@@ -305,11 +305,10 @@ const REPORTS = {
       rows: (await svc.listEntries(db, "staff", { hub: hub || undefined })).map((s) => [s.employee_id, s.name, level(s.staff_level), s.hub, names.get(s.upline_id)?.name || "", s.phone || "", s.status, s.join_date || "", s.leave_date || "", s.target, ...(canPay ? [s.basic_pay] : [])]) };
   },
   weekly: async ({ db, period, hub, canPay }) => {
-    const names = await staffNames(db);
+    const weeks = (await svc.weeklyView(db, period, hub || undefined)).flatMap((m) => m.weeks.map((w) => ({ m, w })));
     return { title: "Weekly sheet", subtitle: monthLabel(period),
-      columns: [C("Week starting"), C("Manager"), C("Hub"), C("Business", "money", true), C("Profit %", "pct"), C("Rent", "money", true), C("Hub fee", "money", true), C("Security", "money", true), C("Personal draw", "money", true), ...(canPay ? [C("Weekly balance", "money", true)] : [])],
-      rows: (await svc.listEntries(db, "weekly", { period, hub: hub || undefined })).map((w) => [w.week_start, names.get(w.manager_id)?.name || w.manager_id, names.get(w.manager_id)?.hub || "", w.business_total, w.profit_percent, w.rent, w.hub_fee, w.security_cost, w.personal_draw,
-        ...(canPay ? [Math.round(w.business_total * w.profit_percent) - w.rent - w.hub_fee - w.security_cost - w.personal_draw] : [])]) };
+      columns: [C("Week starting"), C("Manager"), C("Hub"), C("Business", "money", true), ...(canPay ? [C("Commission %", "pct"), C("Rent", "money", true), C("Hub fee", "money", true), C("Security", "money", true), C("Weekly balance", "money", true)] : [])],
+      rows: weeks.map(({ m, w }) => [w.week_start, m.name, m.hub, w.business_total, ...(canPay ? [w.profit_percent, w.rent, w.hub_fee, w.security_cost, w.weekly_balance] : [])]) };
   },
 };
 
@@ -416,7 +415,7 @@ function personReportPdf(d, { canPay, company = "" }) {
       if (ded.length) { y -= 3; for (const l of ded) row(l.label, "-" + fmtMoney(l.amount)); row("Total deductions", "-" + rs(pay.deductions), true); }
       y -= 3; row("Net pay", rs(pay.net), true);
       if (pay.closing || pay.opening) row("Balance carried (opening / closing)", `${fmtMoney(pay.opening)} / ${fmtMoney(pay.closing)}`);
-    } else row(m.is_manager ? "A manager's pay comes from the weekly account and is worked out by the office." : "No sales or entries this month, so there is nothing to calculate yet.", "");
+    } else row(m.is_manager ? "A manager's pay is worked out from the weekly commission on his sales and his team's." : "No sales or entries this month, so there is nothing to calculate yet.", "");
   }
 
   if (mo.daily.length) {

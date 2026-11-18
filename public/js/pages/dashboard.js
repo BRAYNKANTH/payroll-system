@@ -49,7 +49,7 @@ export default {
         <span class="hub-count">${plural(x.active.length, "person", "people")}</span>
         <span class="muted hub-head">${x.head ? `Head: ${x.head.name}` : "No coacher yet"}</span>
         <span class="hub-nums"><span><small>Sales</small><b class="num">${compact(x.sales)}</b></span>
-          ${pay ? html`<span><small>Gross pay</small><b class="num">${compact(st.gross_pay || 0)}</b></span><span><small>Manager account</small><b class="num ${st.manager_balance < 0 ? "neg" : ""}">${compact(st.manager_balance || 0)}</b></span>` : ""}</span>
+          ${pay ? html`<span><small>Gross pay</small><b class="num">${compact(st.gross_pay || 0)}</b></span>` : ""}</span>
         <span class="hub-chips">${x.attention.length ? x.attention.map(([tone, text]) => html`<span class="badge ${tone}">${text}</span>`) : html`<span class="badge green">All clear</span>`}</span>
         <span class="hub-go">Open hub ${icon("right")}</span></a>`;
     };
@@ -68,10 +68,9 @@ export default {
       ${pay ? monthCard(d, k) : ""}
 
       <div class="grid kpis">
-        ${kpi("Hub business", money(k.hub_business), "store", "blue", `From weekly sheets. Daily sheets: Rs ${money(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${money(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
-        ${!pay ? "" : kpi("Sellers' gross pay", k.calculated ? money(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "seller" : "sellers"}. Managers are paid through their own account.` : "Run payroll to calculate")}
+        ${kpi("Hub business", money(k.hub_business), "store", "blue", `Daily sheets: Rs ${money(k.guys_business)}${k.hub_business !== k.guys_business ? ` (Rs ${money(Math.abs(k.hub_business - k.guys_business))} ${k.guys_business < k.hub_business ? "less" : "more"})` : ""}`)}
+        ${!pay ? "" : kpi("Sellers' gross pay", k.calculated ? money(k.gross_pay) : "—", "wallet", "", k.calculated ? `${k.active_guys} ${k.active_guys === 1 ? "seller" : "sellers"}. Managers are paid separately.` : "Run payroll to calculate")}
         ${kpi("Cash and stock short", money(k.settle_up + k.stock_shortfall), "coins", "amber", `Cash Rs ${money(k.settle_up)} · Stock Rs ${money(k.stock_shortfall)}`)}
-        ${!pay ? "" : kpi("Managers' balance", k.calculated ? money(k.manager_balance) : "—", "trend", k.manager_balance < 0 ? "red" : "green", "Combined closing balance")}
       </div>
 
       <section class="mt-4" aria-labelledby="hubs-h">

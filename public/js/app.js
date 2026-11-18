@@ -27,13 +27,13 @@ const NAV = [
   { path: "/", label: "Dashboard", icon: "dashboard", page: "dashboard", perm: "read" },
   { path: "/team", label: "My team", icon: "users", page: "team", perm: "read_team", roles: ["manager"] },
   { group: "Data entry" },
+  { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly", perm: "read" },
   { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { path: "/hub-stock", label: "Stock to hubs", icon: "warehouse", page: "hubsupply", perm: "manage_products" },
   { path: "/stock-overview", label: "Hub stock", icon: "warehouse", page: "stockview", perm: "stock", hubOnly: true },
   { path: "/morning", label: "Give stock", icon: "box", page: "morning", perm: "stock" },
   { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily", perm: "read" },
   { path: "/live", label: "Live sales", icon: "trend", page: "live", perm: ["read", "read_team"] },
-  { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly", perm: "read" },
   { path: "/stock", label: "Stock count", icon: "box", page: "stock", perm: "read" },
   { path: "/branch-stock", label: "Hub count sheet", icon: "store", page: "hubstock", perm: "read" },
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances", perm: "read" },
@@ -470,13 +470,35 @@ function drawBar(route) {
       <nav class="ws-tabs" aria-label="Hub sections">${tabs.map((t) => `<a href="${base}${t.key === "overview" ? "" : "/" + t.key}" data-link${t.key === tab ? ' aria-current="page"' : ""}>${esc(t.label)}</a>`).join("")}</nav>
       ${subs.length > 1 ? `<nav class="ws-sub" aria-label="${esc(route.ws.label)} pages">${subs.map((x) => `<a href="${base}/${tab}${x[0] ? "/" + x[0] : ""}" data-link${x[0] === sub ? ' aria-current="page"' : ""}>${esc(x[1])}</a>`).join("")}</nav>` : ""}</div>`;
     $("#ws-switch")?.addEventListener("change", (e) => navigate(location.pathname.replace(`/hubs/${hub}`, `/hubs/${e.target.value}`)));
+    showActiveTab(bar);
     return;
   }
   const sec = route ? sectionOf(location.pathname) : null;
   if (sec) {
     const tabs = SECTIONS[sec].tabs.filter(([p]) => can(permOfPath(p)));
     bar.innerHTML = `<div class="ws"><nav class="ws-tabs" aria-label="${esc(SECTIONS[sec].label)} pages">${tabs.map(([p, l]) => `<a href="${p}" data-link${p === location.pathname ? ' aria-current="page"' : ""}>${esc(l)}</a>`).join("")}</nav></div>`;
+    showActiveTab(bar);
   } else bar.innerHTML = "";
+}
+// On a phone a long page introduction shows two lines with a "Read more" button, so the figures start higher.
+function clampIntro(view) {
+  if (!matchMedia("(max-width: 860px)").matches) return;
+  const p = view.querySelector(".page-head p");
+  if (!p || p.dataset.clamped || p.textContent.trim().length < 110) return;
+  p.dataset.clamped = "1"; p.classList.add("clamp");
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "more-link"; b.textContent = "Read more"; b.setAttribute("aria-expanded", "false");
+  b.onclick = () => { const open = p.classList.toggle("open"); b.textContent = open ? "Show less" : "Read more"; b.setAttribute("aria-expanded", String(open)); };
+  p.after(b);
+}
+// On a phone the tab strips scroll sideways; slide the open tab into view so it is never hidden off the edge (sideways only, the page does not move).
+function showActiveTab(bar) {
+  bar.querySelectorAll(".ws-tabs, .ws-sub, .portal-tabs").forEach((strip) => {
+    const on = strip.querySelector('[aria-current="page"], button.on');
+    if (!on || strip.scrollWidth <= strip.clientWidth) return;
+    const s = strip.getBoundingClientRect(), a = on.getBoundingClientRect();
+    strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2;
+  });
 }
 
 export async function render({ moveFocus = false, restoreY = 0 } = {}) {
@@ -520,6 +542,7 @@ export async function render({ moveFocus = false, restoreY = 0 } = {}) {
     view.dataset.page = page; // lets the styles treat every page the same way
     document.body.dataset.page = page;
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
+    if (seq === renderSeq) { clampIntro(view); showActiveTab(view); }
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");
     view.classList.add("page-in");
