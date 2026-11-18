@@ -1,6 +1,6 @@
 import { post } from "../api.js";
 import { state } from "../app.js";
-import { $, html, icon, toast, busy, initials } from "../ui.js";
+import { $, html, icon, toast, busy, initials, hapticsOn, setHaptics } from "../ui.js";
 
 export default {
   title: "My account",
@@ -13,6 +13,8 @@ export default {
           <div><h2>${u.full_name}</h2><div class="muted">${u.username} · ${u.role}${u.hub ? ` · hub ${u.hub}` : ""}</div></div></div>
           <div class="card-body"><div class="faint" style="font-size:14px;margin-bottom:6px">You can</div>
             <div class="row" style="gap:6px">${u.permissions.map((p) => html`<span class="badge plain">${p.replace(/_/g, " ")}</span>`)}</div></div></div>
+        <div class="card"><div class="card-head"><h2>On this phone</h2></div><div class="card-body">
+          <label class="check-row" style="display:flex;gap:12px;align-items:center;min-height:48px;cursor:pointer"><input type="checkbox" id="haptics" ${hapticsOn() ? "checked" : ""}><span>Vibrate a little when an action works</span></label></div></div>
         <div class="card"><div class="card-head"><h2>Change password</h2></div><div class="card-body">
           <form id="pf" class="stack" style="gap:14px">
             <div class="field"><label>Current password</label><input class="input" type="password" name="current_password" autocomplete="current-password" required></div>
@@ -21,6 +23,7 @@ export default {
             <div><button class="btn primary" id="pw">${icon("lock")} Update password</button></div>
           </form></div></div>
       </div>`;
+    $("#haptics").onchange = (e) => { setHaptics(e.target.checked); toast(e.target.checked ? "Vibration on" : "Vibration off"); };
     $("#pf").onsubmit = (e) => {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));

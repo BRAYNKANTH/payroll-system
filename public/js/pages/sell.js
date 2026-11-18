@@ -2,13 +2,12 @@
 // The date is always today and the price is always the list price. Under the till sit the seller's stock for the day
 // (what the hub gave them and what is left), the sales made so far, and the cash handed in at the end of the day.
 import { get, post, del } from "../api.js";
-import { $, $$, html, raw, esc, icon, toast, busy, confirmDialog, emptyState, announce } from "../ui.js";
+import { buzz, $, $$, html, raw, esc, icon, toast, busy, confirmDialog, emptyState, announce } from "../ui.js";
 
 const n0 = (c) => (Number(c) / 100).toLocaleString("en-LK", { maximumFractionDigits: 2 });
 const rs = (c) => `Rs ${n0(c)}`;
 const when = (iso) => { try { return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Colombo" }); } catch { return ""; } };
 const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
-const buzz = (ms = 12) => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } };
 const LOW = 3; // this many or fewer pieces left shows as "low"
 
 // Mounts the till into `box`. `onChanged` runs after anything is saved, so the rest of the page can refresh its totals.

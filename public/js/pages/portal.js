@@ -1,7 +1,7 @@
 // Staff portal: one page for any employee (distributor, supervisor, manager, promoting manager or coacher), showing only their own figures and their team's sales.
 import { get, post, del } from "../api.js";
 import { state } from "../app.js";
-import { $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime } from "../ui.js";
+import { buzz, $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime } from "../ui.js";
 import { mountSell } from "./sell.js";
 
 let tab = "month";
@@ -19,14 +19,13 @@ const readBase64 = (file) => new Promise((ok, fail) => {
   r.onerror = () => fail(new Error("The file could not be read"));
   r.readAsDataURL(file);
 });
-const buzz = (ms = 8) => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } }; // a light tap on phones that allow it
 
 // The person's own pay rules in plain words.
 function payRules(p, me, rate) {
   const rs = (c) => `Rs ${money(c)}`;
   const lines = [];
   if (me?.senior) return [`A fixed salary of <b>${rs(p.basic_pay)}</b> every month, paid to your bank.`, `Plus <b>${pct(rate, 2)}</b> of the sales of everyone below you, worked out by the office when the month closes.`];
-  if (me?.is_manager) return [`Your pay is worked out from your weekly account: the weekly commission on your own and your team's sales, your own sales commission, and the deductions for rent, hub fee, security and the company return. The office completes it each week.`, `Only your basic salary of <b>${rs(p.basic_pay)}</b> is paid to your bank each month; the rest runs as your account with the company.`];
+  if (me?.is_manager) return [`Your pay is your basic salary of <b>${rs(p.basic_pay)}</b> plus the weekly commission on your own and your team's sales (20% when the week reaches your target, otherwise 15%) and your own sales commission, less the weekly rent and hub fee and any extra pay or food you give your team.`, `It is all paid to your bank at month end.`];
   if (p.pay_scheme === "tiered") {
     lines.push(`If your sales in the month go over <b>${rs(p.target)}</b>: a fixed basic pay of <b>${rs(p.basic_pay)}</b> plus <b>${pct(p.commission_rate, 0)}</b> of the sales above the target.`);
     lines.push(`If your sales are <b>${rs(p.target)}</b> or less: <b>${pct(p.base_commission_rate, 0)}</b> of all your sales, and no basic pay.`);
@@ -163,7 +162,7 @@ export default {
           <div class="h-top"><span>${monthName(d.period)}</span><span class="h-chip">${final ? "Final" : pay ? "Not final" : "Open"}</span></div>
           <div class="h-label">${final ? "Net pay" : "Estimated take-home so far"}</div>
           <div class="h-amount ${pay && pay.net < 0 ? "negative" : ""}">${pay ? raw(`<small>Rs</small>${money(pay.net)}`) : "—"}</div>
-          <div class="h-foot">${final ? `Paid to your bank: Rs ${money(d.official.paid)}` : pay ? "Changes as more days are entered" : me.is_manager ? "Your pay is worked out from your weekly account and shown here once the month is closed" : "Your pay appears when your sales are entered"}</div>
+          <div class="h-foot">${final ? `Paid to your bank: Rs ${money(d.official.paid)}` : pay ? "Changes as more days are entered" : me.is_manager ? "Your pay is shown here once the month is closed" : "Your pay appears when your sales are entered"}</div>
           ${m.target ? html`<div class="h-bar" role="progressbar" aria-label="Progress to target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(attain, 1) * 100)}"><span style="width:${Math.min(100, attain * 100)}%"></span></div>
           <div class="h-foot">Sales Rs ${n0(m.business)} of Rs ${n0(m.target)} target · ${pct(attain, 0)}</div>` : ""}
         </section>
@@ -323,7 +322,6 @@ export default {
     };
     $$("#tabs button", el).forEach((b) => (b.onclick = () => {
       if (tab === b.dataset.t) return;
-      buzz(6);
       const was = tab; tab = b.dataset.t;
       history.pushState({ tab }, "", `${location.pathname}?tab=${tab}`);
       if (was === "sell" && dirty) { dirty = false; this.render({ ...ctx, refresh: true }); } else show();

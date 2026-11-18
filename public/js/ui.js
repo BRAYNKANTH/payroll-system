@@ -137,6 +137,11 @@ const P = {
 };
 export const icon = (name, cls = "") => raw(`<svg class="i ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ""}</svg>`);
 
+// ---- haptics: a light buzz on phones that allow it; people can turn it off on My account
+export const hapticsOn = () => { try { return localStorage.getItem("pr.haptics") !== "off"; } catch { return true; } };
+export const setHaptics = (on) => { try { localStorage.setItem("pr.haptics", on ? "on" : "off"); } catch { /* private mode */ } };
+export const buzz = (ms = 8) => { if (hapticsOn()) { try { navigator.vibrate?.(ms); } catch { /* not supported */ } } };
+
 // ---- live regions & toasts
 // Screen readers only announce changes to live regions that already exist, so both are created up front.
 // The app shell replaces the whole <body> after sign-in, which removes them; this puts them back whenever they are missing.
