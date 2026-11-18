@@ -1592,3 +1592,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 }
 @media (max-width: 700px) { .msheet th.name { border: 0; box-shadow: none; min-width: 0; } }
 #view[data-page] th, #view[data-page] .tp-left { font-size: 14px; }
+
+/* The till says how to sell, and why selling is unavailable when it is */
+.till-steps { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin: 0 0 14px; padding: 0; font-size: 15px; color: var(--text-2); }
+.till-steps li { display: inline-flex; align-items: center; gap: 8px; }
+.till-steps b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: 14px; }
