@@ -200,7 +200,7 @@ export default {
     if (scopeHub() && filters.group === "hub") filters.group = "manager"; // one hub: group by manager instead
 
     const allCols = [
-      { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
+      { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:color-mix(in srgb, var(--accent) 78%, #000)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
       { key: "staff_level", label: "Position", render: (s) => html`${badge(s.role, levelLabel(s.staff_level))}${s.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}` },
       { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
       { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },

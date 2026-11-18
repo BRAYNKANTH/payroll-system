@@ -135,7 +135,7 @@ export function donutChart(el, { items, center = "", sub = "", label = "Donut ch
       <text x="100" y="118" text-anchor="middle" style="font:13px var(--font);fill:var(--text-3)">${esc(sub)}</text>
     </svg>
     <div style="display:grid;gap:8px;flex:1;min-width:160px">${items.map((it) => `
-      <div style="display:flex;align-items:center;gap:8px;font-size:13px"><i style="width:10px;height:10px;border-radius:3px;background:${it.color}"></i>
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px"><i style="width:10px;height:10px;border-radius:3px;background:${it.color}"></i>
       <span style="flex:1;color:var(--text-2)">${esc(it.name)}</span><b class="num">${compact(it.value)}</b></div>`).join("")}</div></div>`;
   bindTips(el);
 }

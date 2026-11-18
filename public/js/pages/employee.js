@@ -158,10 +158,18 @@ export default {
       $$("[data-up]", box).forEach((inp) => (inp.onchange = () => busy(inp.parentElement, async () => {
         const file = inp.files[0];
         if (!file) return;
-        if (file.size > DOC_MAX) throw new Error("The file is larger than 3 MB. Scan or photograph it at a lower quality.");
-        await post(`/api/staff/${encodeURIComponent(s.employee_id)}/documents`, { doc_type: inp.dataset.up, file_name: file.name, mime: file.type, data: await readBase64(file) });
-        toast(`${file.name} uploaded`);
-        await drawDocs();
+        const resetInput = () => { inp.value = ""; };
+        if (file.size > DOC_MAX) {
+          resetInput();
+          throw new Error("The file is larger than 3 MB. Scan or photograph it at a lower quality.");
+        }
+        try {
+          await post(`/api/staff/${encodeURIComponent(s.employee_id)}/documents`, { doc_type: inp.dataset.up, file_name: file.name, mime: file.type, data: await readBase64(file) });
+          toast(`${file.name} uploaded`);
+          await drawDocs();
+        } finally {
+          resetInput();
+        }
       })));
       $$("[data-rm]", box).forEach((b) => (b.onclick = async () => {
         if (!(await confirmDialog({ title: "Remove document?", message: `${b.dataset.name} will be deleted. This cannot be undone.`, confirmText: "Remove", danger: true }))) return;
