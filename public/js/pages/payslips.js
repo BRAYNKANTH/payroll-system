@@ -26,7 +26,7 @@ export default {
       const f = q.toLowerCase();
       const shown = rows.filter((r) => !f || r.name.toLowerCase().includes(f) || r.employee_id.toLowerCase().includes(f));
       $("#list").innerHTML = rows.length ? dataTable({
-        rows: shown, empty: "No matching employees",
+        rows: shown, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
         onRow: (r) => openPayslip(p, r.employee_id),
         rowAction: "View", rowLabel: (r) => `View payslip for ${r.name}`,
         card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span></span>

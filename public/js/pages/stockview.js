@@ -46,7 +46,7 @@ export default {
       </div></div>`.toString();
 
     $("#byprod").innerHTML = d.products.length ? dataTable({
-      rows: d.products, footer: true, empty: "No products yet",
+      rows: d.products, footer: true, empty: "No products yet", emptyHint: "Add products so they can be sent to hubs and sold.",
       cols: [
         { key: "product", label: "Product", render: (p) => html`<b>${p.product}</b>`, total: () => "Total" },
         { key: "received", label: "Received", align: "r", total: (rs) => n0(rs.reduce((a, r) => a + r.received, 0)) },
@@ -60,7 +60,7 @@ export default {
     }).toString() : emptyState("No products yet", "The office adds products first.", "box").toString();
 
     $("#bysell").innerHTML = d.sellers.length ? dataTable({
-      rows: d.sellers, empty: "No sellers in this hub yet",
+      rows: d.sellers, empty: "No sellers in this hub yet", emptyHint: "Add sellers to this hub on the Employees page.",
       groupBy: (s) => s.team.id,
       groupLabel: (key, rs) => `<b>${rs[0].team.title}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "seller" : "sellers"} · ${n0(rs.reduce((a, r) => a + r.left, 0))} pieces held</span>`,
       card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${levelLabel(s.staff_level)}</span></span><span class="mc-end">${n0(s.left)} left<br><span class="muted">sold ${n0(s.sold_today)} today</span></span>`,

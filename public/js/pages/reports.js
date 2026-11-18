@@ -77,7 +77,7 @@ export default {
         pane.innerHTML = d.rows.length ? html`<div class="alert info mb-4">${icon("info")}<div>What was sold this month (from the stock counts, sold × unit price), less the workers' ${pct(d.workers_rate, 0)} and the purchase prices in <a href="/products" data-link>Products</a>.
             ${d.totals.unmatched ? html`<b>${d.totals.unmatched} product${d.totals.unmatched > 1 ? "s are" : " is"} not in the Products list</b>, so no profit can be shown for ${d.totals.unmatched > 1 ? "them" : "it"}.` : ""}</div></div>
           <div class="card"><div class="card-body flush">${dataTable({
-            rows: d.rows, footer: true, empty: "Nothing sold",
+            rows: d.rows, footer: true, empty: "Nothing sold", emptyHint: "Nothing was sold in this period. Try another month.",
             cols: [
               { key: "product", label: "Product", render: (r) => html`<b>${r.product}</b> ${r.matched ? "" : html`<span class="badge amber plain">not in Products</span>`}`, total: () => "Total" },
               { key: "qty", label: "Units sold", align: "r", total: (x) => x.reduce((t, r) => t + r.qty, 0) },
@@ -129,7 +129,7 @@ export default {
         const rows = await get("/api/reports/balances");
         pane.innerHTML = html`<div class="alert info mb-4">${icon("info")}<div>Latest closing balance per employee. Negative guy balances are money owed that is recovered from future pay; manager balances are their running account with the company.</div></div>
           <div class="card"><div class="card-body flush">${dataTable({
-            rows, footer: true, empty: "No balances yet",
+            rows, footer: true, empty: "No balances yet", emptyHint: "Balances appear after the month has been calculated.",
             cols: [
               { key: "name", label: "Employee", render: (r) => html`<a href="/employees/${encodeURIComponent(r.employee_id)}" data-link><b>${r.name}</b></a> <span class="faint">${r.employee_id}</span>`, total: () => "Total" },
               { key: "role", label: "Role", render: (r) => badge(r.role, r.role === "guy" ? "Guy" : "Manager") },
@@ -146,7 +146,7 @@ export default {
         const asc = [...rows].reverse().slice(-12);
         pane.innerHTML = html`${rows.length ? html`<div class="card mb-4"><div class="card-head"><h2>Payroll cost by month</h2></div><div class="card-body" id="c"></div></div>` : ""}
           <div class="card"><div class="card-body flush">${dataTable({
-            rows, empty: "No months calculated yet",
+            rows, empty: "No months calculated yet", emptyHint: "Run payroll for a month and it will appear here.",
             cols: [
               { key: "period", label: "Month", render: (r) => html`<b>${monthName(r.period)}</b>` },
               { key: "status", label: "Status", render: (r) => badge(r.status) },

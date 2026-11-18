@@ -107,10 +107,10 @@ export default {
           <div class="row" style="gap:8px;margin-top:4px"><div class="progress ${a >= 1 ? "green" : a >= 0.7 ? "" : "amber"}" style="flex:1"><span style="width:${Math.min(100, a * 100)}%"></span></div>
           <span style="font-size:14px;font-weight:600;min-width:44px;text-align:right">${t.attainment == null ? "—" : pct(a, 0)}</span></div></div>
         <div style="text-align:right"><b class="num">${compact(t.business)}</b><div class="faint" style="font-size:14px">of ${compact(t.target)}</div></div></div>`;
-    }).join("") : emptyState("No sellers yet", "", "users").toString();
+    }).join("") : emptyState("No sellers yet", "Sellers appear here once they are added to a hub.", "users").toString();
 
     const incomplete = d.completeness.filter((c) => c.missing.length).sort((a, b) => b.missing.length - a.missing.length);
-    $("#complete").innerHTML = !d.completeness.length ? emptyState("No active sellers", "", "users").toString()
+    $("#complete").innerHTML = !d.completeness.length ? emptyState("No active sellers", "Add distributors and supervisors on the Employees page.", "users").toString()
       : !incomplete.length ? emptyState("All caught up", "Every working day so far has an entry.", "checkCircle").toString()
       : incomplete.slice(0, 7).map((c) => html`<div class="list-item">
           <div class="grow"><b>${c.name}</b><span>${c.hub} · missing ${c.missing.slice(0, 4).map((m) => m.slice(8)).join(", ")}${c.missing.length > 4 ? "…" : ""}</span></div>

@@ -1726,7 +1726,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .daily-page .dg-nums b, .daily-page .dstat b { font-variant-numeric: tabular-nums; }
 .daily-page details.dgrp > summary { min-height: 56px; }
 .daily-page .savebar .btn { min-width: 120px; }
-.daily-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); }
+.daily-page .sheet input { height: 44px; min-height: 44px; font-size: 16px; border-color: var(--border); background: var(--surface); }
 .daily-page .sheet input:disabled { background: transparent; border-color: transparent; }
 .daily-page .sheet input:focus { border-color: var(--primary); }
 .daily-page .seg button { padding-inline: 14px; }
@@ -1743,7 +1743,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* ---------- Weekly sheet: roomy entry cells, touch-size week buttons, readable small text ---------- */
 .weekly-page .btn, .weekly-page .btn.sm, .weekly-page .seg button, .weekly-page .tabs button { min-height: 44px; }
 .weekly-page .seg button { padding-inline: 14px; font-size: 15px; }
-.weekly-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
+.weekly-page .sheet input { height: 44px; min-height: 44px; font-size: 16px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
 .weekly-page .sheet input:disabled { background: transparent; border-color: transparent; }
 .weekly-page .sheet input:focus { border-color: var(--primary); }
 .weekly-page .faint, .weekly-page .text-sm, .weekly-page .badge, .weekly-page .card-head .sub, .weekly-page .seg small { font-size: 14px; }
@@ -1752,7 +1752,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* ---------- Stock count: roomy entry cells, touch-size controls, readable small text ---------- */
 .stockc-page .btn, .stockc-page .btn.sm, .stockc-page .btn.icon, .stockc-page .input { min-height: 44px; }
 .stockc-page .btn.icon { min-width: 44px; }
-.stockc-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
+.stockc-page .sheet input { height: 44px; min-height: 44px; font-size: 16px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
 .stockc-page .sheet input:disabled { background: transparent; border-color: transparent; }
 .stockc-page .sheet input:focus { border-color: var(--primary); }
 .stockc-page .sheet th { white-space: nowrap; }
@@ -1761,7 +1761,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* ---------- Hub stock sheet: roomy entry cells, touch-size controls, readable small text ---------- */
 .hubsheet-page .btn, .hubsheet-page .btn.sm, .hubsheet-page .btn.icon, .hubsheet-page .input { min-height: 44px; }
 .hubsheet-page .btn.icon { min-width: 44px; }
-.hubsheet-page .sheet input { height: 44px; min-height: 44px; font-size: 15px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
+.hubsheet-page .sheet input { height: 44px; min-height: 44px; font-size: 16px; border-color: var(--border); background: var(--surface); font-variant-numeric: tabular-nums; }
 .hubsheet-page .sheet input:disabled { background: transparent; border-color: transparent; }
 .hubsheet-page .sheet input:focus { border-color: var(--primary); }
 .hubsheet-page .sheet th { white-space: nowrap; }
@@ -2030,3 +2030,10 @@ a.crumb-group { min-width: 44px; justify-content: center; }
 .text-sm, .mc-label, .mstep .mdot, .user-chip .who b, .gsearch .gs-key, .num.text-sm { font-size: 14px; }
 .nav .count { background: color-mix(in srgb, var(--accent) 78%, #000); font-size: 12px; }
 :root[data-theme="dark"] .nav .count { background: var(--accent); }
+
+/* Phones and touch screens: any field under 16px makes iOS zoom the page when it is focused */
+@media (pointer: coarse), (max-width: 860px) {
+  .gsearch input, .input.sm, select.input.sm, .period-picker select, .period-picker input, .filterbar select, .filterbar input { font-size: 16px; }
+}
+@media (pointer: coarse), (max-width: 860px) { .sheet input, .sheet td input, table input { font-size: 16px; } }
+.empty .empty-hint { margin: 0; color: var(--text-2); font-size: 14px; }

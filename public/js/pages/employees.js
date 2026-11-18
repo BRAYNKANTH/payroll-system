@@ -251,7 +251,7 @@ export default {
         : filters.group === "manager" ? (() => { const g = managerGroupOf(rs[0], byId); return `<b>${g.title}</b> <span class="muted">· ${g.sub ? g.sub + " · " : ""}${rs.length} ${rs.length === 1 ? "person" : "people"}</span>`; })()
         : `<b>${levelLabel(key, rs.length)}</b> <span class="muted">· ${rs.length}</span>`;
       $("#list").innerHTML = staff.length ? dataTable({
-        rows, groupBy, groupLabel, empty: "No employees match these filters", cls: "people",
+        rows, groupBy, groupLabel, empty: "No employees match these filters", emptyHint: "Try a different search, or clear the filters.", cls: "people",
         card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${hubName(s.hub)}${(s.upline_id || s.manager_id) && byId[s.upline_id || s.manager_id] ? ` · reports to ${byId[s.upline_id || s.manager_id].name}` : ""}</span></span>
           <span class="mc-end">${badge(s.role, levelLabel(s.staff_level))}<br>${badge(s.status)}</span>`,
         summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"}`, rowAction: "", rowLabel: (s) => `Open ${s.name}`,

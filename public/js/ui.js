@@ -194,7 +194,7 @@ function setBackgroundInert(on) {
 document.addEventListener("keydown", (e) => {
   const top = layers[layers.length - 1];
   if (!top) return;
-  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); top.close(); return; }
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); top.dismiss(); return; }
   if (e.key !== "Tab") return;
   const items = [...top.panel.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null || el.tagName === "IFRAME");
   if (!items.length) { e.preventDefault(); return; }
@@ -228,10 +228,25 @@ function overlayShell(cls, title, inner, { onClose } = {}) {
     onClose?.();
   };
   layer.close = close;
+  // Closing by hand (X, Cancel, Escape, tapping outside) asks first if the person has typed into a form here, so a long form is never lost by accident.
+  // Closing from code after a save (close()) never asks.
+  layer.dirty = false;
+  let asking = false;
+  layer.dismiss = async () => {
+    if (layer.dirty && !asking) {
+      asking = true;
+      const ok = await confirmDialog({ title: "Discard what you typed?", message: "You started filling this in. If you close it now, what you typed will be lost.", confirmText: "Discard", danger: true });
+      asking = false;
+      if (!ok) return;
+    }
+    close();
+  };
+  panel.addEventListener("input", (e) => { if (e.target.closest?.("form")) layer.dirty = true; });
+  panel.addEventListener("change", (e) => { if (e.target.closest?.("form")) layer.dirty = true; });
   layers.push(layer);
   setBackgroundInert(true);
-  ov.addEventListener("click", close);
-  panel.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", close));
+  ov.addEventListener("click", () => layer.dismiss());
+  panel.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => (/^(done|close)$/i.test(b.textContent.trim()) ? close() : layer.dismiss())));
   linkLabels(panel);
   setTimeout(() => {
     // On a touch screen, focusing a field would open the keyboard over the form; focus the dialog itself instead.
@@ -306,9 +321,9 @@ export function confirmDialog({ title, message, confirmText = "Confirm", danger 
 // cols: [{ key, label, align: 'r'|'c', render(row) -> html/raw, sort(row) -> value | false, total(rows) -> html }]
 // onRow: makes rows clickable for mouse users AND adds a real button per row (rowLabel names it) so the
 // same action works from the keyboard and for screen readers.
-export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100, card, summary, groupBy, groupLabel }) {
+export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowAction = "Open", empty = "Nothing here yet", emptyHint = "", sortable = true, footer = false, cls = "", rowAttr, caption = "", pageSize = 100, card, summary, groupBy, groupLabel }) {
   const id = "t" + Math.random().toString(36).slice(2, 8);
-  if (!rows.length) return raw(`<div class="empty"><div class="ico">${icon("sheet")}</div><h4>${esc(empty)}</h4></div>`);
+  if (!rows.length) return raw(`<div class="empty"><div class="ico">${icon("sheet")}</div><h4>${esc(empty)}</h4>${emptyHint ? `<p class="empty-hint">${esc(emptyHint)}</p>` : ""}</div>`);
   // On a phone a list of cards is easier to read and tap than a wide table. Each card is one button, so the whole row works as one control.
   // A table with more than four columns and no card of its own becomes cards too: the first column is the title, the rest are label and value pairs.
   const labelled = cols.filter((c) => c.label);

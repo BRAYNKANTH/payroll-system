@@ -40,7 +40,7 @@ export default {
 
       if (tab === "feed") {
         pane.innerHTML = d.feed.length ? html`<div class="card"><div class="card-body flush">${dataTable({
-          rows: d.feed, sortable: false, pageSize: 25, empty: "No sales entered yet",
+          rows: d.feed, sortable: false, pageSize: 25, empty: "No sales entered yet", emptyHint: "Sales appear here as soon as they are entered on the daily sheet.",
           cols: [
             { key: "date", label: "Day", render: (r) => html`<b>${dateLabel(r.date)}</b><div class="faint text-sm">${r.self_entered ? `entered ${dateTime(r.entered_at)}` : "entered by the office"}</div>` },
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>` },
@@ -60,7 +60,7 @@ export default {
         })}</div></div>`.toString() : html`<div class="card">${emptyState("No sales entered yet", "Sales appear here as soon as they are entered, by the office or by the sellers themselves.", "chart")}</div>`.toString();
       } else {
         pane.innerHTML = d.people.length ? html`<div class="card"><div class="card-body flush">${dataTable({
-          rows: d.people, pageSize: 25, empty: "Nobody has sales this month",
+          rows: d.people, pageSize: 25, empty: "Nobody has sales this month", emptyHint: "People show here once they have a sale this month.",
           cols: [
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>` },
             { key: "days", label: "Days", align: "r" },

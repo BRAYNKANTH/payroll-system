@@ -32,7 +32,7 @@ export default {
       <div class="card"><div class="card-body flush" id="list"></div></div>`;
 
     $("#list").innerHTML = rows.length ? dataTable({
-      rows, empty: "No products yet", onRow: (p) => open(p), rowLabel: (p) => `Edit ${p.name}`, rowAction: "Edit",
+      rows, empty: "No products yet", emptyHint: "Add products so they can be sent to hubs and sold.", onRow: (p) => open(p), rowLabel: (p) => `Edit ${p.name}`, rowAction: "Edit",
       cols: [
         { key: "name", label: "Product", render: (p) => html`<b>${p.name}</b>` },
         { key: "office_stock", label: "In the office", align: "r", render: (p) => html`<b class="${p.office_stock < 1 ? "neg" : ""}">${p.office_stock}</b>` },

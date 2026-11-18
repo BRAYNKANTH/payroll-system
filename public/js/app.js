@@ -533,7 +533,9 @@ export async function render({ moveFocus = false } = {}) {
   } catch (err) {
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");
-    view.innerHTML = `<div class="alert err" role="alert">${icon("alert")}<div><b>Couldn't load this page.</b><br>${esc(err.message)}</div></div>`;
+    const offline = navigator.onLine === false;
+    view.innerHTML = `<div class="alert err" role="alert">${icon("alert")}<div><b>Couldn't load this page.</b><br>${offline ? "You look to be offline. Check your connection, then try again." : "Something went wrong on our side. Try again in a moment."}<div class="faint text-sm" style="margin-top:6px">${esc(err.message)}</div><button type="button" class="btn" id="retry-load" style="margin-top:10px">Try again</button></div></div>`;
+    $("#retry-load")?.addEventListener("click", () => render());
   }
 }
 
@@ -601,17 +603,7 @@ boot().catch((e) => {
   document.getElementById("boot-retry").onclick = () => location.reload();
 });
 
-// Forms: tie every visible label to its control, so screen readers and voice control can name the field (WCAG 1.3.1, 4.1.2).
-let labelSeq = 0;
-function linkLabels(root) {
-  if (!root.querySelectorAll) return;
-  for (const lb of root.querySelectorAll("label:not([for])")) {
-    if (lb.querySelector("input,select,textarea")) continue;
-    const ctl = lb.nextElementSibling?.matches("input,select,textarea") ? lb.nextElementSibling : lb.parentElement?.querySelector(":scope > input, :scope > select, :scope > textarea, :scope > .input-wrap input");
-    if (!ctl || ctl.type === "hidden" || ctl.labels?.length) continue;
-    if (!ctl.id) ctl.id = `fld-${++labelSeq}`;
-    lb.htmlFor = ctl.id;
-  }
-}
-new MutationObserver((muts) => { for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1) linkLabels(n); }).observe(document.body, { childList: true, subtree: true });
-linkLabels(document.body);
+
+// Offline: say so quietly, and confirm when the connection is back (nothing is saved while offline).
+window.addEventListener("offline", () => toast("You're offline. Changes can't be saved until you reconnect.", "warn"));
+window.addEventListener("online", () => toast("Back online.", "ok"));

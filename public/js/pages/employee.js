@@ -129,16 +129,16 @@ export default {
         </div></div>`,
       history: () => p.history.length ? html`
         <div class="card mb-4"><div class="card-head"><h2>Net pay over time</h2></div><div class="card-body" id="chart"></div></div>
-        <div class="card"><div class="card-body flush" id="hist"></div></div>` : html`<div class="card">${emptyState("No pay history yet", "", "file")}</div>`,
+        <div class="card"><div class="card-body flush" id="hist"></div></div>` : html`<div class="card">${emptyState("No pay history yet", "Pay appears here after the first month is calculated.", "file")}</div>`,
       team: () => html`<div class="card"><div class="card-body flush">${dataTable({
-        rows: p.team, empty: "No guys report to this manager", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),
+        rows: p.team, empty: "No guys report to this manager", emptyHint: "People appear here when they are set to report to this manager.", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),
         cols: [{ key: "name", label: "Name", render: (g) => html`<b>${g.name}</b> <span class="faint">${g.employee_id}</span>` }, { key: "basic_pay", label: "Basic", align: "r", render: (g) => money(g.basic_pay) },
           { key: "target", label: "Target", align: "r", render: (g) => money(g.target) }, { key: "status", label: "Status", render: (g) => badge(g.status) }],
       })}</div></div>`,
       documents: () => html`<div class="card"><div class="card-head"><div><h2>Documents</h2><div class="sub">JPG, PNG, WebP or PDF, up to 3 MB each</div></div></div>
         <div class="card-body" id="docs"><div class="loading-screen"><div class="spinner"></div></div></div></div>`,
       changes: () => html`<div class="card"><div class="card-body flush">${dataTable({
-        rows: p.changes, sortable: false, empty: "No changes since the record was created",
+        rows: p.changes, sortable: false, empty: "No changes since the record was created", emptyHint: "Edits to this person's details will be listed here.",
         cols: [{ key: "changed_at", label: "When", render: (a) => dateTime(a.changed_at) }, { key: "changed_by", label: "Who" }, { key: "diff", label: "Change", render: (a) => auditDiff(a) }],
       })}</div></div>`,
     };

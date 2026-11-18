@@ -55,7 +55,7 @@ export default {
     };
 
     $("#recent").innerHTML = dataTable({
-      rows: recent, sortable: false, pageSize: 5, empty: "No decisions yet",
+      rows: recent, sortable: false, pageSize: 5, empty: "No decisions yet", emptyHint: "Approved and rejected items will show here.",
       cols: [
         { key: "row_key", label: "Entry", render: (a) => html`<b>${a.row_key.split("@")[0]}</b><div class="faint text-sm">${a.row_key.split("@")[1]}</div>` },
         { key: "action", label: "Decision", render: (a) => badge(a.action === "approve" ? "approved" : "rejected") },
