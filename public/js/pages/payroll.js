@@ -1,6 +1,6 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce, confirmDialog } from "../ui.js";
 import { openBreakdown } from "./breakdown.js";
 
 let filter = "all";
@@ -29,6 +29,7 @@ export default {
         <div class="actions">
           ${calculated ? exportButtons("register", { period: p }) : ""}
           ${badge(data.status)}
+          ${can("finalize") && !scopeHub() && calculated && !finalized ? html`<button class="btn ${pending || rejected ? "" : "primary"}" id="close-month">${icon("lock")} Close month</button>` : ""}
           ${can("run_payroll") && !finalized ? html`<button class="btn ${calculated ? "" : "primary"}" id="run">${icon("refresh")} ${calculated ? "Update salary figures" : "Work out salaries"}</button>` : ""}
         </div>
       </div>
@@ -112,6 +113,33 @@ export default {
       toast(`Worked out ${r.employees} people — ${r.auto_approved} auto-approved, ${r.pending_review} need review`, r.pending_review ? "warn" : "ok");
       refreshPending();
       this.render(ctx);
+    });
+    // Closing the month is final: salaries are worked out once more, the month's sheets are locked and sellers can open their payslips.
+    $("#close-month")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      if (pending || rejected) {
+        toast(`${pending + rejected} ${pending + rejected === 1 ? "entry still needs" : "entries still need"} a decision before the month can be closed. Open Approvals.`, "warn");
+        return;
+      }
+      const month = monthName(p);
+      const ok = await confirmDialog({
+        title: `Close ${month}?`,
+        message: `<ul style="margin:0;padding-left:18px;line-height:1.7">
+          <li><b>${all.length}</b> people · to the bank <b>Rs ${money(sum("disbursed_amount"))}</b></li>
+          <li>Salaries are worked out once more from the latest sheets.</li>
+          <li>The daily, weekly, stock and allowance entries for ${month} are <b>locked</b>. They cannot be changed afterwards.</li>
+          <li>Sellers can then open their payslips.</li></ul>
+          <p style="margin:12px 0 0"><b>This cannot be undone here.</b></p>`,
+        confirmText: `Close ${month}`, danger: true,
+      });
+      if (!ok) return;
+      await busy(btn, async () => {
+        try { await post(`/api/payroll/${p}/finalize`); }
+        catch (err) { throw new Error(String(err.message).replace(/^Finalize earlier periods first: (.+)$/, (_, m) => `Close the earlier months first: ${m.split(", ").map((x) => monthName(x)).join(", ")}`)); }
+        toast(`${month} is closed. Payslips are ready.`, "ok");
+        refreshPending();
+        this.render(ctx);
+      });
     });
     $("#run")?.addEventListener("click", run);
     $("#run2")?.addEventListener("click", run);
