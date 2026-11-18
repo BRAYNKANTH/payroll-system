@@ -129,7 +129,7 @@ export default {
           <div style="max-height:46vh;overflow:auto;border:1px solid var(--border,#e5e7eb);border-radius:10px">
             <table class="table" style="width:100%"><thead><tr><th scope="col"></th><th scope="col">Employee</th><th scope="col">Username</th></tr></thead><tbody>
             ${cands.map((x, i) => html`<tr><td><input type="checkbox" class="bk-row" data-i="${i}" ${x.user.length >= 3 ? "checked" : "disabled"} aria-label="Create a login for ${x.name}"></td>
-              <td><b>${x.name}</b><br><span class="faint" style="font-size:12px">${LV[x.staff_level] || x.staff_level} · ${x.employee_id} · ${x.hub}</span></td>
+              <td><b>${x.name}</b><br><span class="faint" style="font-size:14px">${LV[x.staff_level] || x.staff_level} · ${x.employee_id} · ${x.hub}</span></td>
               <td>${x.user.length >= 3 ? x.user : html`<span class="faint">no mobile number</span>`}</td></tr>`)}
             </tbody></table></div>` : html`<div class="alert info">${icon("info")}<div>Every active employee already has a login.</div></div>`}
         </div>`.toString(),

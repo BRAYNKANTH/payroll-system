@@ -105,8 +105,8 @@ export default {
       return html`<div class="list-item"><div class="avatar">${initials(t.name)}</div>
         <div class="grow"><b><a href="/employees/${encodeURIComponent(t.employee_id)}" data-link>${t.name}</a></b>
           <div class="row" style="gap:8px;margin-top:4px"><div class="progress ${a >= 1 ? "green" : a >= 0.7 ? "" : "amber"}" style="flex:1"><span style="width:${Math.min(100, a * 100)}%"></span></div>
-          <span style="font-size:12px;font-weight:600;min-width:44px;text-align:right">${t.attainment == null ? "—" : pct(a, 0)}</span></div></div>
-        <div style="text-align:right"><b class="num">${compact(t.business)}</b><div class="faint" style="font-size:11px">of ${compact(t.target)}</div></div></div>`;
+          <span style="font-size:14px;font-weight:600;min-width:44px;text-align:right">${t.attainment == null ? "—" : pct(a, 0)}</span></div></div>
+        <div style="text-align:right"><b class="num">${compact(t.business)}</b><div class="faint" style="font-size:14px">of ${compact(t.target)}</div></div></div>`;
     }).join("") : emptyState("No sellers yet", "", "users").toString();
 
     const incomplete = d.completeness.filter((c) => c.missing.length).sort((a, b) => b.missing.length - a.missing.length);
@@ -115,7 +115,7 @@ export default {
       : incomplete.slice(0, 7).map((c) => html`<div class="list-item">
           <div class="grow"><b>${c.name}</b><span>${c.hub} · missing ${c.missing.slice(0, 4).map((m) => m.slice(8)).join(", ")}${c.missing.length > 4 ? "…" : ""}</span></div>
           <div class="progress ${c.logged / c.expected >= 0.9 ? "green" : "amber"}" style="width:90px"><span style="width:${(c.logged / Math.max(1, c.expected)) * 100}%"></span></div>
-          <span class="num" style="font-size:12px;width:48px;text-align:right">${c.logged}/${c.expected}</span></div>`).join("");
+          <span class="num" style="font-size:14px;width:48px;text-align:right">${c.logged}/${c.expected}</span></div>`).join("");
 
     // On a phone the summary cards stay up top and each section below opens on tap. Exceptions open first when there are any.
     if (isPhone()) foldCards([...el.querySelectorAll(".grid.halves > .card")], { open: pay && d.exceptions.length ? [0] : [] });

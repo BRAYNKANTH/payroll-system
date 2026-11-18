@@ -600,3 +600,18 @@ boot().catch((e) => {
     <details><summary>Technical detail</summary><p>${esc(e.message)}</p></details></main>`;
   document.getElementById("boot-retry").onclick = () => location.reload();
 });
+
+// Forms: tie every visible label to its control, so screen readers and voice control can name the field (WCAG 1.3.1, 4.1.2).
+let labelSeq = 0;
+function linkLabels(root) {
+  if (!root.querySelectorAll) return;
+  for (const lb of root.querySelectorAll("label:not([for])")) {
+    if (lb.querySelector("input,select,textarea")) continue;
+    const ctl = lb.nextElementSibling?.matches("input,select,textarea") ? lb.nextElementSibling : lb.parentElement?.querySelector(":scope > input, :scope > select, :scope > textarea, :scope > .input-wrap input");
+    if (!ctl || ctl.type === "hidden" || ctl.labels?.length) continue;
+    if (!ctl.id) ctl.id = `fld-${++labelSeq}`;
+    lb.htmlFor = ctl.id;
+  }
+}
+new MutationObserver((muts) => { for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1) linkLabels(n); }).observe(document.body, { childList: true, subtree: true });
+linkLabels(document.body);

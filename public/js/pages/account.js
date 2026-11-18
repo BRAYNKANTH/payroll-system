@@ -11,7 +11,7 @@ export default {
       <div class="grid halves">
         <div class="card"><div class="profile-head"><div class="avatar lg">${initials(u.full_name)}</div>
           <div><h2>${u.full_name}</h2><div class="muted">${u.username} · ${u.role}${u.hub ? ` · hub ${u.hub}` : ""}</div></div></div>
-          <div class="card-body"><div class="faint" style="font-size:12px;margin-bottom:6px">You can</div>
+          <div class="card-body"><div class="faint" style="font-size:14px;margin-bottom:6px">You can</div>
             <div class="row" style="gap:6px">${u.permissions.map((p) => html`<span class="badge plain">${p.replace(/_/g, " ")}</span>`)}</div></div></div>
         <div class="card"><div class="card-head"><h2>Change password</h2></div><div class="card-body">
           <form id="pf" class="stack" style="gap:14px">
