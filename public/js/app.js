@@ -337,13 +337,15 @@ function isDark() {
   return t === "dark"; // light unless the user chose dark
 }
 function applyTheme() {
-  const t = store.get("pr.theme");
+  // A saved choice wins; otherwise follow the device's light/dark setting.
+  const t = store.get("pr.theme") || (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : null);
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   const tc = document.querySelector('meta[name="theme-color"]');
   if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#faf8f4";
   const b = $("#theme-btn");
   if (b) { b.innerHTML = icon(isDark() ? "sun" : "moon"); b.setAttribute("aria-label", isDark() ? "Switch to light theme" : "Switch to dark theme"); }
 }
+window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => { if (!store.get("pr.theme")) applyTheme(); });
 function toggleTheme() {
   store.set("pr.theme", isDark() ? "light" : "dark");
   applyTheme();

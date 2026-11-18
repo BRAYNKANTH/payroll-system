@@ -1968,3 +1968,60 @@ body[data-page="payslip"] .period-picker { display: none; }
 a.crumb-group { display: inline-flex; align-items: center; min-height: 44px; }
 a.crumb-group { min-width: 44px; justify-content: center; }
 .ws-sub a, .ws-tabs a, .ws-sub button, .ws-tabs button { min-height: 44px; display: inline-flex; align-items: center; }
+
+/* ===== Dark mode: first paint follows the device until the script applies the saved choice ===== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { color-scheme: dark; }
+  :root:not([data-theme]) body { background: #090e18; color: #f1f5f9; }
+}
+
+/* ===== Reduced transparency: solid panels instead of blurred glass ===== */
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root[data-theme="dark"] { --glass-blur: none; }
+  :root { --glass-bg: var(--surface); --hero-chip-bg: var(--surface); }
+  :root[data-theme="dark"] { --glass-bg: #121927; --hero-chip-bg: #121927; }
+}
+
+/* ===== High contrast (device "increase contrast"): stronger text, borders and focus, no blur ===== */
+@media (prefers-contrast: more) {
+  :root {
+    --border: rgba(11, 21, 38, 0.6); --border-strong: #0b1526;
+    --text-2: #0b1526; --text-3: #1e293b; --sidebar-muted: #1e293b; --sidebar-text: #0b1526;
+    --primary: #004a9f; --primary-2: #003a7e; --primary-text: #003a7e;
+    --success: #0f5f27; --warning: #8a4500; --danger: #a8000f; --info: #01577f; --accent: #7a4f00;
+    --glass-bg: var(--surface); --glass-blur: none; --hero-chip-bg: #fff;
+    --shadow-xs: none; --shadow-sm: none; --shadow: none; --shadow-md: 0 0 0 1px #0b1526; --shadow-lg: 0 0 0 2px #0b1526;
+  }
+  :root[data-theme="dark"] {
+    --border: rgba(255, 255, 255, 0.6); --border-strong: #ffffff;
+    --text: #ffffff; --text-2: #ffffff; --text-3: #e2e8f0; --sidebar-muted: #e2e8f0; --sidebar-text: #ffffff;
+    --primary: #8ec5ff; --primary-2: #b8dbff; --primary-text: #b8dbff;
+    --success: #6ee7b7; --warning: #fcd34d; --danger: #fca5a5; --info: #7dd3fc; --accent: #fcd34d;
+    --glass-bg: #121927; --hero-chip-bg: #000;
+    --shadow-md: 0 0 0 1px #fff; --shadow-lg: 0 0 0 2px #fff;
+  }
+  :focus-visible, .btn:focus-visible, .nav a:focus-visible { outline: 3px solid var(--text) !important; outline-offset: 2px; }
+  .btn, .input, select, textarea, .card, .badge, .chip, .alert, .menu, .sheet, .m-card, .period-picker { border: 1px solid var(--border-strong); }
+  .btn.ghost { border-color: var(--border-strong); }
+  a { text-decoration: underline; }
+  .nav a.active, .nav a[aria-current="page"] { outline: 2px solid var(--text); outline-offset: -2px; }
+  .table th, .table td { border-bottom-color: var(--border-strong); }
+}
+
+/* ===== Windows High Contrast / forced colours: let the system palette draw, keep shapes visible ===== */
+@media (forced-colors: active) {
+  .btn, .input, select, textarea, .card, .badge, .chip, .alert, .menu, .sheet, .m-card, .period-picker, .user-chip, .avatar, .kpi { border: 1px solid CanvasText; forced-color-adjust: auto; }
+  .btn.primary, .btn.danger { border-width: 2px; }
+  :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px; }
+  .nav a.active, .nav a[aria-current="page"], .tabs .active, .tabs [aria-selected="true"], .seg .on { outline: 2px solid Highlight; outline-offset: -2px; font-weight: 700; }
+  .step .dot, .badge::before { forced-color-adjust: none; }
+  .chart rect, .chart path, .chart circle { forced-color-adjust: none; }
+  svg.i { fill: currentColor; }
+  .btn:disabled { border-style: dashed; color: GrayText; }
+}
+
+/* Dark mode: white text on the bright dark-theme blue failed contrast, so filled blue pills use the deep blue of the primary button, and avatars use dark text */
+.step.current .dot, .skip-link, .chip-btn.on, .ws-sub a[aria-current="page"] { background: #13539f; border-color: #13539f; color: #fff; }
+:root[data-theme="dark"] .avatar { color: #0b1526; }
+/* The dark-theme primary button keeps its deep-blue gradient, so its text must stay white */
+:root[data-theme="dark"] .btn.primary, :root[data-theme="dark"] .step.current .dot, :root[data-theme="dark"] .skip-link { color: #fff; }

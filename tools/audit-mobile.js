@@ -5,6 +5,7 @@
 //   node tools/audit-mobile.js --base=https://your-site        another address
 //   node tools/audit-mobile.js --roles=admin,pavan              only some logins
 //   node tools/audit-mobile.js --viewport=laptop                1366x768 instead of a phone (also: tablet)
+//   node tools/audit-mobile.js --theme=dark                     also: contrast, dark-contrast (the device's dark and increase-contrast settings)
 //   node tools/audit-mobile.js --max=40                         most pages per login (default 60)
 //   node tools/audit-mobile.js --extra=/me/payslips/2026-09    also open pages the menus do not link to
 //
@@ -19,6 +20,7 @@ const arg = (name, dflt) => { const a = process.argv.find((x) => x.startsWith(`-
 const BASE = arg("base", "http://localhost:8090").replace(/\/$/, "");
 const VIEW = { phone: { width: 375, height: 812, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, tablet: { width: 768, height: 1024, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, laptop: { width: 1366, height: 768, isMobile: false, hasTouch: false, deviceScaleFactor: 1 } }[arg("viewport", "phone")];
 const MAX = Number(arg("max", 60));
+const THEME = arg("theme", "light"); // light | dark | contrast (device "increase contrast") | dark-contrast
 const OUT = path.join(__dirname, "..", "audit-report");
 
 // Demo logins (the local demo and the live demo). Override with AUDIT_USERS='[{"name":"admin","user":"admin","pass":"..."}]'.
@@ -89,7 +91,7 @@ async function run() {
   for (const u of users) {
     const role = { name: u.name, kind: u.kind || u.name, pages: [], error: null };
     report.roles.push(role);
-    const ctx = await browser.newContext({ viewport: { width: VIEW.width, height: VIEW.height }, isMobile: VIEW.isMobile, hasTouch: VIEW.hasTouch, deviceScaleFactor: VIEW.deviceScaleFactor });
+    const ctx = await browser.newContext({ viewport: { width: VIEW.width, height: VIEW.height }, isMobile: VIEW.isMobile, hasTouch: VIEW.hasTouch, deviceScaleFactor: VIEW.deviceScaleFactor, colorScheme: /dark/.test(THEME) ? "dark" : "light", contrast: /contrast/.test(THEME) ? "more" : "no-preference" });
     const page = await ctx.newPage();
     let consoleErrs = [], failed = [];
     page.on("console", (m) => { if (m.type() === "error" && !/vibrate|favicon/i.test(m.text())) consoleErrs.push(m.text().slice(0, 160)); });
