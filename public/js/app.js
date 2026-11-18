@@ -458,6 +458,10 @@ function drawBar(route) {
   if (!bar) return;
   const filter = $(".hub-filter");
   if (filter) filter.hidden = !!route?.ws; // inside a hub the hub is already chosen
+  // On a phone, inside a hub the month picker joins the hub row; anywhere else it goes back to the filter row.
+  const picker = $(".period-picker"), fbar = $("#filterbar");
+  if (picker && $("#filters") && !$("#filters").contains(picker)) $("#filters").append(picker);
+  if (fbar) fbar.style.display = "";
   if (route?.ws) {
     const { hub, tab, sub } = route.ws;
     const h = state.hubs.find((x) => x.code === hub);
@@ -470,6 +474,7 @@ function drawBar(route) {
       <nav class="ws-tabs" aria-label="Hub sections">${tabs.map((t) => `<a href="${base}${t.key === "overview" ? "" : "/" + t.key}" data-link${t.key === tab ? ' aria-current="page"' : ""}>${esc(t.label)}</a>`).join("")}</nav>
       ${subs.length > 1 ? `<nav class="ws-sub" aria-label="${esc(route.ws.label)} pages">${subs.map((x) => `<a href="${base}/${tab}${x[0] ? "/" + x[0] : ""}" data-link${x[0] === sub ? ' aria-current="page"' : ""}>${esc(x[1])}</a>`).join("")}</nav>` : ""}</div>`;
     $("#ws-switch")?.addEventListener("change", (e) => navigate(location.pathname.replace(`/hubs/${hub}`, `/hubs/${e.target.value}`)));
+    if (picker && fbar && matchMedia("(max-width: 860px)").matches) { $(".ws-top", bar).append(picker); fbar.style.display = "none"; }
     showActiveTab(bar);
     return;
   }
