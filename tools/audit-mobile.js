@@ -6,6 +6,7 @@
 //   node tools/audit-mobile.js --roles=admin,pavan              only some logins
 //   node tools/audit-mobile.js --viewport=laptop                1366x768 instead of a phone (also: tablet)
 //   node tools/audit-mobile.js --max=40                         most pages per login (default 60)
+//   node tools/audit-mobile.js --extra=/me/payslips/2026-09    also open pages the menus do not link to
 //
 // It only opens pages; it never presses buttons, so it is safe to run on live data. Output: audit-report/index.html (open it in a browser), plus report.json.
 // Checks per page: sideways scrolling, buttons and links under 44 px, text under 14 px, clipped text, WCAG 2.1 AA problems (colour contrast, labels,
@@ -103,7 +104,7 @@ async function run() {
       await Promise.all([page.waitForSelector("#view", { timeout: 60000 }), page.keyboard.press("Enter")]);
       await waitReady(page);
       // find the pages this login can reach: its menu, bottom bar, tabs and links
-      const queue = [new URL(page.url()).pathname]; const done = new Set();
+      const queue = [new URL(page.url()).pathname, ...arg("extra", "").split(",").filter(Boolean)]; const done = new Set();
       while (queue.length && done.size < MAX) {
         const p = queue.shift(); if (done.has(p)) continue; done.add(p);
         consoleErrs = []; failed = [];

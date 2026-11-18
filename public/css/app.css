@@ -1652,3 +1652,58 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .mc-x { min-width: 44px; flex: none; }
 .stockc-page .sheet td, .stockc-page .sheet tfoot th { overflow: visible; text-overflow: clip; }
 .mc-chip .mc-x { min-height: 44px; margin-block: -6px; }
+
+/* ---------- Payslip (a seller's phone screen): purpose is to answer "how much, why, what carries forward" in plain words ---------- */
+.slip { max-width: 640px; margin: 0 auto; padding: 0 0 112px; }
+.sl-top { margin: 4px 0 4px; }
+.sl-back { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; padding: 0 12px 0 4px; font-size: 16px; font-weight: 600; color: var(--primary); text-decoration: none; }
+.sl-back svg, .sl-nav svg { width: 20px; height: 20px; }
+.sl-months { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 0 0 16px; }
+.sl-months h1 { margin: 0; font-size: 24px; line-height: 1.2; text-align: center; }
+.sl-nav { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; padding: 0 8px; font-size: 15px; font-weight: 600; color: var(--text-2); text-decoration: none; border-radius: 12px; }
+.sl-nav:first-child { justify-self: start; } .sl-nav:last-child { justify-self: end; }
+.sl-nav:hover { background: var(--surface-2, var(--primary-soft)); }
+.sl-nav.off { visibility: hidden; }
+.sl-hero { background: var(--primary-soft); border: 1px solid var(--border); border-radius: 20px; padding: 22px 20px 20px; margin: 0 0 12px; text-align: center; }
+.sl-kicker { margin: 0; font-size: 16px; color: var(--text-2); font-weight: 600; }
+.sl-big { margin: 6px 0 12px; font: 700 40px/1.1 var(--font-display, inherit); font-variant-numeric: tabular-nums; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; }
+.sl-big small { font-size: 18px; font-weight: 600; color: var(--text-2); margin-right: 4px; }
+.sl-status { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 10px; font-size: 15px; color: var(--text-2); }
+.sl-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; background: var(--success-soft); color: var(--success); font-weight: 700; font-size: 14px; }
+.sl-chip svg { width: 16px; height: 16px; }
+.sl-eq { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 4px; margin: 0 0 20px; padding: 14px 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); text-align: center; }
+.sl-eq span { display: block; font-size: 14px; color: var(--text-2); }
+.sl-eq b { display: block; margin-top: 2px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.sl-eq .op { font-size: 20px; color: var(--text-3); padding: 0 2px; }
+.sl-card { padding: 18px 16px 8px; margin: 0 0 16px; border-radius: 16px; }
+.sl-card h2 { margin: 0 0 8px; font-size: 18px; }
+.sl-list { list-style: none; margin: 0; padding: 0; }
+.sl-line { border-top: 1px solid var(--border); }
+.sl-line:first-child { border-top: 0; }
+.sl-plain, .sl-help summary { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; min-height: 52px; padding: 12px 0; font-size: 16px; }
+.sl-help summary { cursor: pointer; list-style: none; }
+.sl-help summary::-webkit-details-marker { display: none; }
+.sl-help summary .sl-label::after { content: " ⓘ"; color: var(--primary); font-size: 14px; white-space: nowrap; }
+.sl-help summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
+.sl-help p { margin: -4px 0 12px; font-size: 15px; line-height: 1.5; color: var(--text-2); }
+.sl-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sl-amt, .sl-dl dd, .sl-total b { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; text-align: right; }
+.sl-total, .sl-dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 12px 0; font-size: 16px; }
+.sl-total { border-top: 2px solid var(--border-strong, var(--border)); font-weight: 700; }
+.sl-dl { margin: 0; } .sl-dl > div { border-top: 1px solid var(--border); } .sl-dl > div:first-child { border-top: 0; }
+.sl-dl dt { color: var(--text-2); } .sl-dl dd { margin: 0; }
+.sl-none, .sl-note { margin: 4px 0 8px; font-size: 15px; color: var(--text-2); }
+.sl-meter { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; margin: 10px 0 6px; }
+.sl-meter span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+.sl-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--glass-bg, var(--bg)); backdrop-filter: blur(10px); border-top: 1px solid var(--border); }
+.sl-actions .btn { display: flex; width: 100%; max-width: 640px; margin: 0 auto; min-height: 52px; justify-content: center; font-size: 17px; }
+@media (min-width: 861px) { .sl-actions { left: var(--sidebar-w, 0); } }
+@media (max-width: 360px) { .sl-big { font-size: 34px; } .sl-eq { grid-template-columns: 1fr; } .sl-eq .op { display: none; } }
+@media (prefers-reduced-motion: no-preference) { .slip { animation: slIn .2s ease-out; } @keyframes slIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } } }
+@media print { .sl-actions, .sl-top, .sl-months a { display: none; } }
+
+/* The payslip has its own month switcher, so the top bar's month picker is hidden there (two month controls would confuse) */
+body[data-page="payslip"] .period-picker { display: none; }
+.sl-nav span { white-space: nowrap; }
+.sl-chip { color: #14602a; }
+.sl-empty-h { font-size: 24px; margin: 8px 0 16px; }

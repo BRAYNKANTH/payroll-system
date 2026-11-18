@@ -57,6 +57,7 @@ const NAV = [
 const EXTRA_ROUTES = [
   { re: /^\/employees\/([\w.-]+)$/, page: "employee", nav: "/employees" },
   { re: /^\/account$/, page: "account", nav: null },
+  { re: /^\/me\/payslips\/(\d{4}-\d{2})$/, page: "payslip", nav: null, perm: "self" },
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
 const isStaff = () => state.user?.role === "staff";
@@ -476,7 +477,7 @@ function drawBar(route) {
 export async function render({ moveFocus = false } = {}) {
   const seq = ++renderSeq;
   dirtyCheck = null;
-  if (isStaff() && !["/me", "/account"].includes(location.pathname)) history.replaceState({}, "", "/me");
+  if (isStaff() && !["/me", "/account"].includes(location.pathname) && !/^\/me\/payslips\/\d{4}-\d{2}$/.test(location.pathname)) history.replaceState({}, "", "/me");
   const route = resolve(location.pathname);
   const { page, nav, params, perm, ws } = route;
   state.routeHub = ws ? ws.hub : "";
@@ -512,6 +513,7 @@ export async function render({ moveFocus = false } = {}) {
     $("#crumbs").innerHTML = crumbsFor(route, mod);
     document.title = `${mod.title} · ${state.settings.company_name || "Payroll"}`;
     view.dataset.page = page; // lets the styles treat every page the same way
+    document.body.dataset.page = page;
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");

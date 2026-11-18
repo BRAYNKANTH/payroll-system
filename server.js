@@ -136,6 +136,7 @@ function createHandler(dbReady) {
 
     // Staff portal: a signed-in distributor, supervisor or group manager sees only their own figures.
     ["GET", /^\/api\/me\/portal$/, "self", ({ user, q }) => portal.summary(database, user, q.get("period") || new Date().toISOString().slice(0, 7))],
+    ["GET", /^\/api\/me\/payslip\/(\d{4}-\d{2})\/data$/, "self", ({ user, m }) => portal.payslipData(database, user, m[1])],
     ["GET", /^\/api\/me\/payslip\/(\d{4}-\d{2})$/, "self", async ({ user, m }) => ({ html: await portal.payslip(database, user, m[1]) })],
     ["GET", /^\/api\/me\/report\.pdf$/, "self", async ({ user, q }) => {
       const f = exporter.personReportPdf(await portal.summary(database, user, q.get("period") || new Date().toISOString().slice(0, 7)), { canPay: true, company: (await db.getSettings(database)).company_name || "" });

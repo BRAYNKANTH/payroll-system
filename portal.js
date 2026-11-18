@@ -112,6 +112,27 @@ async function payslip(db, user, period) {
   return reports.payslipHtml(db, period, s.employee_id, null);
 }
 
+// One closed month's payslip as data, for the phone screen. Only the signed-in person's own, only once the month is final (the same rule as the printed payslip).
+async function payslipData(db, user, period) {
+  svc.assertPeriod(period);
+  const s = await me(db, user);
+  if (!(await svc.isFinalized(db, period))) throw httpError(403, "Your payslip is available once the month has been finalized");
+  const r = await db.get("SELECT * FROM pay_period_summary WHERE employee_id = ? AND period = ?", s.employee_id, period);
+  if (!r) throw httpError(404, "There is no payslip for that month");
+  const d = JSON.parse(r.detail);
+  const months = (await db.all(`SELECT p.period FROM pay_period_summary p JOIN periods x ON x.period = p.period AND x.status = 'finalized'
+    WHERE p.employee_id = ? ORDER BY p.period`, s.employee_id)).map((x) => x.period);
+  const at = months.indexOf(period);
+  return {
+    period, name: s.name, employee_id: s.employee_id, hub: s.hub_name, position: svc.LEVEL_NAME[s.staff_level] || s.staff_level, is_seller: s.role === "guy",
+    bank: s.bank_name ? { name: s.bank_name, last4: s.bank_account_no ? String(s.bank_account_no).slice(-4) : "" } : null,
+    earnings: (d.earnings || []).map((l) => ({ label: l.label, amount: l.amount })), deductions: (d.deductions || []).map((l) => ({ label: l.label, amount: l.amount })),
+    gross: r.gross_earnings, total_deductions: r.total_deductions, net_pay: r.net_pay, paid: r.disbursed_amount, opening: r.opening_balance, closing: r.closing_balance,
+    business: d.total_business ?? null, target: d.target ?? null, over_target: d.over_target_amount ?? null,
+    prev: at > 0 ? months[at - 1] : null, next: at >= 0 && at < months.length - 1 ? months[at + 1] : null,
+  };
+}
+
 const listDocuments = async (db, user) => svc.listDocuments(db, (await me(db, user)).employee_id, user.hub);
 const addDocument = async (db, user, body) => svc.addDocument(db, (await me(db, user)).employee_id, body, user.username, user.hub);
 async function getDocument(db, user, id) {
@@ -121,4 +142,4 @@ async function getDocument(db, user, id) {
   return d;
 }
 
-module.exports = { summary, forEmployee, payslip, listDocuments, addDocument, getDocument };
+module.exports = { summary, forEmployee, payslip, payslipData, listDocuments, addDocument, getDocument };

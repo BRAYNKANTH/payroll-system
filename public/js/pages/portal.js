@@ -43,7 +43,7 @@ function payRules(p, me, rate) {
 // ---- grouped list rows (the iOS settings look): label on the left, value on the right
 const row = (label, value, { sub = "", vsub = "", cls = "", strong = false, href = "" } = {}) => {
   const inner = `<div class="g-l">${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ""}</div><div class="g-v ${cls}">${value}${vsub ? `<small class="${cls}">${vsub}</small>` : ""}</div>`;
-  return href ? `<a class="g-row link${strong ? " strong" : ""}" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="g-row${strong ? " strong" : ""}">${inner}</div>`;
+  return href ? `<a class="g-row link${strong ? " strong" : ""}" href="${esc(href)}" ${href.startsWith("/me/") ? "data-link" : 'target="_blank" rel="noopener"'}>${inner}</a>` : `<div class="g-row${strong ? " strong" : ""}">${inner}</div>`;
 };
 const group = (title, rows) => `<div class="g-group">${title ? `<div class="g-head">${esc(title)}</div>` : ""}${rows.join("")}</div>`;
 const keep = (l) => l.amount !== 0 || /Basic/.test(l.label);
@@ -127,6 +127,7 @@ function setupPull() {
   });
 }
 
+export { plain, keep };
 export default {
   title: "My page",
   async render(ctx) {
@@ -311,10 +312,10 @@ export default {
               { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>` },
               { key: "disbursed_amount", label: "Paid to bank", align: "r", render: (r) => money(r.disbursed_amount) },
               { key: "closing_balance", label: "Carried forward", align: "r", render: (r) => html`<span class="${r.closing_balance < 0 ? "neg" : ""}">${money(r.closing_balance)}</span>` },
-              { key: "slip", label: "", sort: false, align: "r", render: (r) => html`<a class="btn sm" href="/api/me/payslip/${r.period}" target="_blank" rel="noopener">${icon("printer")} Payslip</a>` },
+              { key: "slip", label: "", sort: false, align: "r", render: (r) => html`<a class="btn sm" href="/me/payslips/${r.period}" data-link aria-label="Open the payslip for ${monthName(r.period)}">${icon("file")} Payslip</a>` },
             ],
           }).toString(),
-          group("", d.history.map((r) => row(monthName(r.period), money(r.net_pay), { sub: `Earned ${n0(r.gross_earnings)} · Taken off ${n0(r.total_deductions)}`, vsub: `Paid ${n0(r.disbursed_amount)}`, cls: r.net_pay < 0 ? "neg" : "", href: `/api/me/payslip/${r.period}` }))));
+          group("", d.history.map((r) => row(monthName(r.period), money(r.net_pay), { sub: `Earned ${n0(r.gross_earnings)} · Taken off ${n0(r.total_deductions)}`, vsub: `Paid ${n0(r.disbursed_amount)}`, cls: r.net_pay < 0 ? "neg" : "", href: `/me/payslips/${r.period}` }))));
       }
       if (tab === "documents") drawDocs().catch((e) => toast(e.message, "err"));
     };

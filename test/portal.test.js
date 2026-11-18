@@ -95,6 +95,23 @@ test("final figures and the payslip appear only after the month is finalized, an
   assert.ok(!/Name D2|Name S1|Name D9/.test(slip), "the payslip holds only my own");
   assert.doesNotMatch(slip, /DRAFT/);
   await assert.rejects(() => portal.payslip(d, u, "bad"), /Invalid period/);
+
+  // the same payslip as data for the phone screen: my own figures, matching the register, with the months either side
+  const data = await portal.payslipData(d, u, "2026-10");
+  assert.equal(data.employee_id, "D1");
+  assert.equal(data.net_pay, row.net_pay);
+  assert.equal(data.closing, row.closing_balance);
+  assert.equal(data.gross, data.earnings.reduce((t, l) => t + l.amount, 0), "the earnings lines add up to the gross");
+  assert.equal(data.prev, null); assert.equal(data.next, null);
+  assert.equal(JSON.stringify(data).includes("Name D2"), false, "nothing about anyone else");
+  await assert.rejects(() => portal.payslipData(d, u, "2026-09"), /finalized|no payslip/i);
+});
+
+test("the payslip data is refused until the month is final", async () => {
+  const d = await setup();
+  const u = await login(d, "D1", "user-d1");
+  await svc.runPeriod(d, "2026-10", "admin");
+  await assert.rejects(() => portal.payslipData(d, u, "2026-10"), /finalized/);
 });
 
 test("I can upload and open my own documents but never another person's", async () => {
