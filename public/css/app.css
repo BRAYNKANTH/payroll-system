@@ -1955,4 +1955,16 @@ body[data-page="payslip"] .period-picker { display: none; }
 
 /* Sidebar links: 44px tall */
 .nav a { min-height: 44px; }
-.topbar .crumb, .topbar .crumbs, .kbd, kbd.gs-key { font-size: 13px; }
+.topbar .crumb, .topbar .crumbs { font-size: 14px; }
+
+/* Top bar controls: 44px on every screen size */
+.topbar .btn, .topbar .btn.sm, .topbar .menu-btn, .topbar #theme-btn { min-height: 44px; }
+.topbar .btn.icon, .topbar .menu-btn, .topbar #theme-btn { min-width: 44px; }
+.topbar .input, .topbar .input.sm, .topbar select, .topbar #gs-input { min-height: 44px; }
+.topbar .period-picker, .topbar .period-picker select, .topbar .period-picker input { min-height: 44px; }
+.topbar .period-picker button { min-width: 44px; min-height: 44px; }
+.user-chip, #ws-switch, .row-act .btn { min-height: 44px; }
+.row-act .btn { min-width: 44px; }
+a.crumb-group { display: inline-flex; align-items: center; min-height: 44px; }
+a.crumb-group { min-width: 44px; justify-content: center; }
+.ws-sub a, .ws-tabs a, .ws-sub button, .ws-tabs button { min-height: 44px; display: inline-flex; align-items: center; }
