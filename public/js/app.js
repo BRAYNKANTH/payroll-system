@@ -29,13 +29,13 @@ const NAV = [
   { group: "Data entry" },
   { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
   { path: "/hub-stock", label: "Stock to hubs", icon: "warehouse", page: "hubsupply", perm: "manage_products" },
-  { path: "/stock-overview", label: "Stock overview", icon: "warehouse", page: "stockview", perm: "stock", hubOnly: true },
-  { path: "/morning", label: "Morning stock", icon: "box", page: "morning", perm: "stock" },
+  { path: "/stock-overview", label: "Hub stock", icon: "warehouse", page: "stockview", perm: "stock", hubOnly: true },
+  { path: "/morning", label: "Give stock", icon: "box", page: "morning", perm: "stock" },
   { path: "/daily", label: "Daily sheet", icon: "sheet", page: "daily", perm: "read" },
   { path: "/live", label: "Live sales", icon: "trend", page: "live", perm: ["read", "read_team"] },
   { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly", perm: "read" },
   { path: "/stock", label: "Stock count", icon: "box", page: "stock", perm: "read" },
-  { path: "/branch-stock", label: "Hub stock sheet", icon: "store", page: "hubstock", perm: "read" },
+  { path: "/branch-stock", label: "Hub count sheet", icon: "store", page: "hubstock", perm: "read" },
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances", perm: "read" },
   { group: "Payroll" },
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
@@ -67,7 +67,7 @@ const WS_TABS = [
   { key: "overview", label: "Overview", page: "hub", perm: "read" },
   { key: "people", label: "People", page: "employees", perm: "read" },
   { key: "sales", label: "Sales", subs: [["", "Live sales", "live"], ["daily", "Daily sheet", "daily"]] },
-  { key: "stock", label: "Stock", subs: [["", "Morning stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub stock sheet", "hubstock"], ["view", "Stock overview", "stockview"]] },
+  { key: "stock", label: "Stock", subs: [["", "Hub stock", "stockview"], ["give", "Give stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub count sheet", "hubstock"]] },
   { key: "money", label: "Money", subs: [["", "Weekly sheet", "weekly"], ["loans", "Advances & loans", "loans"], ["allowances", "Allowances", "allowances"]] },
 ];
 const SECTIONS = {
@@ -107,7 +107,7 @@ function menuItems() {
     add("/team", "My team", "users", { short: "Team" });
     add("/live", "Live sales", "trend", { short: "Live" });
     add("/employees", "Employees", "users", { short: "People" });
-    if (can("stock")) { add("/stock-overview", "Stock overview", "warehouse", { short: "Stock" }); add("/morning", "Morning stock", "box", { short: "Give" }); }
+    if (can("stock")) { add("/stock-overview", "Hub stock", "warehouse", { short: "Stock" }); add("/morning", "Give stock", "box", { short: "Give" }); }
   }
   if (u.employee_id) add("/me", "My page", "user");
   return out;

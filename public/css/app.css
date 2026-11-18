@@ -1627,3 +1627,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .stockv-list li { padding-inline: 20px; }
 .stockv-list li > span:last-child { white-space: nowrap; }
 @media (max-width: 860px) { .stockv-list li { flex-wrap: wrap; } }
+
+/* Give stock: a plain day row, and a calm "Nothing" tag */
+.daybar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mc-chip.out { background: var(--warning-soft); color: var(--warning); }

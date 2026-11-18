@@ -8,7 +8,7 @@ const dateText = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB
 const n0 = (n) => Number(n).toLocaleString("en-LK");
 
 export default {
-  title: "Stock overview",
+  title: "Hub stock",
   async render({ el }) {
     const code = scopeHub();
     const d = await get("/api/stock-overview" + qs({ hub: code }));
@@ -21,8 +21,8 @@ export default {
 
     el.innerHTML = html`<div class="stockv-page">
       <div class="page-head">
-        <div><h1>Stock overview</h1><p>${d.hub.name} · as of today. What came from the office, what the hub holds, and what the sellers hold and sold.</p></div>
-        <div class="actions">${link(isManager ? "/morning" : base, "Give stock to sellers", "plus", true)}${isManager ? "" : link(base + "/count", "Stock count", "sheet")}${isManager ? "" : link(base + "/sheet", "Hub stock sheet", "store")}</div>
+        <div><h1>Hub stock</h1><p>${d.hub.name} · as of today. Stock sent by the office stays in the hub until you give it to sellers. Sellers keep what they have from day to day.</p></div>
+        <div class="actions">${link(isManager ? "/morning" : base + "/give", "Give stock to sellers", "plus", true)}${isManager ? "" : link(base + "/count", "Stock count", "sheet")}${isManager ? "" : link(base + "/sheet", "Hub count sheet", "store")}</div>
       </div>
 
       <div class="grid kpis mb-4">

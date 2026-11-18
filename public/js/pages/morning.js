@@ -11,7 +11,7 @@ const label = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", 
 let day = null;
 
 export default {
-  title: "Morning stock",
+  title: "Give stock",
   async render(ctx) {
     const { el } = ctx;
     const today = slToday();
@@ -21,7 +21,9 @@ export default {
     const isToday = day === today;
     const canGive = day <= today && day >= shift(today, -3);
     const givenTotal = d.sellers.reduce((t, s) => t + s.given.reduce((n, g) => n + g.qty, 0), 0);
-    const without = d.sellers.filter((s) => !s.given.length && !s.carried.length).length;
+    const overview0 = () => can("manage_products") && !state.user.hub;
+    const without = d.sellers.filter((s) => !(s.left || []).length).length;
+    const hubEmpty = !overview0() && Object.values(d.pools).every((list) => list.every((p) => p.left === 0));
     // The admin does not hand stock to sellers: the admin sees each hub with its coacher and what it holds. The coacher gives it out.
     const overview = can("manage_products") && !state.user.hub;
     const tm = new Map();
@@ -31,21 +33,19 @@ export default {
 
     el.innerHTML = html`
       <div class="page-head">
-        <div><h1>Morning stock</h1><p>${overview ? "Each hub's coacher gives the stock out to the sellers. Here you see every hub, its coacher, what the hub holds and how much has been given out." : "Give each seller the stock they take out today. They see it on their phone and can only sell what they have."}</p></div>
+        <div><h1>${overview ? "Morning stock" : "Give stock"}</h1><p>${overview ? "Each hub's coacher gives the stock out to the sellers. Here you see every hub, its coacher, what the hub holds and how much has been given out." : "Sellers keep their stock from day to day, so you only top up the ones who need more."}</p></div>
+        ${overview ? "" : html`<div class="actions"><a class="btn" href="/stock-overview" data-link>${icon("box")} Hub stock</a></div>`}
       </div>
-      <div class="card mb-4"><div class="card-body row between" style="gap:12px;flex-wrap:wrap">
+      <div class="daybar mb-4">
         <div class="row daynav" style="gap:8px;align-items:center">
           <button type="button" class="btn icon" id="d-prev" aria-label="Previous day">${icon("left")}</button>
           <div><b style="font-size:17px">${label(day)}</b>${isToday ? html` <span class="badge green">Today</span>` : ""}</div>
           <button type="button" class="btn icon" id="d-next" aria-label="Next day" ${day >= today ? "disabled" : ""}>${icon("right")}</button>
           ${isToday ? "" : html`<button type="button" class="btn sm" id="d-today">Back to today</button>`}
         </div>
-        <div class="muted">${overview ? `${d.hubs.length} ${d.hubs.length === 1 ? "hub" : "hubs"} · ${givenAll} ${givenAll === 1 ? "piece" : "pieces"} given out` : `${d.sellers.length} ${d.sellers.length === 1 ? "seller" : "sellers"} · ${givenTotal} ${givenTotal === 1 ? "piece" : "pieces"} given${canGive && without ? ` · ${without} with no stock` : ""}`}</div>
-      </div></div>
-      ${overview ? "" : Object.entries(d.pools).map(([h, list]) => html`<section class="card mb-4" aria-label="${hubName(h)} stock"><div class="card-body">
-        <div class="row between" style="gap:12px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:17px">${hubName(h)} stock</b><span class="muted">What the hub holds to give out to sellers</span></div>
-        ${list.length ? html`<div class="mc-chips">${list.filter((p) => p.left > 0).slice(0, 8).map((p) => html`<span class="mc-chip given">${p.left} × ${p.product}</span>`)}${list.filter((p) => p.left > 0).length > 8 ? html`<span class="muted">+ ${list.filter((p) => p.left > 0).length - 8} more products</span>` : ""}</div>` : html`<span class="muted">No products yet.</span>`}
-        ${list.length && list.every((p) => p.left === 0) ? html`<p class="muted" style="margin:10px 0 0">The hub has no stock to give out. The office sends stock to the hub first.</p>` : ""}</div></section>`)}
+        <div class="muted">${overview ? `${d.hubs.length} ${d.hubs.length === 1 ? "hub" : "hubs"} · ${givenAll} ${givenAll === 1 ? "piece" : "pieces"} given out` : `${d.sellers.length} ${d.sellers.length === 1 ? "seller" : "sellers"}${canGive && without ? ` · ${without} with no stock` : ""}`}</div>
+      </div>
+      ${hubEmpty ? html`<div class="alert warn mb-4">${icon("box")}<div><b>The hub has no stock to give out.</b> The office sends stock to the hub first. <a href="/stock-overview" data-link>See hub stock</a></div></div>` : ""}
       ${!canGive ? html`<div class="alert info mb-4">${icon("info")}<div>${day > today ? "This day has not happened yet." : "Stock can be changed only for the last 3 days. You can still look at this day."}</div></div>` : ""}
       ${overview ? html`<div class="grid three">${d.hubs.map((h) => html`<article class="mcard card" aria-label="${h.name}">
           <div class="mc-top"><div class="avatar" aria-hidden="true">${h.code}</div><div class="mc-who"><b>${h.name}</b><span class="muted">${h.code}</span></div></div>
@@ -57,15 +57,15 @@ export default {
       : d.sellers.length ? html`${teams.map((g) => html`<details class="dgrp card" data-gid="${g.id}" open>
           <summary><span class="dg-chev" aria-hidden="true">${icon("right")}</span><span class="avatar" aria-hidden="true">${initials(g.title)}</span>
             <span class="dg-title"><b>${g.title}</b><small>${g.sub}${g.sub ? " · " : ""}${g.people.length} ${g.people.length === 1 ? "seller" : "sellers"}</small></span>
-            <span class="dg-nums"><span><small>Given</small><b>${g.people.reduce((t, x) => t + x.given.reduce((n, y) => n + y.qty, 0), 0)}</b></span><span><small>Sold</small><b>${g.people.reduce((t, x) => t + x.sold_pieces, 0)}</b></span>${canGive && g.people.some((x) => !x.given.length && !x.carried.length) ? html`<span class="dg-prog part">${g.people.filter((x) => !x.given.length && !x.carried.length).length} without stock</span>` : ""}</span></summary>
+            <span class="dg-nums"><span><small>Given</small><b>${g.people.reduce((t, x) => t + x.given.reduce((n, y) => n + y.qty, 0), 0)}</b></span><span><small>Holding</small><b>${g.people.reduce((t, x) => t + (x.left || []).reduce((n, l) => n + l.qty, 0), 0)}</b></span>${canGive && g.people.some((x) => !(x.left || []).length) ? html`<span class="dg-prog part">${g.people.filter((x) => !(x.left || []).length).length} without stock</span>` : ""}</span></summary>
           <div class="table-wrap" tabindex="-1"><table class="table sheet msheet">
             <caption class="sr-only">Stock for ${g.title}'s team</caption>
-            <thead><tr><th scope="col">Seller</th><th scope="col">Carried over</th><th scope="col">Given ${isToday ? "today" : "this day"}</th><th scope="col" class="r">Sold</th>${canGive ? html`<th scope="col"><span class="sr-only">Give stock</span></th>` : ""}</tr></thead>
+            <thead><tr><th scope="col">Seller</th><th scope="col">Has now</th><th scope="col">Given ${isToday ? "today" : "this day"}</th>${canGive ? html`<th scope="col"><span class="sr-only">Give stock</span></th>` : ""}</tr></thead>
             <tbody>${g.people.map((x) => html`<tr data-emp="${x.employee_id}">
               <th scope="row" class="name"><b>${x.name}</b><div class="faint text-sm fw-400">${x.employee_id} · ${levelLabel(x.staff_level)}</div></th>
-              <td data-label="Carried over">${x.carried.length ? html`<div class="mc-chips">${x.carried.map((c) => html`<span class="mc-chip">${c.qty} × ${c.product}</span>`)}</div>` : html`<span class="muted">Nothing</span>`}</td>
+              <td data-label="Has now">${(x.left || []).length ? html`<div class="mc-chips">${x.left.slice(0, 4).map((c) => html`<span class="mc-chip">${c.qty} × ${c.product}</span>`)}${x.left.length > 4 ? html`<span class="muted">+${x.left.length - 4} more</span>` : ""}</div>` : html`<span class="mc-chip out">Nothing</span>`}</td>
               <td data-label="Given ${isToday ? 'today' : 'this day'}">${x.given.length ? html`<div class="mc-chips">${x.given.map((y) => html`<span class="mc-chip given">${y.qty} × ${y.product}${canGive ? html`<button type="button" class="mc-x" data-del="${y.id}" aria-label="Take back ${y.qty} ${y.product} from ${x.name}">${icon("x")}</button>` : ""}</span>`)}</div>` : html`<span class="muted">Nothing yet</span>`}</td>
-              <td class="r num" data-label="Sold">${x.sold_pieces}</td>${canGive ? html`<td class="r give-cell"><button type="button" class="btn sm primary" data-give="${x.employee_id}">${icon("plus")} Give stock</button></td>` : ""}</tr>`)}</tbody></table></div>
+              ${canGive ? html`<td class="r give-cell"><button type="button" class="btn sm primary" data-give="${x.employee_id}">${icon("plus")} Give stock</button></td>` : ""}</tr>`)}</tbody></table></div>
         </details>`)}`
         : html`<div class="card">${emptyState("No sellers here yet", "Add distributors, supervisors or managers to this hub first.", "users")}</div>`}`;
 

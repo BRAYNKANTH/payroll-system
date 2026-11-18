@@ -10,7 +10,7 @@ const LABEL = { opening_stock: "Opening", received: "Received", issued: "Given o
 const prevPeriod = (p) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
 
 export default {
-  title: "Hub stock sheet",
+  title: "Hub count sheet",
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
@@ -25,7 +25,7 @@ export default {
 
     el.innerHTML = html`<div class="hubsheet-page">
       <div class="page-head">
-        <div><h1>Hub stock sheet</h1><p>Each hub's stock for the month. Expected = opening + received − given out. Difference = expected − counted.</p></div>
+        <div><h1>Hub count sheet</h1><p>Each hub's stock for the month. Expected = opening + received − given out. Difference = expected − counted.</p></div>
         <div class="actions">${editable ? html`
           <button type="button" class="btn" id="carry">${icon("copy")} Open from last month's count</button>
           <button type="button" class="btn" id="add" ${hubs.length ? "" : "disabled"}>${icon("plus")} Add product</button>` : ""}</div>

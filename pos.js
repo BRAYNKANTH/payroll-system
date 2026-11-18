@@ -186,7 +186,12 @@ async function morning(db, { date, hub }) {
       const mine = given.filter((g) => g.employee_id === p.employee_id).map((g) => ({ id: Number(g.id), product_id: Number(g.product_id), product: pname.get(key(g.product_id)), qty: g.qty }));
       const keep = [...carried.entries()].filter(([k, n]) => k.startsWith(p.employee_id + "|") && n > 0).map(([k, n]) => ({ product_id: Number(k.split("|")[1]), product: pname.get(k.split("|")[1]), qty: n }));
       const soldPieces = [...sold.entries()].filter(([k]) => k.startsWith(p.employee_id + "|")).reduce((t, [, n]) => t + n, 0);
-      return { employee_id: p.employee_id, name: p.name, hub: p.hub, staff_level: p.staff_level, team: teamOf(p, everyone), carried: keep, given: mine, sold_pieces: soldPieces };
+      // what the seller has now: carried over + given today - sold today, per product
+      const has = new Map(keep.map((c) => [String(c.product_id), c.qty]));
+      for (const g of mine) has.set(String(g.product_id), (has.get(String(g.product_id)) || 0) + g.qty);
+      for (const [k, n] of sold) if (k.startsWith(p.employee_id + "|")) { const pid = k.split("|")[1]; has.set(pid, (has.get(pid) || 0) - n); }
+      const left = [...has.entries()].filter(([, n]) => n > 0).map(([pid, n]) => ({ product_id: Number(pid), product: pname.get(pid), qty: n })).sort((a, b) => b.qty - a.qty);
+      return { employee_id: p.employee_id, name: p.name, hub: p.hub, staff_level: p.staff_level, team: teamOf(p, everyone), carried: keep, given: mine, left, sold_pieces: soldPieces };
     }),
   };
   // One line per hub: its coacher (who gives the stock out), what is given today and who has none. The admin sees this instead of every seller.
@@ -195,7 +200,7 @@ async function morning(db, { date, hub }) {
     const mine = out.sellers.filter((x) => x.hub === h.code);
     const c = coachers.find((x) => x.hub === h.code);
     return { code: h.code, name: h.name, status: h.status, coacher: c ? { employee_id: c.employee_id, name: c.name } : null, sellers: mine.length,
-      given_pieces: mine.reduce((t, x) => t + x.given.reduce((n, g) => n + g.qty, 0), 0), without_stock: mine.filter((x) => !x.given.length && !x.carried.length).length };
+      given_pieces: mine.reduce((t, x) => t + x.given.reduce((n, g) => n + g.qty, 0), 0), without_stock: mine.filter((x) => !x.left.length).length };
   });
   return out;
 }
