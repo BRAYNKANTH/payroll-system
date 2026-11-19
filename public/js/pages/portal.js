@@ -3,8 +3,10 @@ import { get, post, del } from "../api.js";
 import { state } from "../app.js";
 import { buzz, $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime, initials } from "../ui.js";
 import { mountSell } from "./sell.js";
+import { swipeTabs } from "../phone.js";
 
 let tab = "month";
+let monthDeck = "pay"; // 'pay' | 'days' | 'rules'
 let tabInit = false; // the first time the page opens, a seller lands on the till
 let dirty = false;   // something was sold or changed in the till, so the month figures need a refresh
 const DOC_TYPES = [["nic", "ID / NIC"], ["bank_book", "Bank book front page"], ["ol_results", "O/L results sheet"], ["other", "Other"]];
@@ -230,22 +232,40 @@ export default {
           stat("Security deposit held", `<small>Rs</small>${n0(d.security_held)}`, "in total, from closed months", "shield", ""),
         ]).join(""))}</div>
 
-        ${pay ? html`<section class="card mb-4 glist"><div class="card-head"><div><h2>${final ? `Your pay for ${monthName(d.period)}` : "Estimate so far"}</h2>
-            <div class="sub">${final ? "Final. The month is closed." : "Worked out with your pay rules from the days entered up to now"}</div></div>
-            ${final ? html`<a class="btn sm primary" href="/api/me/payslip/${d.period}" target="_blank" rel="noopener">${icon("printer")} Payslip</a>` : badge("amber", "Not final")}</div>
-          ${raw(payGroups(pay))}
-          ${final ? raw(group("Balance", [row("Brought forward", money(d.official.opening)), row("Net pay", money(d.official.net), { strong: true, cls: d.official.net < 0 ? "neg" : "" }),
-            row("Paid to your bank", money(d.official.paid)), row("Carried to next month", money(d.official.closing), { cls: d.official.closing < 0 ? "neg" : "" })])) : ""}
-          ${final ? "" : html`<div class="card-foot muted">The office calculates the final figure at the end of the month and may check some entries first. Your payslip appears here after the month is closed.</div>`}
-        </section>` : html`<div class="card mb-4">${emptyState("No sales entered yet this month", "When your daily sales are entered, your progress and an estimate of your pay appear here.", "chart")}</div>`}
+        <!-- Apple iOS Segmented Deck Switcher (Chunked for zero scroll fatigue) -->
+        <div class="month-deck-nav seg mb-3" role="tablist" aria-label="Month sections">
+          <button type="button" class="${monthDeck === "pay" ? "on" : ""}" data-mdeck="pay" role="tab" aria-selected="${monthDeck === "pay"}">${icon("wallet")} Pay breakdown</button>
+          ${me.senior ? "" : html`<button type="button" class="${monthDeck === "days" ? "on" : ""}" data-mdeck="days" role="tab" aria-selected="${monthDeck === "days"}">${icon("sheet")} Daily days ${m.days ? html`<span class="badge plain sm">${m.days}</span>` : ""}</button>`}
+          <button type="button" class="${monthDeck === "rules" ? "on" : ""}" data-mdeck="rules" role="tab" aria-selected="${monthDeck === "rules"}">${icon("info")} Stock & rules</button>
+        </div>
 
+        <div id="month-deck-body">
+          <!-- SUB-DECK 1: PAY BREAKDOWN -->
+          <div id="mdeck-pay" ${monthDeck === "pay" ? "" : "hidden"}>
+            ${pay ? html`<section class="card mb-4 glist"><div class="card-head"><div><h2>${final ? `Your pay for ${monthName(d.period)}` : "Estimate so far"}</h2>
+                <div class="sub">${final ? "Final. The month is closed." : "Worked out with your pay rules from the days entered up to now"}</div></div>
+                ${final ? html`<a class="btn sm primary" href="/api/me/payslip/${d.period}" target="_blank" rel="noopener">${icon("printer")} Payslip</a>` : badge("amber", "Not final")}</div>
+              ${raw(payGroups(pay))}
+              ${final ? raw(group("Balance", [row("Brought forward", money(d.official.opening)), row("Net pay", money(d.official.net), { strong: true, cls: d.official.net < 0 ? "neg" : "" }),
+                row("Paid to your bank", money(d.official.paid)), row("Carried to next month", money(d.official.closing), { cls: d.official.closing < 0 ? "neg" : "" })])) : ""}
+              ${final ? "" : html`<div class="card-foot muted">The office calculates the final figure at the end of the month and may check some entries first. Your payslip appears here after the month is closed.</div>`}
+            </section>` : html`<div class="card mb-4">${emptyState("No sales entered yet this month", "When your daily sales are entered, your progress and an estimate of your pay appear here.", "chart")}</div>`}
+          </div>
 
+          <!-- SUB-DECK 2: DAILY DAYS -->
+          ${me.senior ? "" : html`
+          <div id="mdeck-days" ${monthDeck === "days" ? "" : "hidden"}>
+            <section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>
+          </div>`}
 
-        ${me.senior ? "" : html`<section class="card mb-4"><div class="card-head"><div><h2>Your days</h2><div class="sub">Sales and the money you handed in</div></div></div><div class="card-body flush" id="days"></div></section>`}
-        ${m.stock.length ? html`<section class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></section>` : ""}
-        ${m.allowances.length ? html`<section class="card mb-4"><div class="card-head"><h2>Allowances this month</h2></div><div class="card-body flush" id="allow"></div></section>` : ""}
-        <details class="card fold"><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay, me, d.senior_rate).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>
-        ${raw(glossary())}`,
+          <!-- SUB-DECK 3: STOCK & RULES -->
+          <div id="mdeck-rules" ${monthDeck === "rules" ? "" : "hidden"}>
+            ${m.stock.length ? html`<section class="card mb-4"><div class="card-head"><div><h2>Stock count</h2><div class="sub">Missing pieces are taken off your pay</div></div></div><div class="card-body flush" id="stock"></div></section>` : ""}
+            ${m.allowances.length ? html`<section class="card mb-4"><div class="card-head"><h2>Allowances this month</h2></div><div class="card-body flush" id="allow"></div></section>` : ""}
+            <details class="card fold mb-4" open><summary><h2>How your pay is worked out</h2></summary><div class="card-body"><ul style="margin:0;padding-left:18px">${raw(payRules(me.pay, me, d.senior_rate).map((l) => `<li style="margin-bottom:6px">${l}</li>`).join(""))}</ul></div></details>
+            ${raw(glossary())}
+          </div>
+        </div>`,
 
       team: () => html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">${monthName(d.period)}: sales of everyone below you. Sales only, never anyone's pay.</div></div></div>
         <div class="card-body flush" id="team"></div></section>
@@ -351,6 +371,40 @@ export default {
           toast("Removed");
           await this.render({ ...ctx, refresh: true });
         })));
+
+        const setMDeck = (dk) => {
+          monthDeck = dk;
+          $$("[data-mdeck]", el).forEach((b) => {
+            const on = b.dataset.mdeck === dk;
+            b.classList.toggle("on", on);
+            b.setAttribute("aria-selected", String(on));
+          });
+          const deckBody = $("#month-deck-body");
+          if (deckBody) {
+            ["pay", "days", "rules"].forEach((k) => {
+              const panel = deckBody.querySelector(`#mdeck-${k}`);
+              if (panel) panel.hidden = (k !== dk);
+            });
+            deckBody.classList.remove("pane-in");
+            void deckBody.offsetWidth;
+            deckBody.classList.add("pane-in");
+          }
+        };
+
+        $$("[data-mdeck]", el).forEach((b) => {
+          b.onclick = () => { setMDeck(b.dataset.mdeck); buzz(6); };
+        });
+
+        const deckEl = $("#month-deck-body");
+        if (deckEl) {
+          const mDecks = me.senior ? ["pay", "rules"] : ["pay", "days", "rules"];
+          swipeTabs({
+            el: deckEl,
+            tabs: mDecks,
+            getActive: () => monthDeck,
+            setActive: (dk) => { setMDeck(dk); buzz(8); },
+          });
+        }
       }
       if (tab === "team" && d.team) {
         $("#team").innerHTML = d.team.length ? both(
@@ -396,6 +450,20 @@ export default {
       history.pushState({ tab }, "", `${location.pathname}?tab=${tab}`);
       if (was === "sell" && dirty) { dirty = false; this.render({ ...ctx, refresh: true }); } else show();
     }));
+
+    const tabOrder = [...(me.sells ? ["sell"] : []), "month", ...(d.team ? ["team"] : []), "payslips", ...(d.loans.length ? ["loans"] : []), "documents", "details"];
+    swipeTabs({
+      el: $("#tabs"),
+      tabs: tabOrder,
+      getActive: () => tab,
+      setActive: (t) => {
+        if (tab === t) return;
+        const was = tab; tab = t;
+        history.pushState({ tab }, "", `${location.pathname}?tab=${tab}`);
+        if (was === "sell" && dirty) { dirty = false; this.render({ ...ctx, refresh: true }); } else show();
+        buzz(10);
+      },
+    });
     if (!panes[tab] || (tab === "loans" && !d.loans.length)) tab = "month";
     show(!ctx.refresh);
 

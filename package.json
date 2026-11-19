@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node --no-warnings server.js",
     "demo": "node --no-warnings seed.js data/demo && node --no-warnings server.js data/demo",
+    "seed:explore": "node --no-warnings seed-explore.js data/demo --reset",
     "demo:october": "node --no-warnings seed.js data/october --open=2026-10 && node --no-warnings server.js data/october",
     "trial": "node --no-warnings server.js data/trial 8091",
     "seed:neon": "node --env-file=.env --no-warnings seed.js",

@@ -220,3 +220,60 @@ export function compactSteps(list, { actions = {} } = {}) {
     e.currentTarget.textContent = holder.hidden ? "All steps" : "Hide steps";
   };
 }
+
+// ---------------------------------------------------------------- touch gesture swipe between tabs
+export function swipeTabs({ el, tabs, getActive, setActive, threshold = 40 }) {
+  if (!el || !tabs || tabs.length < 2) return () => {};
+  let startX = 0, startY = 0, startTime = 0;
+  let active = false;
+
+  const onTouchStart = (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    active = true;
+  };
+
+  const onTouchMove = (e) => {
+    if (!active) return;
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    const dx = Math.abs(e.touches[0].clientX - startX);
+    // If predominantly vertical scroll, cancel tab swipe
+    if (dy > dx && dy > 12) {
+      active = false;
+    }
+  };
+
+  const onTouchEnd = (e) => {
+    if (!active) return;
+    active = false;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const dt = Date.now() - startTime;
+
+    if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 1.3 && dt < 500) {
+      const cur = getActive();
+      const idx = tabs.indexOf(cur);
+      if (idx === -1) return;
+      if (dx < 0 && idx < tabs.length - 1) {
+        // Swiped Left -> Move forward
+        setActive(tabs[idx + 1]);
+      } else if (dx > 0 && idx > 0) {
+        // Swiped Right -> Move back
+        setActive(tabs[idx - 1]);
+      }
+    }
+  };
+
+  el.addEventListener("touchstart", onTouchStart, { passive: true });
+  el.addEventListener("touchmove", onTouchMove, { passive: true });
+  el.addEventListener("touchend", onTouchEnd, { passive: true });
+  return () => {
+    el.removeEventListener("touchstart", onTouchStart);
+    el.removeEventListener("touchmove", onTouchMove);
+    el.removeEventListener("touchend", onTouchEnd);
+  };
+}

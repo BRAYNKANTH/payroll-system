@@ -3,6 +3,9 @@
 // (what the hub gave them and what is left), the sales made so far, and the cash handed in at the end of the day.
 import { get, post, del } from "../api.js";
 import { buzz, $, $$, html, raw, esc, icon, toast, busy, confirmDialog, emptyState, announce } from "../ui.js";
+import { swipeTabs } from "../phone.js";
+
+const SUBTABS = ["sell", "sales", "stock", "eod"];
 
 const n0 = (c) => (Number(c) / 100).toLocaleString("en-LK", { maximumFractionDigits: 2 });
 const rs = (c) => `Rs ${n0(c)}`;
@@ -296,6 +299,17 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
       };
     }
   };
+
+  swipeTabs({
+    el: box,
+    tabs: SUBTABS,
+    getActive: () => subtab,
+    setActive: (t) => {
+      subtab = t;
+      draw();
+      buzz(10);
+    },
+  });
 
   draw();
 }

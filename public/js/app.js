@@ -2,6 +2,7 @@
 import { get, post, setUnauthorizedHandler } from "./api.js";
 import { $, $$, esc, icon, initials, monthName, toast, announce, confirmDialog, ensureLive } from "./ui.js";
 import { mountSearch } from "./search.js";
+import { swipeTabs } from "./phone.js";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -404,7 +405,15 @@ function enhanceTabs(root) {
       if (on && panel) panel.setAttribute("aria-labelledby", b.id);
     });
     tabs().forEach((b) => { b.setAttribute("role", "tab"); b.id ||= `tab-${++tabSeq}`; if (panel) b.setAttribute("aria-controls", "pane"); });
-    if (panel) { panel.setAttribute("role", "tabpanel"); panel.tabIndex = 0; }
+    if (panel) {
+      panel.setAttribute("role", "tabpanel"); panel.tabIndex = 0;
+      swipeTabs({
+        el: panel,
+        tabs: tabs().map((b) => b.id),
+        getActive: () => bar.querySelector("button.on")?.id,
+        setActive: (id) => bar.querySelector(`#${id}`)?.click(),
+      });
+    }
     sync();
     new MutationObserver(sync).observe(bar, { subtree: true, attributes: true, attributeFilter: ["class"] });
     bar.addEventListener("keydown", (e) => {
@@ -483,6 +492,15 @@ function drawBar(route) {
     const tabs = SECTIONS[sec].tabs.filter(([p]) => can(permOfPath(p)));
     bar.innerHTML = `<div class="ws"><nav class="ws-tabs" aria-label="${esc(SECTIONS[sec].label)} pages">${tabs.map(([p, l]) => `<a href="${p}" data-link${p === location.pathname ? ' aria-current="page"' : ""}>${esc(l)}</a>`).join("")}</nav></div>`;
     showActiveTab(bar);
+    const viewEl = $("#view");
+    if (viewEl && tabs.length > 1) {
+      swipeTabs({
+        el: viewEl,
+        tabs: tabs.map(([p]) => p),
+        getActive: () => location.pathname,
+        setActive: (p) => navigate(p),
+      });
+    }
   } else bar.innerHTML = "";
 }
 // On a phone a long page introduction shows two lines with a "Read more" button, so the figures start higher.
