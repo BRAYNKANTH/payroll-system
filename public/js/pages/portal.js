@@ -143,10 +143,10 @@ export default {
     const final = !!d.official;
 
     el.innerHTML = html`
-      <div class="page-head">
+      <div class="page-head portal-head">
         <div><h1>Hello, ${me.name.split(" ")[0]}</h1>
           <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""}</p></div>
-        <div class="actions"><a class="btn" href="/api/me/report.pdf?period=${d.period}" target="_blank" rel="noopener">${icon("file")} <span class="lbl-sm">My report (PDF)</span></a><button type="button" class="btn" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
+        <div class="actions"><a class="btn sm" href="/api/me/report.pdf?period=${d.period}" target="_blank" rel="noopener">${icon("file")} <span class="lbl-sm">My report (PDF)</span></a><button type="button" class="btn sm" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[...(me.sells ? [["sell", "Sell", "Sell", "bag", ""]] : []), ["month", "This month", "Month", "chart", ""],
         ...(d.team ? [["team", "My team", "Team", "users", d.team.length]] : []), ["payslips", "Payslips", "Payslips", "wallet", d.history.length],
@@ -253,6 +253,7 @@ export default {
     // A phone gets a list; a wide screen keeps the table. Both are written, CSS shows the right one.
     const both = (table, list) => `<div class="show-lg">${table}</div><div class="show-sm">${list}</div>`;
     const show = (animate = true) => {
+      el.setAttribute("data-tab", tab);
       const pane = $("#pane");
       pane.innerHTML = panes[tab]().toString();
       if (animate) { pane.classList.remove("pane-in"); void pane.offsetWidth; pane.classList.add("pane-in"); }

@@ -1460,7 +1460,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .page-head h1 { font-size: var(--t-display); line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
 .page-head p { max-width: 65ch; color: var(--text-2); font-size: 15px; }
 @media (max-width: 860px) {
-  .page-head h1 { font-size: 26px; }
+  .page-head h1 { font-size: 22px; }
+  .page-head { margin-bottom: 14px; gap: 10px; }
+  .portal-head h1 { font-size: 20px; }
+  .portal-head p { font-size: 13px; }
+  .hero .h-amount { font-size: 32px; }
+  .hero .h-amount small { font-size: 16px; }
 }
 
 /* ---- Month card: Apple squircle widget with ambient elevation ---- */
@@ -1485,78 +1490,230 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .caps-warn { display: flex; gap: 6px; align-items: center; color: var(--warning); font-size: 13.5px; font-weight: 500; }
 .btn .btn-label { display: inline; }
 
-/* ---------- The till: selling one product at a time ---------- */
-.till { display: grid; gap: 16px; }
+/* ---------- The till: Apple iOS POS (Fast, tactile, thumb-friendly) ---------- */
+.till { display: flex; flex-direction: column; gap: 12px; max-width: 680px; margin: 0 auto; width: 100%; }
 .till .card { margin: 0; }
-.till-head { padding: 20px 22px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: #fff; border: 0; }
-.till-date { font-size: 14px; opacity: .85; }
-.till-total { font-size: 44px; line-height: 1.1; font-weight: 700; margin: 4px 0 2px; letter-spacing: -.01em; }
-.till-total small { font-size: 18px; font-weight: 600; opacity: .8; margin-right: 6px; }
-.till-sub { font-size: 14.5px; opacity: .9; }
-.till-lock { margin-top: 12px; padding: 8px 12px; border-radius: var(--radius-sm); background: rgba(255,255,255,.18); display: flex; gap: 8px; align-items: center; font-size: 14px; }
-.till-lock svg { width: 16px; height: 16px; }
-.till-search { position: relative; margin-bottom: 14px; }
-.till-search > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); display: grid; color: var(--text-3); pointer-events: none; }
-.till-search .input { height: 52px; padding-left: 44px; font-size: 17px; border-radius: 14px; }
-.till-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.till-prod { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 92px; padding: 14px; text-align: left; cursor: pointer;
-  background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; color: var(--text); font: inherit; transition: border-color .12s ease, box-shadow .12s ease, transform .08s ease; }
-.till-prod:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
-.till-prod:active { transform: scale(.98); }
-.till-prod:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Till Header: Compact iOS Status Card */
+.till-head {
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #196dc9 0%, #104a8b 100%);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(16, 74, 139, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.th-left { display: flex; flex-direction: column; gap: 2px; }
+.th-date { font-size: 13px; font-weight: 500; opacity: .88; letter-spacing: .01em; }
+.th-total { font-size: 26px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 3px; }
+.th-total small { font-size: 14px; font-weight: 600; opacity: .82; }
+.th-sub { font-size: 12px; opacity: .85; }
+.th-right { display: flex; align-items: center; }
+.eod-jump-btn {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #fff;
+  border-radius: 12px;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.eod-jump-btn:hover { background: rgba(255, 255, 255, 0.26); }
+.eod-jump-btn span { font-size: 11px; opacity: .88; text-transform: uppercase; letter-spacing: .04em; }
+.eod-jump-btn b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.eod-jump-btn b.neg { color: #fca5a5; }
+.till-lock { width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: var(--radius-sm); background: rgba(255, 255, 255, .15); display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
+.till-lock svg { width: 14px; height: 14px; }
+
+/* Sub-Navigation: iOS Segmented Control */
+.till-nav-wrap { width: 100%; }
+.till-nav {
+  display: flex;
+  width: 100%;
+  background: var(--surface-3);
+  padding: 3px;
+  border-radius: var(--radius);
+  gap: 3px;
+}
+.till-nav button {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  border: 0;
+  background: none;
+  border-radius: calc(var(--radius) - 3px);
+  cursor: pointer;
+  transition: all .14s cubic-bezier(.16, 1, .3, 1);
+  white-space: nowrap;
+}
+.till-nav button svg { width: 15px; height: 15px; opacity: .75; }
+.till-nav button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+}
+.till-nav button.on svg { color: var(--primary); opacity: 1; }
+.till-nav .badge { font-size: 11px; padding: 1px 6px; border-radius: 999px; }
+
+/* Search bar on till */
+.till-search { position: relative; width: 100%; margin-bottom: 12px; }
+.till-search > span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: grid; color: var(--text-3); pointer-events: none; }
+.till-search > span svg { width: 16px; height: 16px; }
+.till-search .input { height: 40px; padding-left: 36px; padding-right: 32px; font-size: 14.5px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-xs); }
+.till-search .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.ts-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 4px; display: grid; place-items: center; }
+.ts-clear svg { width: 14px; height: 14px; }
+
+/* Product Grid & Cards */
+.till-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
+.till-prod {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 84px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  color: var(--text);
+  font: inherit;
+  transition: transform .12s cubic-bezier(.16, 1, .3, 1), box-shadow .12s ease, border-color .12s ease;
+}
+.till-prod:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.till-prod:active { transform: scale(.97); }
 .till-prod.on { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 3px var(--primary-soft); }
-.till-prod.out { opacity: .55; cursor: not-allowed; background: var(--surface-3); }
-.tp-name { font-weight: 650; font-size: 17px; line-height: 1.25; }
-.tp-price { font-size: 15px; color: var(--text-2); }
-.tp-left { margin-top: auto; font-size: 13.5px; font-weight: 600; color: var(--success); }
-.tp-left.low { color: var(--warning); }
-.tp-left.none { color: var(--text-3); }
+.till-prod.out { opacity: .5; cursor: not-allowed; background: var(--surface-3); }
+.tp-name { font-weight: 650; font-size: 14.5px; line-height: 1.25; color: var(--text); }
+.tp-bottom { display: flex; width: 100%; justify-content: space-between; align-items: baseline; margin-top: auto; padding-top: 4px; gap: 4px; }
+.tp-price { font-size: 13.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.tp-badge { font-size: 11px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; }
+.tp-badge.ok { background: var(--success-soft); color: var(--success); }
+.tp-badge.low { background: var(--warning-soft); color: var(--warning); }
+.tp-badge.none { background: var(--surface-3); color: var(--text-3); }
 
-.till-sheet { position: sticky; bottom: 12px; z-index: 5; padding: 16px; border: 1.5px solid var(--primary); box-shadow: 0 12px 32px -8px rgba(15, 23, 42, .28); border-radius: 20px; background: var(--surface); }
-.ts-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.ts-name { font-size: 20px; }
-.ts-qty { display: grid; grid-template-columns: 64px 1fr 64px; gap: 10px; margin: 14px 0 10px; align-items: stretch; }
-.ts-step { display: grid; place-items: center; min-height: 64px; border-radius: 16px; border: 1.5px solid var(--border-strong); background: var(--surface-3); color: var(--text); cursor: pointer; }
-.ts-step svg { width: 26px; height: 26px; }
-.ts-step:active { transform: scale(.96); }
-.ts-step:disabled { opacity: .4; cursor: not-allowed; }
-.ts-step:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.ts-qty .input { height: 64px; text-align: center; font-size: 30px; font-weight: 700; border-radius: 16px; padding: 0; }
-.ts-quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.chip-btn { min-width: 48px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text); font: 600 15px var(--font); cursor: pointer; }
+/* Bottom Action Sheet (Selling modal) */
+.till-sheet {
+  position: sticky;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  z-index: 50;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.22);
+  animation: modalPop .18s cubic-bezier(.16, 1, .3, 1);
+}
+.ts-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 0 auto 8px; }
+.ts-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.ts-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.ts-meta { font-size: 13px; color: var(--text-2); margin-top: 1px; }
+.ts-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.ts-qty { display: grid; grid-template-columns: 46px 1fr 46px; gap: 8px; align-items: stretch; }
+.ts-step {
+  display: grid; place-items: center; height: 46px; width: 46px; border-radius: 12px;
+  border: 1px solid var(--border-strong); background: var(--surface-3); color: var(--text); cursor: pointer;
+  transition: transform .08s ease, background-color .1s ease;
+}
+.ts-step svg { width: 18px; height: 18px; }
+.ts-step:active:not(:disabled) { transform: scale(.95); }
+.ts-step:disabled { opacity: .35; cursor: not-allowed; }
+.ts-qty .input { height: 46px; text-align: center; font-size: 20px; font-weight: 700; border-radius: 12px; padding: 0; font-variant-numeric: tabular-nums; }
+.ts-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-btn {
+  height: 32px; min-width: 38px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text);
+  font: 600 13px var(--font); cursor: pointer; transition: all .1s ease;
+}
 .chip-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
-.chip-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.till-sell { width: 100%; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 22px; border: 0; border-radius: 18px;
-  background: var(--success); color: #fff; font: 700 18px var(--font); cursor: pointer; box-shadow: 0 6px 16px -6px rgba(27, 128, 58, .6); transition: transform .08s ease, filter .12s ease; }
-.till-sell b { font-size: 20px; }
-.till-sell:hover { filter: brightness(1.05); }
-.till-sell:active { transform: scale(.985); }
-.till-sell:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
-.till-sell.loading, .till-sell:disabled { opacity: .7; pointer-events: none; }
+.chip-btn:active { transform: scale(.96); }
 
-.till-stock { width: 100%; border-collapse: collapse; font-size: 15px; }
-.till-stock th, .till-stock td { padding: 12px 10px; text-align: right; border-bottom: 1px solid var(--border); }
-.till-stock thead th { font-size: 12.5px; color: var(--text-2); font-weight: 650; }
-.till-stock th:first-child, .till-stock td:first-child { text-align: left; padding-left: 18px; }
-.till-stock tbody th { font-weight: 650; color: var(--text); }
-.till-stock td.left { font-size: 18px; }
+/* Main Sell Action Button */
+.till-sell {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #22934c 0%, #17753b 100%);
+  color: #fff;
+  font: 700 15px var(--font);
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(23, 117, 59, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform .08s ease, filter .1s ease;
+}
+.till-sell b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.till-sell:hover { filter: brightness(1.04); }
+.till-sell:active { transform: scale(.98); }
+.till-sell:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.till-sell.loading, .till-sell:disabled { opacity: .65; pointer-events: none; }
+
+/* Quick Bar at bottom of Sell tab */
+.till-quick-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin-top: 4px;
+  box-shadow: var(--shadow-xs);
+}
+
+.till-stock { width: 100%; border-collapse: collapse; font-size: 14px; }
+.till-stock th, .till-stock td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+.till-stock thead th { font-size: 12px; color: var(--text-2); font-weight: 650; }
+.till-stock th:first-child, .till-stock td:first-child { text-align: left; padding-left: 14px; }
+.till-stock tbody th { font-weight: 600; color: var(--text); }
+.till-stock .ts-sub { display: block; font-size: 12px; font-weight: 400; color: var(--text-3); margin-top: 2px; }
+.till-stock td.left { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .till-stock td.left.low b { color: var(--warning); }
-.till-stock .tag { margin-left: 6px; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--warning-soft); color: var(--warning); vertical-align: middle; }
+.till-stock .tag { margin-left: 6px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--warning-soft); color: var(--warning); vertical-align: middle; }
 .till-stock tr.none td, .till-stock tr.none th { color: var(--text-3); }
 .till-lines { list-style: none; margin: 0; padding: 0; }
-.till-lines li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.till-lines li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .till-lines li:last-child { border-bottom: 0; }
 .tl-main { display: flex; flex-direction: column; min-width: 0; }
-.tl-main b { font-size: 16px; }
-.tl-main .muted { font-size: 13.5px; }
-.tl-amt { font-weight: 700; font-size: 16px; }
-.eod-sum { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-3); font-size: 15px; }
-.eod-sum b { text-align: right; }
+.tl-main b { font-size: 15px; font-weight: 650; }
+.tl-main .muted { font-size: 12.5px; color: var(--text-3); }
+.tl-amt { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.eod-sum { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-3); font-size: 14px; }
+.eod-sum b { text-align: right; font-variant-numeric: tabular-nums; }
+.eod-sum b.neg { color: var(--danger); }
+
 @media (max-width: 860px) {
-  .till-sheet { bottom: calc(66px + env(safe-area-inset-bottom)); }
-  .till-total { font-size: 40px; }
+  /* On mobile Sell tab: hide monthly filterbar and reduce clutter */
+  body:has(#view[data-tab="sell"]) #filterbar,
+  body:has(#view[data-tab="sell"]) .filterbar { display: none !important; }
+  #view[data-tab="sell"] .portal-head { display: none; }
+  #view[data-tab="sell"] { padding-top: 10px; }
   .till-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .till-lines li .btn.sm { min-height: 44px; }
+  .till-sheet { bottom: calc(60px + env(safe-area-inset-bottom)); border-radius: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .till-prod, .till-sell, .ts-step { transition: none; } .till-prod:active, .till-sell:active, .ts-step:active { transform: none; } }
 
@@ -1830,11 +1987,6 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 }
 @media (max-width: 700px) { .msheet th.name { border: 0; box-shadow: none; min-width: 0; } }
 #view[data-page] th, #view[data-page] .tp-left { font-size: 14px; }
-
-/* The till says how to sell, and why selling is unavailable when it is */
-.till-steps { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin: 0 0 14px; padding: 0; font-size: 15px; color: var(--text-2); }
-.till-steps li { display: inline-flex; align-items: center; gap: 8px; }
-.till-steps b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: 14px; }
 
 /* Add product: the profit preview keeps one shape; only its numbers change as you type */
 .pprev { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2, var(--surface)); padding: 16px 18px; }
