@@ -22,7 +22,7 @@ export default {
     const week = (r) => `${dateText(r.w.week_start)} – ${dateText(r.w.week_end)}`;
     $("#grid").innerHTML = rows.length ? dataTable({
       rows, sortable: false, pageSize: 50, caption: "Managers' weeks",
-      card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.hub} · ${week(r)}</span></span><span class="mc-val">${money(r.w.business_total)}</span>`,
+      card: (r) => html`<span class="mc-main"><b>${week(r)}</b><span class="mc-sub">${r.name} · ${r.hub}</span></span><span class="mc-val">Rs ${money(r.w.business_total)}</span>`,
       cols: [
         { key: "name", label: "Manager", render: (r) => html`<b>${r.name}</b> <span class="faint">${r.hub}</span>` },
         { key: "week", label: "Week", render: week },

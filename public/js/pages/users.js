@@ -4,10 +4,10 @@ import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago, LE
 const LV = Object.fromEntries(LEVELS);
 
 const ROLES = [
-  ["staff", "Staff portal", "A distributor or supervisor signs in to see their own sales, pay and payslips, and to record their sales. A coacher or a manager who is chosen here automatically gets the coacher or manager login below"],
-  ["coacher", "Coacher (hub head)", "Heads one hub and sees all of it: every person, all stock and sheets. Gives stock out, marks and confirms the days, registers the team. Never sees pay"],
-  ["manager", "Manager", "Sees only the people who report to them: their sales, stock and details, view only. Never sees pay. A manager tagged as stock keeper can also handle the stock of the whole hub"],
-  ["admin", "Admin", "Everything, including finalizing months, users and settings"],
+  ["staff", "Staff portal", "Distributors & supervisors: own sales, pay and daily sheets"],
+  ["coacher", "Coacher (hub head)", "Heads one hub: all people, stock and confirmation"],
+  ["manager", "Manager", "Own team: sales, stock and members. Never sees pay"],
+  ["admin", "Admin", "Full access: payroll, approvals, users and settings"],
 ];
 const roleBadge = (r) => badge(r === "admin" ? "admin" : "green", ROLES.find((x) => x[0] === r)?.[1] || r);
 

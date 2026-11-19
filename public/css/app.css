@@ -159,7 +159,6 @@ code, .mono { font-family: var(--mono); font-size: 14px; }
 .nav a.active {
   background: var(--primary-soft); color: var(--primary-text); font-weight: 650;
 }
-.nav a.active::before { content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
 .nav svg { width: 18px; height: 18px; flex-shrink: 0; }
 .nav .count {
   margin-left: auto; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
@@ -494,14 +493,21 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .toast svg { width: 18px; height: 18px; flex-shrink: 0; }
 .toast.ok svg { color: var(--success); } .toast.err svg { color: var(--danger); } .toast.warn svg { color: var(--warning); }
 
-/* ---------- Tabs ---------- */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; overflow-x: auto; }
-.tabs button {
-  border: 0; background: none; padding: 10px 16px; font: 600 13.5px var(--font); color: var(--text-2); cursor: pointer;
-  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s, opacity .15s ease;
+/* ---------- Tabs (Apple iOS Segmented Pill Strip) ---------- */
+.tabs {
+  display: flex; gap: 6px; border-bottom: 0; margin-bottom: 16px; overflow-x: auto; scrollbar-width: none; padding: 4px 2px;
 }
-.tabs button.on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 650; }
-.tabs button:hover { color: var(--text); }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button {
+  border: 1px solid transparent; background: var(--surface-2); border-radius: var(--radius-pill);
+  padding: 8px 16px; font: 600 13.5px var(--font); color: var(--text-2); cursor: pointer;
+  white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s ease;
+}
+.tabs button:hover { background: var(--surface-3); color: var(--text); }
+.tabs button.on {
+  background: var(--surface); color: var(--primary); border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm); font-weight: 650;
+}
 
 /* ---------- Profile ---------- */
 .profile-head { display: flex; gap: 18px; align-items: center; padding: 20px; flex-wrap: wrap; }
@@ -743,9 +749,10 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
 /* Summary cards (Apple iOS Widget style) */
 .kpi {
   padding: 18px 20px;
-  border-top: 3px solid var(--primary);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
+  background: var(--surface);
   transition: transform .18s cubic-bezier(.16, 1, .3, 1), box-shadow .18s cubic-bezier(.16, 1, .3, 1), border-color .18s ease;
 }
 .kpi:hover {
@@ -753,10 +760,6 @@ th[aria-sort="descending"] .sort-ind::after { content: "▼"; opacity: 1; font-s
   box-shadow: var(--shadow-md);
   border-color: var(--border-strong);
 }
-.kpi:has(.icon.blue) { border-top-color: var(--info); }
-.kpi:has(.icon.green) { border-top-color: var(--success); }
-.kpi:has(.icon.amber) { border-top-color: var(--warning); }
-.kpi:has(.icon.red) { border-top-color: var(--danger); }
 .kpi .icon { width: 34px; height: 34px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); }
 .kpi .icon.blue { background: var(--info-soft); color: var(--info); }
 .kpi .icon.green { background: var(--success-soft); color: var(--success); }
@@ -1011,12 +1014,12 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
     box-shadow: 0 -4px 16px rgba(15, 23, 42, .06);
   }
   .bottom-nav a, .bottom-nav button {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 56px; padding: 6px 2px; border: 0; background: none;
-    color: var(--text-3); font: 600 12.5px var(--font); text-decoration: none; border-top: 2px solid transparent; cursor: pointer; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 54px; padding: 6px 2px; border: 0; background: none;
+    color: var(--text-3); font: 600 12.5px var(--font); text-decoration: none; cursor: pointer; position: relative;
     transition: transform .12s cubic-bezier(.2, .8, .2, 1), color .12s ease;
   }
   .bottom-nav svg { width: 22px; height: 22px; }
-  .bottom-nav a[aria-current="page"] { color: var(--primary); border-top-color: var(--primary); font-weight: 650; }
+  .bottom-nav a[aria-current="page"] { color: var(--primary); font-weight: 650; }
   .bottom-nav a:active, .bottom-nav button:active { transform: scale(.92); }
   .bottom-nav a:focus-visible, .bottom-nav button:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
   .bottom-nav .dot { position: absolute; top: 8px; left: calc(50% + 6px); width: 9px; height: 9px; border-radius: 50%; background: var(--danger); border: 2px solid var(--surface); }
@@ -1053,11 +1056,22 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .stepper-foot .btn.primary { flex: 1; }
 .stepper-foot [data-close] { margin-right: auto; }
 .m-card .chev, .fold-btn .chev { width: 12px; height: 12px; background: var(--text-3); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 1.5 8.5 6 4 10.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 1.5 8.5 6 4 10.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; flex-shrink: 0; }
-.sec-menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.sec-menu .m-card { width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-height: 64px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); font: inherit; color: var(--text); cursor: pointer; }
-.sec-menu .m-card small { display: block; color: var(--text-3); font-size: 13px; font-weight: 400; margin-top: 2px; }
+/* Apple iOS Inset Grouped list (Settings style) */
+.sec-menu ul {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.sec-menu li { border-bottom: 1px solid var(--border); }
+.sec-menu li:last-child { border-bottom: 0; }
+.sec-menu .m-card {
+  width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 18px; min-height: 58px; background: transparent; border: 0; border-radius: 0; box-shadow: none;
+  font: inherit; color: var(--text); cursor: pointer; transition: background-color .15s ease;
+}
+.sec-menu .m-card:hover { background: var(--surface-2); }
 .sec-menu .m-card:active { background: var(--surface-3); }
+.sec-menu .m-card small { display: block; color: var(--text-3); font-size: 13px; font-weight: 400; margin-top: 2px; }
 .sec-bar { margin: 0 0 14px; }
 .fold-head { cursor: pointer; }
 .fold-btn { margin-left: auto; width: 44px; height: 44px; border: 0; background: none; border-radius: var(--radius); display: grid; place-items: center; cursor: pointer; color: var(--text-2); }
@@ -1143,8 +1157,11 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .quick .q-actions .btn { min-height: 48px; }
 .quick form { display: grid; gap: 12px; }
 
-.m-card .mc-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
-.m-card .mc-kv .k { color: var(--text-3); }
+.m-card .mc-kv {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13.5px;
+  padding-top: 6px; margin-top: 4px; border-top: 1px solid var(--border);
+}
+.m-card .mc-kv .k { color: var(--text-3); font-size: 13px; }
 .m-card .mc-kv .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .m-list .m-card:has(.mc-kv) { align-items: flex-start; }
 
@@ -1166,9 +1183,7 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 @media (prefers-reduced-motion: reduce) { .auth-art .ledger .short dd::after { animation: none; } }
 
 /* ---------- Home: where the month stands, on ruled ledger paper ---------- */
-.month-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 40px; align-items: center; padding: 22px 28px 22px 64px; margin-bottom: 16px; position: relative;
-}
-.month-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 44px; width: 2px; background: var(--gold); opacity: .85; }
+.month-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 40px; align-items: center; padding: 22px 24px; margin-bottom: 16px; position: relative; }
 .month-card h2 { font: 600 28px/1.2 var(--font-display); margin: 0 0 6px; }
 .month-card p { margin: 0 0 14px; max-width: 34em; color: var(--text-2); font-size: 15px; }
 .month-card .mc-right { margin: 0; display: grid; gap: 10px; text-align: right; }
@@ -1176,8 +1191,7 @@ table.table, .kv, .alert, .breakdown, .sheet th.name, .list-item .grow b, .step 
 .month-card dd { margin: 0; font: 600 30px/1.15 var(--font-display); font-variant-numeric: tabular-nums; word-break: break-word; }
 .month-card dd small { font: 600 15px var(--font); margin-right: 5px; color: var(--accent); }
 @media (max-width: 860px) {
-  .month-card { grid-template-columns: 1fr; padding: 18px 16px 18px 46px; gap: 14px; }
-  .month-card::before { left: 30px; }
+  .month-card { grid-template-columns: 1fr; padding: 18px 20px; gap: 14px; }
   .month-card h2 { font-size: 24px; }
   .month-card .mc-right { text-align: left; }
   .month-card dd { font-size: 24px; word-break: normal; white-space: nowrap; }
@@ -1334,10 +1348,11 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* Hub cards on the dashboard: Apple iOS Widget Tile */
 .section-title { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
 .hub-tile {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 20px 22px;
+  padding: 20px 46px 20px 22px;
   text-decoration: none;
   color: inherit;
   background: var(--surface);
@@ -1366,6 +1381,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .hub-go { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; color: var(--primary); min-height: 24px; transition: transform .15s ease; }
 .hub-tile:hover .hub-go { transform: translateX(2px); }
 .hub-go svg { width: 16px; height: 16px; }
+.hub-chev {
+  position: absolute; top: 22px; right: 18px; color: var(--text-3); display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; transition: transform .15s ease, color .15s ease;
+}
+.hub-chev svg { width: 18px; height: 18px; }
+.hub-tile:hover .hub-chev { transform: translateX(3px); color: var(--primary); }
 @media (max-width: 860px) { .hub-go { min-height: 44px; } }
 
 /* ---------- Critique fixes (Nov 2026) ---------- */
@@ -1776,21 +1797,21 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 @media (max-width: 860px) { .mc-foot .btn { min-height: 44px; } .mc-x { width: 36px; height: 36px; } }
 
 /* ---------- Hub workspace: the open hub's name, its sections and their pages ---------- */
-.ws { padding: 12px 24px 0; background: var(--bg); border-bottom: 1px solid var(--border); }
+.ws { padding: 10px 24px 10px; background: var(--bg); border-bottom: 1px solid var(--border); }
 .ws-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
 .ws-hub { font-size: 20px; font-weight: 700; color: var(--text); }
 .ws-top > select { width: auto; margin-left: auto; min-width: 160px; }
-.ws-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.ws-tabs { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; background: var(--surface-3); padding: 4px; border-radius: var(--radius); }
 .ws-tabs::-webkit-scrollbar { display: none; }
-.ws-tabs a { flex: 0 0 auto; padding: 12px 16px; min-height: 44px; display: inline-flex; align-items: center; font-size: 15.5px; font-weight: 600; color: var(--text-2); text-decoration: none; border-bottom: 3px solid transparent; }
+.ws-tabs a { flex: 1 1 auto; padding: 8px 12px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; font-size: 13.5px; font-weight: 600; color: var(--text-2); text-decoration: none; border-radius: calc(var(--radius) - 3px); border: 0; transition: all .14s cubic-bezier(.16, 1, .3, 1); white-space: nowrap; }
 .ws-tabs a:hover { color: var(--text); }
-.ws-tabs a[aria-current="page"] { color: var(--primary); border-bottom-color: var(--primary); }
+.ws-tabs a[aria-current="page"] { color: var(--text); background: var(--surface); box-shadow: 0 2px 6px rgba(0, 0, 0, .08); }
 .ws-tabs a:focus-visible, .ws-sub a:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 6px; }
 .ws-sub { display: flex; gap: 8px; overflow-x: auto; padding: 10px 0 12px; scrollbar-width: none; }
 .ws-sub::-webkit-scrollbar { display: none; }
 .ws-sub a { flex: 0 0 auto; padding: 7px 14px; min-height: 36px; display: inline-flex; align-items: center; border-radius: 999px; border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text-2); font-size: 14.5px; font-weight: 600; text-decoration: none; }
 .ws-sub a[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: #fff; }
-@media (max-width: 860px) { .ws { padding: 10px 14px 0; } .ws-sub a { min-height: 44px; } .ws-top > select { margin-left: 0; width: 100%; } }
+@media (max-width: 860px) { .ws { padding: 8px 14px 10px; } .ws-sub a { min-height: 44px; } .ws-top > select { margin-left: 0; width: 100%; } }
 
 /* ---------- Daily sheet: totals strip and one card per manager ---------- */
 .dsum { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; padding: 16px 18px; background: var(--surface-3); border-bottom: 1px solid var(--border); }
@@ -1996,6 +2017,31 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 @media (max-width: 520px) {
   .grid.kpis .kpi .value, .dash .kpi .value { font-size: 21px; overflow-wrap: normal; white-space: nowrap; }
   .grid.kpis .kpi .value small { font-size: 13px; }
+  .page-head .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .page-head .actions > .row {
+    flex: 1 1 auto;
+    display: flex;
+  }
+  .page-head .actions > .row .btn {
+    flex: 1;
+  }
+  .seg {
+    display: flex;
+    width: 100%;
+  }
+  .seg button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 4px !important;
+    text-align: center;
+    font-size: 12.5px !important;
+  }
 }
 /* second pass: table headers, small print and chips read at 14px on every page */
 #view[data-page] .table th, #view[data-page] .sheet th, #view[data-page] small, #view[data-page] .dg-prog, #view[data-page] .seg button,
@@ -2275,8 +2321,9 @@ details.fold + details.fold { margin-top: 8px; }
   .ws-top .faint { white-space: nowrap; }
   .ws-top > select { width: auto; flex: 1 1 0; min-width: 0; margin-left: auto; max-width: 190px; }
   /* The five hub sections fit across the screen without sideways scrolling. */
-  .ws-tabs { gap: 0; justify-content: space-between; }
-  .ws-tabs a { flex: 1 1 auto; justify-content: center; padding: 0 6px; font-size: 14.5px; }
+  .ws-tabs { gap: 3px; padding: 3px; border-radius: var(--radius); background: var(--surface-3); }
+  .ws-tabs a { flex: 1 1 auto; justify-content: center; padding: 6px 8px; font-size: 13px; min-height: 36px; border: 0; }
+  .ws-tabs a[aria-current="page"] { background: var(--surface); color: var(--text); box-shadow: 0 2px 6px rgba(0, 0, 0, .08); }
   /* Pages inside a section: smaller pills that fit three across. */
   .ws-sub { gap: 6px; padding: 8px 0 10px; }
   .ws-sub a { padding: 0 10px; font-size: 13.5px; }

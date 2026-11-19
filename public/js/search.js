@@ -29,7 +29,7 @@ export function mountSearch(host, { navigate, state, scopeHub }) {
     <label class="sr-only" for="gs-input">Search people and hubs</label>
     <span class="gs-ico" aria-hidden="true">${icon("search")}</span>
     <input id="gs-input" class="input sm" type="text" role="combobox" aria-expanded="false" aria-controls="gs-list" aria-autocomplete="list"
-      placeholder="Search people, hubs" autocomplete="off" spellcheck="false" enterkeyhint="search">
+      placeholder="Search..." autocomplete="off" spellcheck="false" enterkeyhint="search">
     <kbd class="gs-key" aria-hidden="true">/</kbd>
     <ul id="gs-list" role="listbox" aria-label="Search results" hidden></ul>`;
   const input = host.querySelector("input"), list = host.querySelector("ul");

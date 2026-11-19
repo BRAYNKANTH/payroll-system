@@ -31,7 +31,7 @@ export default {
           <span class="muted hub-head">${levelLabel(m.staff_level)}</span>
           <span class="hub-nums"><span><small>Today</small><b class="num">${compact(m.today_business)}</b></span><span><small>This month</small><b class="num">${compact(m.month_business)}</b></span><span><small>Stock</small><b class="num">${m.stock_pieces}</b></span></span>
           <span class="hub-chips">${m.unconfirmed ? html`<span class="badge amber">${plural(m.unconfirmed, "day", "days")} waiting for the coacher</span>` : html`<span class="badge green">Up to date</span>`}${m.stock_pieces === 0 ? html`<span class="badge amber">No stock</span>` : ""}</span>
-          <span class="hub-go">Open ${icon("right")}</span></a>`)}</div>`
+          <span class="hub-chev" aria-hidden="true">${icon("right")}</span></a>`)}</div>`
           : html`<div class="card">${emptyState("No one reports to you yet", `${first ? first + ", " : ""}people you are the manager of appear here.`, "users")}</div>`}
       </section>`;
   },
