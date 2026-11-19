@@ -53,7 +53,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
           <button type="button" class="${subtab === "sell" ? "on" : ""}" data-subtab="sell" role="tab" aria-selected="${subtab === "sell"}">${icon("bag")} Sell</button>
           <button type="button" class="${subtab === "sales" ? "on" : ""}" data-subtab="sales" role="tab" aria-selected="${subtab === "sales"}">${icon("tag")} Sales ${st.lines.length ? html`<span class="badge plain sm">${st.lines.length}</span>` : ""}</button>
           <button type="button" class="${subtab === "stock" ? "on" : ""}" data-subtab="stock" role="tab" aria-selected="${subtab === "stock"}">${icon("box")} Stock</button>
-          <button type="button" class="${subtab === "eod" ? "on" : ""}" data-subtab="eod" role="tab" aria-selected="${subtab === "eod"}">${icon("check")} End of Day</button>
+          <button type="button" class="${subtab === "eod" ? "on" : ""}" data-subtab="eod" role="tab" aria-selected="${subtab === "eod"}">${icon("check")} Day End</button>
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
           <span>${st.totals.count} sale${st.totals.count === 1 ? "" : "s"} (${rs(st.totals.amount)})</span>
           <div class="row" style="gap:6px">
             <button type="button" class="btn sm ghost" data-subtab="sales">View sales</button>
-            <button type="button" class="btn sm primary" data-subtab="eod">Finish day</button>
+            <button type="button" class="btn sm primary" data-subtab="eod">Day End</button>
           </div>
         </div>
       ` : ""}
@@ -136,7 +136,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
               <h2>Today's sales</h2>
               <div class="sub">Total: ${rs(st.totals.amount)} (${st.totals.count} ${st.totals.count === 1 ? "sale" : "sales"})</div>
             </div>
-            <button type="button" class="btn sm ghost" data-subtab="sell">Back to sell</button>
+            <button type="button" class="btn sm ghost" data-subtab="sell">${icon("left")} Till</button>
           </div>
           ${st.lines.length ? html`
             <ul class="till-lines" role="list">
@@ -162,7 +162,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
               <h2>My stock today</h2>
               <div class="sub">What the hub issued you and what is left to sell</div>
             </div>
-            <button type="button" class="btn sm ghost" data-subtab="sell">Back to sell</button>
+            <button type="button" class="btn sm ghost" data-subtab="sell">${icon("left")} Till</button>
           </div>
           ${inHand.length ? html`
             <div class="card-body flush">
@@ -186,7 +186,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
               <h2>End of day</h2>
               <div class="sub">Enter the cash handed in. Your hub head will confirm the day.</div>
             </div>
-            <button type="button" class="btn sm ghost" data-subtab="sell">Back to sell</button>
+            <button type="button" class="btn sm ghost" data-subtab="sell">${icon("left")} Till</button>
           </div>
           <form id="eod" class="card-body form-grid" autocomplete="off">
             <div class="field"><label for="eod-set">Money handed in (Rs)</label><input class="input" id="eod-set" name="settled_amount" inputmode="decimal" placeholder="0" value="${day.recorded && day.settled ? n0(day.settled).replace(/,/g, "") : ""}" ${st.locked || !st.totals.count ? "disabled" : ""}></div>

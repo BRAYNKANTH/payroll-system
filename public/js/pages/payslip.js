@@ -3,7 +3,7 @@
 // Plain words, big figures, one column, the printed copy one tap away.
 import { get } from "../api.js";
 import { $, html, icon, money, monthName, pct } from "../ui.js";
-import { plain, keep } from "./portal.js";
+import { plain, plainParts, keep } from "./portal.js";
 
 // A short "what is this?" for lines people ask about. Only lines that need it get one.
 const HELP = [
@@ -38,10 +38,11 @@ export default {
     const paid = d.paid > 0;
     const earn = d.earnings.filter(keep), took = d.deductions.filter(keep);
     const line = (l, sign) => {
-      const label = plain(l.label), help = helpFor(label);
+      const { label, sub } = plainParts(l.label);
+      const help = helpFor(label);
       return html`<li class="sl-line">
-        ${help ? html`<details class="sl-help"><summary><span class="sl-label">${label}</span><span class="sl-amt">${sign}${money(l.amount)}</span></summary><p>${help}</p></details>`
-          : html`<div class="sl-plain"><span class="sl-label">${label}</span><span class="sl-amt">${sign}${money(l.amount)}</span></div>`}</li>`;
+        ${help ? html`<details class="sl-help"><summary><div class="sl-label"><b>${label}</b>${sub ? html`<span class="sl-sub">${sub}</span>` : ""}</div><span class="sl-amt">${sign}${money(l.amount)}</span></summary><p>${help}</p></details>`
+          : html`<div class="sl-plain"><div class="sl-label"><b>${label}</b>${sub ? html`<span class="sl-sub">${sub}</span>` : ""}</div><span class="sl-amt">${sign}${money(l.amount)}</span></div>`}</li>`;
     };
     const nb = (p, dir) => (p
       ? html`<a class="sl-nav" href="/me/payslips/${p}" data-link aria-label="${short(p)}, ${dir === "prev" ? "earlier month" : "later month"}">${dir === "prev" ? icon("left") : ""}<span>${short(p)}</span>${dir === "next" ? icon("right") : ""}</a>`

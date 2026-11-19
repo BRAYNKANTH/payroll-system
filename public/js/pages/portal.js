@@ -1,7 +1,7 @@
 // Staff portal: one page for any employee (distributor, supervisor, manager, promoting manager or coacher), showing only their own figures and their team's sales.
 import { get, post, del } from "../api.js";
 import { state } from "../app.js";
-import { buzz, $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime } from "../ui.js";
+import { buzz, $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime, initials } from "../ui.js";
 import { mountSell } from "./sell.js";
 
 let tab = "month";
@@ -40,12 +40,13 @@ function payRules(p, me, rate) {
 }
 
 // ---- grouped list rows (the iOS settings look): label on the left, value on the right
-const row = (label, value, { sub = "", vsub = "", cls = "", strong = false, href = "" } = {}) => {
-  const inner = `<div class="g-l">${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ""}</div><div class="g-v ${cls}">${value}${vsub ? `<small class="${cls}">${vsub}</small>` : ""}</div>`;
+const row = (label, value, { sub = "", vsub = "", cls = "", strong = false, href = "", avatar = "" } = {}) => {
+  const inner = `${avatar ? `<div class="avatar sm" aria-hidden="true">${esc(avatar)}</div>` : ""}<div class="g-l">${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ""}</div><div class="g-v ${cls}">${value}${vsub ? `<small class="${cls}">${vsub}</small>` : ""}</div>`;
   return href ? `<a class="g-row link${strong ? " strong" : ""}" href="${esc(href)}" ${href.startsWith("/me/") ? "data-link" : 'target="_blank" rel="noopener"'}>${inner}</a>` : `<div class="g-row${strong ? " strong" : ""}">${inner}</div>`;
 };
 const group = (title, rows) => `<div class="g-group">${title ? `<div class="g-head">${esc(title)}</div>` : ""}${rows.join("")}</div>`;
 const keep = (l) => l.amount !== 0 || /Basic/.test(l.label);
+
 // The engine's labels carry its internal rule names; show them in plain words.
 const plain = (label) => {
   const sec = /^Security \((fixed|pct_gross|pct_basic|pct_business):([\d.]+)/.exec(label);
@@ -64,6 +65,47 @@ const plain = (label) => {
   return label;
 };
 
+// Returns title and secondary sub-caption for iOS grouped lists & payslips.
+const plainParts = (rawLabel) => {
+  const label = plain(rawLabel);
+  const commSales = /^Commission \((.+?) of your sales, (Rs [\d.,]+); the target was not reached\)$/.exec(label);
+  if (commSales) {
+    return { label: `Commission (${commSales[1]})`, sub: `${commSales[2]} sales · target not reached` };
+  }
+  const commTarget = /^Commission \((.+?) of (Rs [\d.,]+) sales above your target\)$/.exec(label);
+  if (commTarget) {
+    return { label: `Commission (${commTarget[1]})`, sub: `${commTarget[2]} sales above target` };
+  }
+  const extraTarget = /^Extra pay above target \((.+?) of (Rs [\d.,]+) sales above your target\)$/.exec(label);
+  if (extraTarget) {
+    return { label: `Extra pay (${extraTarget[1]})`, sub: `${extraTarget[2]} sales above target` };
+  }
+  const food = /^Food allowance \((.+?)\)$/.exec(label);
+  if (food) {
+    return { label: "Food allowance", sub: food[1] };
+  }
+  const sec = /^Security deposit \((.+?)\)$/.exec(label);
+  if (sec) {
+    return { label: "Security deposit", sub: sec[1] };
+  }
+  const loan = /^Loan payment \((Rs [\d.,]+) still to pay(.*)\)$/.exec(label);
+  if (loan) {
+    return { label: "Loan payment", sub: `${loan[1]} still to pay` };
+  }
+  const adv = /^Advance paid back \((Rs [\d.,]+) still to pay(.*)\)$/.exec(label);
+  if (adv) {
+    return { label: "Advance paid back", sub: `${adv[1]} still to pay` };
+  }
+  if (label.startsWith("Cash not handed in")) {
+    return { label: "Cash not handed in", sub: "Sales minus cash handed in" };
+  }
+  if (label.startsWith("Share of team's sales") || label.startsWith("Share of sales below")) {
+    return { label: "Share of team sales", sub: "Commission from team members" };
+  }
+
+  return { label, sub: "" };
+};
+
 // Short, plain meanings for the words on this page.
 export const GLOSSARY = [
   ["Estimate", "A guess made from the days entered so far. It can change until the office closes the month."],
@@ -80,8 +122,18 @@ export const GLOSSARY = [
   ["Carried to next month", "A balance that moves to next month: money you still owe, or are still owed."],
 ];
 const glossary = () => `<details class="card fold"><summary><h2>What do these words mean?</h2></summary><div class="card-body"><dl class="glossary">${GLOSSARY.map(([t, d]) => `<dt>${esc(t)}</dt><dd>${esc(d)}</dd>`).join("")}</dl></div></details>`;
-const payGroups = (p) => group("Earnings", [...p.earnings.filter(keep).map((l) => row(plain(l.label), money(l.amount))), row("Total earnings", money(p.gross), { strong: true })])
-  + group("Taken off", [...p.deduction_lines.filter(keep).map((l) => row(plain(l.label), money(l.amount))), row("Total taken off", money(p.deductions), { strong: true })]);
+const payGroups = (p) => {
+  const earnRows = p.earnings.filter(keep).map((l) => {
+    const { label, sub } = plainParts(l.label);
+    return row(label, money(l.amount), { sub });
+  });
+  const dedRows = p.deduction_lines.filter(keep).map((l) => {
+    const { label, sub } = plainParts(l.label);
+    return row(label, money(l.amount), { sub });
+  });
+  return group("Earnings", [...earnRows, row("Total earnings", money(p.gross), { strong: true })])
+    + group("Taken off", [...dedRows, row("Total taken off", money(p.deductions), { strong: true })]);
+};
 
 const stat = (label, value, sub = "", ic = "", cls = "") => `<div class="stat ${cls}"><div class="s-label">${ic ? `<span class="s-ic">${icon(ic)}</span>` : ""}${esc(label)}</div><div class="s-value">${value}</div>${sub ? `<div class="s-sub">${sub}</div>` : ""}</div>`;
 
@@ -126,7 +178,7 @@ function setupPull() {
   });
 }
 
-export { plain, keep };
+export { plain, plainParts, keep };
 export default {
   title: "My page",
   async render(ctx) {
@@ -199,8 +251,9 @@ export default {
         <div class="card-body flush" id="team"></div></section>
         <p class="muted" style="margin-top:12px">Total sales below you: <b class="num">Rs ${money(d.below_sales)}</b>.</p>`,
 
-      payslips: () => d.history.length ? html`<section class="card"><div class="card-body flush" id="hist"></div></section>
-        <p class="muted" style="margin-top:12px">Security deposit held back so far: <b class="num">Rs ${money(d.security_held)}</b>.</p>
+      payslips: () => d.history.length ? html`
+        <div class="sec-held-card">${icon("shield")}<div><span>Security deposit held so far</span><b>Rs ${money(d.security_held)}</b></div></div>
+        <section class="card"><div class="card-body flush" id="hist"></div></section>
         ${raw(glossary())}`
         : html`<div class="card">${emptyState("No payslips yet", "Your payslip for a month appears here once the office has closed that month.", "file")}</div>`,
 
@@ -217,26 +270,38 @@ export default {
       documents: () => html`<section class="card"><div class="card-head"><div><h2>My documents</h2><div class="sub">JPG, PNG, WebP or PDF, up to 3 MB each</div></div></div>
         <div class="card-body" id="docs"><div class="sk" style="height:140px"></div></div></section>`,
 
-      details: () => html`<div class="grid halves"><section class="card"><div class="card-head"><h2>My details</h2></div><div class="card-body"><dl class="kv">
-          <dt>Name</dt><dd>${me.name}</dd><dt>Employee ID</dt><dd class="mono">${me.employee_id}</dd><dt>Position</dt><dd>${me.level_name}</dd>
-          <dt>Hub</dt><dd>${me.hub_name}</dd><dt>Reports to</dt><dd>${me.reports_to || "—"}</dd>
-          <dt>Phone</dt><dd>${me.phone || "—"}</dd><dt>NIC</dt><dd>${me.nic || "—"}</dd><dt>Joined</dt><dd>${me.join_date || "—"}</dd></dl></div></section>
-        <section class="card"><div class="card-head"><h2>Bank</h2></div><div class="card-body"><dl class="kv"><dt>Bank</dt><dd>${me.bank_name || "—"}</dd>
-          <dt>Account</dt><dd class="mono">${me.bank_last4 ? "…" + me.bank_last4 : "—"}</dd></dl>
-          <p class="muted" style="margin:12px 0 0">To change your phone, bank account or any other detail, ask your hub manager.</p></div></section></div>`,
+      details: () => html`<div class="grid halves"><section class="card glist"><div class="card-head"><h2>My details</h2></div>
+        ${raw(group("", [
+          row("Name", me.name),
+          row("Employee ID", `<span class="mono">${esc(me.employee_id)}</span>`),
+          row("Position", me.level_name),
+          row("Hub", me.hub_name),
+          row("Reports to", me.reports_to || "—"),
+          row("Phone", me.phone ? `<a href="tel:${esc(me.phone)}">${esc(me.phone)}</a>` : "—"),
+          row("NIC", me.nic || "—"),
+          row("Joined", me.join_date || "—"),
+        ]))}</section>
+        <section class="card glist"><div class="card-head"><h2>Bank</h2></div>
+        ${raw(group("", [
+          row("Bank", me.bank_name || "—"),
+          row("Account", `<span class="mono">${me.bank_last4 ? "…" + esc(me.bank_last4) : "—"}</span>`),
+        ]))}
+        <div class="card-foot muted">To change your phone, bank account or any other detail, ask your hub manager.</div></section></div>`,
     };
 
     const drawDocs = async () => {
       const docs = await get("/api/me/documents");
       const box = $("#docs");
       if (!box) return;
-      box.innerHTML = html`<div class="stack">${DOC_TYPES.map(([k, l]) => {
+      box.innerHTML = html`<div class="doc-list">${DOC_TYPES.map(([k, l]) => {
         const mine = docs.filter((x) => x.doc_type === k);
-        return html`<div class="row between" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
-          <div style="min-width:200px;flex:1"><b>${l}</b> ${k === "other" ? "" : mine.length ? badge("green", "On file") : badge("amber", "Missing")}
-            ${mine.map((x) => html`<div class="row" style="gap:8px;margin-top:6px"><a href="/api/me/documents/${x.id}" target="_blank" rel="noopener">${icon("file")} ${x.file_name}</a>
-              <span class="faint text-sm">${fileSize(x.size_bytes)} · ${dateTime(x.uploaded_at)}</span></div>`)}</div>
-          <label class="btn sm">${icon("upload")} Upload<input type="file" data-up="${k}" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label></div>`;
+        return html`<div class="doc-item">
+          <div class="doc-meta">
+            <div class="doc-head"><b>${l}</b> ${k === "other" ? "" : mine.length ? badge("green", "On file") : badge("amber", "Missing")}</div>
+            ${mine.length ? mine.map((x) => html`<div class="doc-file"><a href="/api/me/documents/${x.id}" target="_blank" rel="noopener">${icon("file")} ${x.file_name}</a> <span class="doc-sub">${fileSize(x.size_bytes)} · ${dateTime(x.uploaded_at)}</span></div>`) : html`<span class="doc-desc muted">Upload required identity document</span>`}
+          </div>
+          <label class="btn sm ghost icon-text doc-btn">${icon("upload")} <span>Upload</span><input type="file" data-up="${k}" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
+        </div>`;
       })}</div>
       <p class="muted" style="margin:14px 0 0">To remove or replace a document, ask your hub manager.</p>`.toString();
       $$("[data-up]", box).forEach((inp) => (inp.onchange = () => busy(inp.parentElement, async () => {
@@ -300,8 +365,12 @@ export default {
               { key: "target", label: "Of target", align: "r", render: (r) => (r.target ? pct(r.business / r.target, 0) : "—"), total: () => "" },
             ],
           }).toString(),
-          group("", [...d.team.map((r) => row(r.name, money(r.business), { sub: `${r.level_name} · ${r.days} day${r.days === 1 ? "" : "s"}${r.target ? ` · ${pct(r.business / r.target, 0)} of target` : ""}`, vsub: r.short ? `Short ${money(r.short)}` : "" })),
-            row("Total below you", money(d.below_sales), { strong: true })])) : emptyState("No one reports to you yet", "People who report to you appear here with their sales.", "users").toString();
+          group("", [...d.team.map((r) => row(r.name, money(r.business), {
+            avatar: initials(r.name),
+            sub: `${r.level_name} · ${r.days} day${r.days === 1 ? "" : "s"}${r.target ? ` · ${pct(r.business / r.target, 0)} of target` : ""}`,
+            vsub: r.short ? `Short ${money(r.short)}` : "",
+          })),
+          row("Total below you", money(d.below_sales), { strong: true })])) : emptyState("No one reports to you yet", "People who report to you appear here with their sales.", "users").toString();
       }
       if (tab === "payslips" && d.history.length) {
         $("#hist").innerHTML = both(
