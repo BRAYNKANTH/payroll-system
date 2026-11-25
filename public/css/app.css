@@ -2727,3 +2727,12 @@ html.fx #view.page-in .hub-tile.ht .ht-badge { animation: pop-badge .6s cubic-be
 .mc-more[open] summary::before { content: "Show less"; }
 .mc-more[open] summary { font-size: 0; }
 .mc-more[open] summary::before { font-size: 14px; }
+
+/* Seller's Sell tab: the bar under the products is one clean row (today's sales on the left, Day End on the right) */
+.till-quick-bar { display: flex; gap: 10px; align-items: center; }
+.till-quick-bar .btn { flex: 1 1 0; min-height: 48px; justify-content: center; }
+
+/* Seller's phone: the greeting and its two buttons belong to the Month tab; the other tabs start with their own content */
+@media (max-width: 860px) {
+  #view[data-tab="payslips"] .portal-head, #view[data-tab="documents"] .portal-head, #view[data-tab="details"] .portal-head, #view[data-tab="loans"] .portal-head { display: none; }
+}

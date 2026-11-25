@@ -43,7 +43,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
         </div>
         <div class="th-right">
           <button type="button" class="eod-jump-btn" data-subtab="eod">
-            <span>End of day</span>
+            <span>To hand in</span>
             <b class="${day.not_handed_in ? "neg" : ""}">${rs(day.not_handed_in || 0)}</b>
           </button>
         </div>
@@ -123,11 +123,8 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
 
         <!-- Compact quick-bar linking to history and end-of-day -->
         <div class="till-quick-bar">
-          <span>${st.totals.count} sale${st.totals.count === 1 ? "" : "s"} (${rs(st.totals.amount)})</span>
-          <div class="row" style="gap:6px">
-            <button type="button" class="btn sm ghost" data-subtab="sales">View sales</button>
-            <button type="button" class="btn sm primary" data-subtab="eod">Day End</button>
-          </div>
+          <button type="button" class="btn ghost" data-subtab="sales">${st.totals.count} ${st.totals.count === 1 ? "sale" : "sales"} today</button>
+          <button type="button" class="btn primary" data-subtab="eod">Day End</button>
         </div>
       ` : ""}
 

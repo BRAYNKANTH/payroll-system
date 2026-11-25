@@ -228,15 +228,18 @@ export default {
         ] : [
           stat("Sales so far", `<small>Rs</small>${n0(m.business)}`, `${m.days} day${m.days === 1 ? "" : "s"} worked`, "chart", "blue"),
           m.over_target > 0 || attain >= 1 ? stat("Over target by", `<small>Rs</small>${n0(m.over_target)}`, "Target passed", "trend", "green") : stat("Still to go", `<small>Rs</small>${n0(m.to_go)}`, "to reach your target", "trend", "amber"),
-          stat("Taken off so far", `<small>Rs</small>${n0(m.settle_up + m.personal)}`, `Cash not handed in Rs ${n0(m.settle_up)} · advances Rs ${n0(m.personal)}`, "coins", "amber"),
+          // The same total as the pay breakdown below (cash not handed in, advances, missing stock, the security deposit and loan payments),
+          // so the take-home figure above adds up with what this card says.
+          stat("Taken off so far", `<small>Rs</small>${n0(pay ? pay.deductions : m.settle_up + m.personal)}`,
+            pay && pay.deductions !== m.settle_up + m.personal ? "Cash, advances, deposit and more: see the breakdown" : `Cash not handed in Rs ${n0(m.settle_up)} · advances Rs ${n0(m.personal)}`, "coins", "amber"),
           stat("Security deposit held", `<small>Rs</small>${n0(d.security_held)}`, "in total, from closed months", "shield", ""),
         ]).join(""))}</div>
 
         <!-- Apple iOS Segmented Deck Switcher (Chunked for zero scroll fatigue) -->
         <div class="month-deck-nav seg mb-3" role="tablist" aria-label="Month sections">
-          <button type="button" class="${monthDeck === "pay" ? "on" : ""}" data-mdeck="pay" role="tab" aria-selected="${monthDeck === "pay"}">${icon("wallet")} Pay breakdown</button>
-          ${me.senior ? "" : html`<button type="button" class="${monthDeck === "days" ? "on" : ""}" data-mdeck="days" role="tab" aria-selected="${monthDeck === "days"}">${icon("sheet")} Daily days ${m.days ? html`<span class="badge plain sm">${m.days}</span>` : ""}</button>`}
-          <button type="button" class="${monthDeck === "rules" ? "on" : ""}" data-mdeck="rules" role="tab" aria-selected="${monthDeck === "rules"}">${icon("info")} Stock & rules</button>
+          <button type="button" class="${monthDeck === "pay" ? "on" : ""}" data-mdeck="pay" role="tab" aria-selected="${monthDeck === "pay"}">${icon("wallet")} Breakdown</button>
+          ${me.senior ? "" : html`<button type="button" class="${monthDeck === "days" ? "on" : ""}" data-mdeck="days" role="tab" aria-selected="${monthDeck === "days"}">${icon("sheet")} Days ${m.days ? html`<span class="badge plain sm">${m.days}</span>` : ""}</button>`}
+          <button type="button" class="${monthDeck === "rules" ? "on" : ""}" data-mdeck="rules" role="tab" aria-selected="${monthDeck === "rules"}">${icon("info")} Rules</button>
         </div>
 
         <div id="month-deck-body">
@@ -339,6 +342,8 @@ export default {
     const both = (table, list) => `<div class="show-lg">${table}</div><div class="show-sm">${list}</div>`;
     const show = (animate = true) => {
       el.setAttribute("data-tab", tab);
+      // The month picker only matters on the tabs about this month; Sell, Payslips, Docs and Profile do not use it.
+      document.body.dataset.filters = ["month", "team", "loans"].includes(tab) ? "" : "none";
       const pane = $("#pane");
       pane.innerHTML = panes[tab]().toString();
       if (animate) { pane.classList.remove("pane-in"); void pane.offsetWidth; pane.classList.add("pane-in"); }
