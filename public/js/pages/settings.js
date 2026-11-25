@@ -6,6 +6,7 @@ import { isPhone, sectionScreens, stackTable } from "../phone.js";
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "Settings",
   async render(ctx) {
     const { el } = ctx;

@@ -14,7 +14,7 @@ export const state = {
   routeHub: "", // set while a hub workspace (/hubs/J1/...) is open
   user: null,
   period: store.get("pr.period") || new Date().toISOString().slice(0, 7),
-  hub: store.get("pr.hub") || "",
+  hub: "", // the hub filter always starts on "All hubs"; it is not remembered between sign-ins, so nobody is left looking at one hub without knowing
   hubs: [],
   settings: {},
   pending: 0,
@@ -280,7 +280,7 @@ function shell() {
   $("#next-period").onclick = () => setPeriod(shift(state.period, 1));
   $("#hub-filter")?.addEventListener("change", async (e) => {
     if (!(await confirmLeave())) { e.target.value = state.hub; return; }
-    state.hub = e.target.value; store.set("pr.hub", state.hub); render();
+    state.hub = e.target.value; render();
   });
   $("#theme-btn").onclick = toggleTheme;
   if (!isStaff()) mountSearch($("#gsearch"), { navigate, state, scopeHub });
@@ -567,6 +567,7 @@ export async function render({ moveFocus = false, restoreY = 0 } = {}) {
     document.title = `${ws ? `${ws.subLabel} · ${state.hubs.find((h) => h.code === ws.hub)?.name || ws.hub}` : mod.title} · ${state.settings.company_name || "Payroll"}`;
     view.dataset.page = page; // lets the styles treat every page the same way
     document.body.dataset.page = page;
+    document.body.dataset.filters = mod.filters === false ? "none" : ""; // the hub and month bar is hidden on pages that do not use it
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq === renderSeq) { clampIntro(view); showActiveTab(view); }
     if (seq !== renderSeq) return;
@@ -636,6 +637,12 @@ export async function boot() {
     return login.render({ needsSetup: s.needs_setup, onDone: boot, company: s.company_name });
   }
   state.user = s.user;
+  state.hub = ""; // every sign-in starts on "All hubs" (a coacher is fixed to their own hub just below)
+  try {
+    localStorage.removeItem("pr.hub"); // the old saved choice from earlier versions
+    for (const k of Object.keys(sessionStorage)) if (k.startsWith("pr.range.")) sessionStorage.removeItem(k); // date choices start fresh at each sign-in too
+    for (const k of Object.keys(localStorage)) if (k.startsWith("pr.range.")) localStorage.removeItem(k);
+  } catch { /* private mode */ }
   if (isStaff()) { state.hubs = []; state.settings = { company_name: s.company_name }; }
   else if (s.hubs && s.settings) { state.hubs = s.hubs; state.settings = s.settings; }
   else [state.hubs, state.settings] = await Promise.all([get("/api/hubs"), get("/api/settings")]);

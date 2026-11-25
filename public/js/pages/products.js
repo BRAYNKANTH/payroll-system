@@ -16,6 +16,7 @@ function split(priceCents, costCents) {
 }
 
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "Products",
   async render(ctx) {
     const { el } = ctx;

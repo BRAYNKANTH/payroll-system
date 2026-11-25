@@ -4,6 +4,7 @@ import { $, html, icon, toast, busy, initials, hapticsOn, setHaptics } from "../
 import { fxMode, setFx } from "../fx.js";
 
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "My account",
   async render({ el }) {
     const u = state.user;
@@ -17,7 +18,8 @@ export default {
         <div class="card"><div class="card-head"><h2>On this phone</h2></div><div class="card-body">
           <label class="check-row" style="display:flex;gap:12px;align-items:center;min-height:48px;cursor:pointer"><input type="checkbox" id="haptics" ${hapticsOn() ? "checked" : ""}><span>Vibrate a little when an action works</span></label>
           <div class="field" style="margin-top:10px"><label for="fx-mode">Animations and glow</label>
-            <select class="input" id="fx-mode"><option value="auto" ${fxMode() === "auto" ? "selected" : ""}>Automatic (off when your device asks for less motion)</option><option value="on" ${fxMode() === "on" ? "selected" : ""}>Always on</option><option value="off" ${fxMode() === "off" ? "selected" : ""}>Off: fastest on an older phone</option></select></div></div></div>
+            <select class="input" id="fx-mode"><option value="auto" ${fxMode() === "auto" ? "selected" : ""}>Automatic</option><option value="on" ${fxMode() === "on" ? "selected" : ""}>Always on</option><option value="off" ${fxMode() === "off" ? "selected" : ""}>Off (fastest)</option></select>
+              <span class="hint">Automatic turns them off when your phone asks for less motion or is short of memory.</span></div></div></div>
         <div class="card"><div class="card-head"><h2>Change password</h2></div><div class="card-body">
           <form id="pf" class="stack" style="gap:14px">
             <div class="field"><label>Current password</label><input class="input" type="password" name="current_password" autocomplete="current-password" required></div>

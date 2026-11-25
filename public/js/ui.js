@@ -53,7 +53,7 @@ export const ago = (iso) => {
 };
 export const initials = (name) => String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
 export const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-export const statusLabel = (s) => ({ auto_approved: "Auto-approved", pending_review: "Needs review", approved: "Approved", rejected: "Rejected", finalized: "Finalized", open: "Open" }[s] || titleCase(s));
+export const statusLabel = (s) => ({ auto_approved: "Calculated", pending_review: "Needs review", approved: "Approved", rejected: "Rejected", finalized: "Finalized", open: "Open" }[s] || titleCase(s));
 export const badge = (s, label) => html`<span class="badge ${s}">${label || statusLabel(s)}</span>`;
 export const roleLabel = (r) => (r === "guy" ? "Distributor / Supervisor" : r === "manager" ? "Manager" : titleCase(r));
 // Chain of command, lowest to highest. Rank decides who may report to whom.

@@ -12,6 +12,7 @@ const ROLES = [
 const roleBadge = (r) => badge(r === "admin" ? "admin" : "green", ROLES.find((x) => x[0] === r)?.[1] || r);
 
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "Users & roles",
   async render(ctx) {
     const { el } = ctx;

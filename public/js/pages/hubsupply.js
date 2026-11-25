@@ -7,6 +7,7 @@ const rs = (c) => `Rs ${(Number(c) / 100).toLocaleString("en-LK", { maximumFract
 const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "Stock to hubs",
   async render(ctx) {
     const { el } = ctx;

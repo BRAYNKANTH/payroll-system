@@ -57,6 +57,7 @@ let f = { table: "", action: "", user: "", from: "", to: "", key: "" };
 const AUDIT_BLANK = { table: "", action: "", user: "", from: "", to: "", key: "" };
 
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "Audit trail",
   async render({ el }) {
     readQuery(f); writeQuery(f, AUDIT_BLANK);

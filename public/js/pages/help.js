@@ -4,6 +4,7 @@ import { GLOSSARY } from "./portal.js";
 
 // One Help page, reachable from the account menu on every screen (same place for everyone).
 export default {
+  filters: false, // this page has no use for the hub and month bar, so it is not shown
   title: "Help",
   async render({ el }) {
     const staff = isStaff();

@@ -28,10 +28,10 @@ export function rangeOf(preset, custom = {}) {
 }
 
 const read = (page, fallback) => {
-  try { const v = JSON.parse(localStorage.getItem("pr.range." + page) || "null"); if (v && PRESETS.some(([k]) => k === v.preset)) return v; } catch { /* nothing saved */ }
+  try { const v = JSON.parse(sessionStorage.getItem("pr.range." + page) || "null"); if (v && PRESETS.some(([k]) => k === v.preset)) return v; } catch { /* nothing saved */ }
   return { preset: fallback };
 };
-const save = (page, v) => { try { localStorage.setItem("pr.range." + page, JSON.stringify(v)); } catch { /* private mode */ } };
+const save = (page, v) => { try { sessionStorage.setItem("pr.range." + page, JSON.stringify(v)); } catch { /* private mode */ } };
 
 // The current choice for a page: { preset, from, to } with real dates.
 export function currentRange(page, fallback = "today") {
@@ -57,16 +57,19 @@ export const rangeText = (r) => (r.from === r.to ? dayText(r.from) : `${dayText(
 export function mountRange(host, { page, fallback = "today", onChange, resolve = (r) => r }) {
   let cur = resolve(currentRange(page, fallback));
   const draw = () => {
+    // On a computer the choices are buttons; on a phone they are one dropdown (a row of six buttons would take half the screen).
     host.innerHTML = html`<div class="range-bar" role="group" aria-label="Date range">
       <div class="seg">${PRESETS.map(([k, l]) => html`<button type="button" data-p="${k}" class="${cur.preset === k ? "on" : ""}" aria-pressed="${cur.preset === k}">${l}</button>`)}</div>
+      <select class="input range-select" id="rg-select" aria-label="Date range">${PRESETS.map(([k, l]) => html`<option value="${k}" ${cur.preset === k ? "selected" : ""}>${l}</option>`)}</select>
+      <span class="range-text">${icon("calendar")} ${rangeText(cur)}</span>
       ${cur.preset === "custom" ? html`<div class="range-custom">
-        <label>From <input type="date" class="input" id="rg-from" value="${cur.from}" max="${today()}"></label>
-        <label>To <input type="date" class="input" id="rg-to" value="${cur.to}" max="${today()}"></label></div>` : ""}
-      <span class="range-text">${icon("calendar")} ${rangeText(cur)}</span></div>`.toString();
+        <label><span>From</span><input type="date" class="input" id="rg-from" value="${cur.from}" max="${today()}"></label>
+        <label><span>To</span><input type="date" class="input" id="rg-to" value="${cur.to}" max="${today()}"></label></div>` : ""}</div>`.toString();
   };
   const set = (preset, custom) => { cur = resolve({ preset, ...rangeOf(preset, custom) }); save(page, { preset, from: cur.from, to: cur.to }); draw(); onChange(cur); };
   host.addEventListener("click", (e) => { const b = e.target.closest("[data-p]"); if (b) set(b.dataset.p, cur); });
   host.addEventListener("change", (e) => {
+    if (e.target.id === "rg-select") return set(e.target.value, cur);
     if (e.target.id !== "rg-from" && e.target.id !== "rg-to") return;
     let from = $("#rg-from", host).value, to = $("#rg-to", host).value;
     // Choosing a start after the end moves the end along (and the other way round), instead of swapping them behind the person's back.
