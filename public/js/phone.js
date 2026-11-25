@@ -109,7 +109,9 @@ export function sectionScreens({ container, sections, saveRow, noun = "Settings"
   nav.setAttribute("aria-label", `${noun} sections`);
   nav.innerHTML = `<ul>${sections.map((s, i) => `<li><button type="button" class="m-card" data-sec="${i}"><span><b>${esc(s.title)}</b>${s.sub ? `<small>${esc(s.sub)}</small>` : ""}</span>
     <span class="chev" aria-hidden="true"></span></button></li>`).join("")}</ul>`;
-  container.prepend(nav);
+  // The list of sections goes under the page's title, not above it.
+  const head = container.querySelector(":scope > .page-head");
+  if (head) head.after(nav); else container.prepend(nav);
   const bar = document.createElement("div");
   bar.className = "sec-bar";
   bar.hidden = true;

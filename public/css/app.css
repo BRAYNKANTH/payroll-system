@@ -2753,3 +2753,13 @@ html.fx #view.page-in .hub-tile.ht .ht-badge { animation: pop-badge .6s cubic-be
   .actions[data-filters-host].filters-open > .filter-panel { display: flex; flex-wrap: wrap; gap: 8px; }
   .actions[data-filters-host] > .seg { flex: 1 1 100%; }
 }
+.m-card .mc-main .badge { justify-self: start; width: max-content; max-width: 100%; }
+
+/* Users on a phone: the four kinds of login are small count tiles; the people are the page */
+@media (max-width: 760px) {
+  .role-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .role-kpis .kpi { padding: 10px 12px; flex-direction: row; }
+  .role-kpis .kpi .foot { display: none; }
+  .role-kpis .kpi { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; }
+  .role-kpis .kpi .value { font-size: 24px; margin: 0; }
+}

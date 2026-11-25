@@ -2,6 +2,7 @@ import { get, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
 import { exportButtons, $, $$, html, icon, money, pct, badge, dataTable, downloadCsv, monthName, fromCents, shortMonth, emptyState } from "../ui.js";
 import { barChart, lineChart, PALETTE } from "../charts.js";
+import { wireFilters } from "../foldfilters.js";
 
 let tab = "hubs";
 // Which export belongs to each tab (Excel and PDF come from the server, see export.js).
@@ -21,15 +22,19 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Reports</h1><p>${monthName(p)} — switch the month in the top bar.</p></div>
-        <div class="actions">
+        <div class="actions" data-filters-host>
           ${can("view_pay") ? html`<a class="btn" href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Payroll register</a>` : ""}
-          <span class="row" id="xbtns" style="gap:8px"></span>
-          <button class="btn" id="csv">${icon("download")} CSV</button>
+          <button type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="rp-dl">${icon("download")} Download</button>
+          <div class="filter-panel" id="rp-dl">
+            <span class="row" id="xbtns" style="gap:8px"></span>
+            <button class="btn" id="csv">${icon("download")} CSV</button>
+          </div>
         </div>
       </div>
       <div class="tabs" id="tabs">${tabsFor().map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
       <div id="pane"><div class="loading-screen"><div class="spinner"></div></div></div>`;
 
+    wireFilters(el);
     let exporter = () => {};
     const pane = $("#pane");
     const views = {
@@ -38,6 +43,9 @@ export default {
         pane.innerHTML = html`<div class="card mb-4"><div class="card-head"><h2>${pay ? "Business and payroll by hub" : "Business by hub"}</h2></div><div class="card-body" id="c"></div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows: d.by_hub, footer: true,
+            // Phone: the hub, its business, and (for the admin) pay and any stock shortfall.
+            card: (h) => html`<span class="mc-main"><b>${h.name}</b><span class="mc-sub">${h.code} · ${h.staff} staff${pay ? ` · gross pay ${money(h.gross_pay)}` : ""}</span>${h.stock_shortfall ? html`<span class="mc-sub neg">stock short ${money(h.stock_shortfall)}</span>` : ""}</span>
+              <span class="mc-end"><b>${money(h.hub_business)}</b><br><span class="muted">business</span></span>`,
             cols: [
               { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b> <span class="faint">${h.code}</span>`, total: () => "All hubs" },
               { key: "staff", label: "Staff", align: "r", total: (r) => r.reduce((t, h) => t + h.staff, 0) },
@@ -58,6 +66,11 @@ export default {
         const rows = await get("/api/reports/commission" + qs({ period: p }));
         pane.innerHTML = rows.length ? html`<div class="card"><div class="card-body flush">${dataTable({
           rows, footer: true,
+          // Phone: who, how far they got to their target, and the commission they earned.
+          summary: (rs) => `${rs.length} people · Rs ${money(rs.reduce((t, r) => t + r.commission, 0))} commission in total`,
+          card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${r.hub} · sold ${money(r.business)} of ${money(r.target)}</span>
+            <span class="progress ${r.business >= r.target ? "green" : "amber"}" style="display:block;height:8px"><span style="width:${Math.min(100, r.target ? (r.business / r.target) * 100 : 0)}%"></span></span></span>
+            <span class="mc-end"><b>${money(r.commission)}</b><br><span class="muted">commission</span></span>`,
           cols: [
             { key: "name", label: "Employee", render: (r) => html`<b>${r.name}</b> <span class="faint">${r.employee_id} · ${r.hub}</span>`, total: () => "Total" },
             { key: "business", label: "Business", align: "r", render: (r) => money(r.business), total: (x) => money(x.reduce((t, r) => t + r.business, 0)) },
@@ -77,6 +90,9 @@ export default {
             ${d.totals.unmatched ? html`<b>${d.totals.unmatched} product${d.totals.unmatched > 1 ? "s are" : " is"} not in the Products list</b>, so no profit can be shown for ${d.totals.unmatched > 1 ? "them" : "it"}.` : ""}</div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows: d.rows, footer: true, empty: "Nothing sold", emptyHint: "Nothing was sold in this period. Try another month.",
+            // Phone: the product, what it sold, and what the company kept after the workers' share and the purchase cost.
+            card: (r) => html`<span class="mc-main"><b>${r.product}</b>${r.matched ? "" : html` <span class="badge amber plain">not in Products</span>`}<span class="mc-sub">${r.qty} sold · sales ${money(r.revenue)}</span></span>
+              <span class="mc-end">${r.matched ? html`<b class="${r.profit < 0 ? "neg" : ""}">${money(r.profit)}</b><br><span class="muted">profit</span>` : html`<span class="muted">no cost known</span>`}</span>`,
             cols: [
               { key: "product", label: "Product", render: (r) => html`<b>${r.product}</b> ${r.matched ? "" : html`<span class="badge amber plain">not in Products</span>`}`, total: () => "Total" },
               { key: "qty", label: "Units sold", align: "r", total: (x) => x.reduce((t, r) => t + r.qty, 0) },
@@ -93,6 +109,10 @@ export default {
         const rows = await get("/api/reports/stock" + qs({ period: p }));
         pane.innerHTML = rows.length ? html`<div class="card"><div class="card-body flush">${dataTable({
           rows, footer: true,
+          // Phone: who is short of which product, and what the shortfall is worth (the largest first).
+          summary: (rs) => `${rs.filter((r) => r.shortfall_value > 0).length} of ${rs.length} lines are short · Rs ${money(rs.reduce((t, r) => t + r.shortfall_value, 0))} in total`,
+          card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.product} · ${r.hub}</span></span>
+            <span class="mc-end">${r.shortfall_value ? html`<b class="neg">${money(r.shortfall_value)}</b><br><span class="muted">${r.shortfall_qty} short</span>` : html`<span class="muted">no shortage</span>`}</span>`,
           cols: [
             { key: "name", label: "Employee", render: (r) => html`<b>${r.name}</b> <span class="faint">${r.hub}</span>`, total: () => "Total" },
             { key: "product", label: "Product" },
@@ -111,6 +131,9 @@ export default {
         const sum = (x, k) => x.reduce((t, r) => t + r[k], 0);
         pane.innerHTML = rows.length ? html`<div class="card"><div class="card-body flush">${dataTable({
           rows, footer: true,
+          // Phone: the hub and product, what the stock is worth, and the difference when the count does not match.
+          card: (r) => html`<span class="mc-main"><b>${hubName(r.hub)}</b><span class="mc-sub">${r.product} · counted ${r.counted_stock}</span></span>
+            <span class="mc-end"><b>${money(r.stock_value)}</b><br><span class="muted">in stock</span>${r.shortfall_qty > 0 ? html`<br><span class="neg">${r.shortfall_qty} short · ${money(r.shortfall_value)}</span>` : r.shortfall_qty < 0 ? html`<br><span class="pos">${-r.shortfall_qty} over</span>` : ""}</span>`,
           cols: [
             { key: "hub", label: "Hub", render: (r) => html`<b>${hubName(r.hub)}</b> <span class="faint">${r.hub}</span>`, total: () => "Total" },
             { key: "product", label: "Product" },
@@ -129,6 +152,10 @@ export default {
         pane.innerHTML = html`<div class="alert info mb-4">${icon("info")}<div>Latest closing balance per employee. Negative guy balances are money owed that is recovered from future pay; manager balances are their running account with the company.</div></div>
           <div class="card"><div class="card-body flush">${dataTable({
             rows, footer: true, empty: "No balances yet", emptyHint: "Balances appear after the month has been calculated.",
+            // Phone: who, and the balance they carry (red when they owe the company); the most owed comes first.
+            summary: (rs) => `${rs.length} people · ${rs.filter((r) => r.closing_balance < 0).length} owe money · Rs ${money(rs.reduce((t, r) => t + Math.min(0, r.closing_balance), 0))} owed in total`,
+            card: (r) => html`<span class="mc-main"><a href="/employees/${encodeURIComponent(r.employee_id)}" data-link><b>${r.name}</b></a><span class="mc-sub">${r.role === "guy" ? "Seller" : "Manager"} · ${r.hub} · as of ${monthName(r.period)}</span></span>
+              <span class="mc-end"><b class="${r.closing_balance < 0 ? "neg" : ""}">${money(r.closing_balance)}</b>${r.closing_balance < 0 ? html`<br><span class="muted">owes</span>` : ""}</span>`,
             cols: [
               { key: "name", label: "Employee", render: (r) => html`<a href="/employees/${encodeURIComponent(r.employee_id)}" data-link><b>${r.name}</b></a> <span class="faint">${r.employee_id}</span>`, total: () => "Total" },
               { key: "role", label: "Role", render: (r) => badge(r.role, r.role === "guy" ? "Guy" : "Manager") },
@@ -146,6 +173,9 @@ export default {
         pane.innerHTML = html`${rows.length ? html`<div class="card mb-4"><div class="card-head"><h2>Payroll cost by month</h2></div><div class="card-body" id="c"></div></div>` : ""}
           <div class="card"><div class="card-body flush">${dataTable({
             rows, empty: "No months calculated yet", emptyHint: "Run payroll for a month and it will appear here.",
+            // Phone: the month, whether it is closed, and the salaries it came to.
+            card: (r) => html`<span class="mc-main"><b>${monthName(r.period)}</b> ${badge(r.status)}<span class="mc-sub">${r.employees} people${r.pending ? ` · ${r.pending} pending` : ""}${r.finalized_by ? ` · closed by ${r.finalized_by}` : ""}</span></span>
+              <span class="mc-end"><b>${money(r.to_bank)}</b><br><span class="muted">salaries</span></span>`,
             cols: [
               { key: "period", label: "Month", render: (r) => html`<b>${monthName(r.period)}</b>` },
               { key: "status", label: "Status", render: (r) => badge(r.status) },
