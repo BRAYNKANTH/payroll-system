@@ -17,7 +17,6 @@ export default {
       <form id="sf" class="stack">
         <div class="card"><div class="card-head"><div><h2>Company</h2></div></div><div class="card-body form-grid">
           <div class="field"><label>Company name</label><input class="input" name="company_name" value="${s.company_name}"></div>
-          <div class="field"><label>Company debit account</label><input class="input mono" name="company_account_no" value="${s.company_account_no}"><span class="hint">Shown on the bank file total line</span></div>
         </div></div>
 
         <div class="card"><div class="card-head"><div><h2>Payroll rules</h2><div class="sub">Changes apply the next time a month is calculated</div></div></div><div class="card-body form-grid">
@@ -62,10 +61,6 @@ export default {
 
         <div class="card"><div class="card-head"><div><h2>Sign-in</h2></div></div><div class="card-body form-grid">
           <div class="field"><label>Session length (hours)</label><input class="input" name="session_hours" inputmode="numeric" value="${s.session_hours}"></div>
-        </div></div>
-
-        <div class="card"><div class="card-head"><div><h2>Bank file</h2></div></div><div class="card-body">
-          <div class="alert warn">${icon("alert")}<div><b>Format: ${s.bank_format} (placeholder).</b> Get the exact bulk-upload / SLIPS column specification from your bank and add it to <code>reports.js</code> before uploading a live file.</div></div>
         </div></div>
 
         <div class="row" style="justify-content:flex-end"><button class="btn primary" id="save">${icon("check")} Save settings</button></div>

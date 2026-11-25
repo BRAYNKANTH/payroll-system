@@ -41,7 +41,7 @@ export default {
             cols: [
               { key: "name", label: "Hub", render: (h) => html`<b>${h.name}</b> <span class="faint">${h.code}</span>`, total: () => "All hubs" },
               { key: "staff", label: "Staff", align: "r", total: (r) => r.reduce((t, h) => t + h.staff, 0) },
-              ...[["hub_business", "Hub business"], ["guys_business", "Guys' business"], ["gross_pay", "Gross pay"], ["net_pay", "Net pay"], ["to_bank", "To bank"], ["stock_shortfall", "Stock short"]] 
+              ...[["hub_business", "Hub business"], ["guys_business", "Guys' business"], ["gross_pay", "Gross pay"], ["net_pay", "Net pay"], ["to_bank", "Salary"], ["stock_shortfall", "Stock short"]] 
                 .filter(([k]) => pay || !["gross_pay", "net_pay", "to_bank"].includes(k))
                 .map(([k, l]) => ({ key: k, label: l, align: "r", render: (h) => html`<span class="${h[k] < 0 ? "neg" : ""}">${money(h[k])}</span>`, total: (r) => money(r.reduce((t, h) => t + h[k], 0)) })),
               ...(pay ? [{ key: "ratio", label: "Payroll / business", align: "r", render: (h) => (h.hub_business ? pct(h.gross_pay / h.hub_business) : "—"), sort: (h) => (h.hub_business ? h.gross_pay / h.hub_business : 0) }] : []),
@@ -152,13 +152,13 @@ export default {
               { key: "employees", label: "Employees", align: "r" },
               { key: "pending", label: "Pending", align: "r", render: (r) => (r.pending ? html`<span class="neg">${r.pending}</span>` : "0") },
               { key: "net_pay", label: "Guys' net pay", align: "r", render: (r) => money(r.net_pay) },
-              { key: "to_bank", label: "To bank", align: "r", render: (r) => money(r.to_bank) },
+              { key: "to_bank", label: "Salary", align: "r", render: (r) => money(r.to_bank) },
               { key: "finalized_by", label: "Finalized", render: (r) => (r.finalized_by ? html`${r.finalized_by} <span class="faint">${new Date(r.finalized_at).toLocaleDateString("en-GB")}</span>` : "—") },
             ],
           })}</div></div>`.toString();
         if (rows.length) lineChart($("#c"), { labels: asc.map((r) => shortMonth(r.period)), series: [
           { name: "Guys' net pay", color: PALETTE[0], values: asc.map((r) => r.net_pay) },
-          { name: "To bank", color: PALETTE[2], values: asc.map((r) => r.to_bank) },
+          { name: "Salary", color: PALETTE[2], values: asc.map((r) => r.to_bank) },
         ] });
         exporter = () => downloadCsv("months.csv", ["period", "status", "employees", "pending", "net_pay", "to_bank", "finalized_by", "finalized_at"],
           rows.map((r) => [r.period, r.status, r.employees, r.pending, fromCents(r.net_pay), fromCents(r.to_bank), r.finalized_by || "", r.finalized_at || ""]));

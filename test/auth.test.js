@@ -112,13 +112,15 @@ test("bulk save creates, updates, skips unchanged and deletes — all or nothing
   assert.equal((await svc.listEntries(d, "daily", { period: "2026-09" })).length, 1);
 });
 
-test("whoever changed a bank account cannot approve it", async () => {
+test("a changed bank account raises no flag, and nothing waits for approval", async () => {
   const { d } = await setup();
   await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1, settled_amount: 1 }, "clerk");
   await svc.updateEntry(d, "staff", "G1", { bank_account_no: "99998888" }, "editor");
   await svc.runPeriod(d, "2026-09", "owner");
-  await assert.rejects(() => svc.review(d, "2026-09", "G1", "editor", "approved", "ok"), /another user/);
-  await svc.review(d, "2026-09", "G1", "owner", "approved", "called employee");
+  const g = (await svc.getPeriod(d, "2026-09")).rows.find((r) => r.employee_id === "G1");
+  assert.equal(g.status, "auto_approved");
+  assert.ok(!g.flags.some((f) => f.code.startsWith("BANK_ACCOUNT")));
+  await assert.rejects(() => svc.review(d, "2026-09", "G1", "owner", "approved", "ok"), /auto-approved/);
 });
 
 test("dashboard summarises a period, optionally per hub", async () => {

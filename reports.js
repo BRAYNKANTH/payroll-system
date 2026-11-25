@@ -1,4 +1,4 @@
-// Payslips, payroll register and bank disbursement file.
+// Payslips and the payroll register. (Salaries are not paid through a bank file from here, so there is no bank file.)
 const { getSettings } = require("./db");
 const { getPeriod, httpError, isFinalized, LEVEL_NAME } = require("./service");
 const { fmt } = require("./engine");
@@ -51,7 +51,6 @@ async function payslipHtml(db, period, employeeId, hub) {
       <div class="grid">
         <div><b>${esc(r.name)}</b> (${esc(r.employee_id)})</div><div>Hub: ${esc(r.hub)}</div>
         <div>Position: ${LEVEL_NAME[r.staff_level] || (r.role === "guy" ? "Distributor" : "Manager")}</div>
-        <div>Bank: ${esc(r.bank_name || "—")} ${r.bank_account_no ? "…" + esc(r.bank_account_no.slice(-4)) : ""}</div>
         <div>Business this period: Rs ${fmt(d.total_business)}</div>
         ${r.role === "guy" ? `<div>Target: Rs ${fmt(d.target)} · Over target: Rs ${fmt(d.over_target_amount)}</div>`
           : d.month_sales != null ? `<div>Sales (own + team): Rs ${fmt(d.month_sales)}${d.retaining ? ` · <b>Retaining manager</b> (below Rs ${fmt(d.retain_threshold)})` : ""}</div>`
@@ -64,7 +63,7 @@ async function payslipHtml(db, period, employeeId, hub) {
       <table>
         <tr><td>Opening balance (from previous period)</td><td class="n">${fmt(r.opening_balance)}</td></tr>
         <tr><td>Net pay this period</td><td class="n">${fmt(r.net_pay)}</td></tr>
-        <tr><td>Paid to bank</td><td class="n">${fmt(r.disbursed_amount)}</td></tr>
+        <tr><td>Salary paid</td><td class="n">${fmt(r.disbursed_amount)}</td></tr>
         <tr class="total"><td>Closing balance (carried forward)</td><td class="n">${fmt(r.closing_balance)}</td></tr>
       </table>
       <div class="net">Net pay: Rs ${fmt(r.net_pay)}${r.role === "guy" ? ` · Paid: Rs ${fmt(r.disbursed_amount)}` : ""}</div>
@@ -115,34 +114,4 @@ async function registerHtml(db, period) {
     <div style="overflow-x:auto"><table><tr>${head}</tr>${body}${total}</table></div></body></html>`;
 }
 
-// ---- Bank disbursement file ------------------------------------------------------------------
-// IMPORTANT: the column layout below is NOT a confirmed bank specification. Before the first live
-// upload, get the bank's bulk-upload / SLIPS file spec (field order, widths, padding, header/trailer
-// records, date format, transaction code) and add it here as a new format.
-const BANK_FORMATS = {
-  generic_csv: {
-    label: "Generic CSV (unconfirmed — check with bank)",
-    extension: "csv",
-    build: ({ rows, period, settings }) => csv([
-      ["Seq", "Beneficiary name", "Bank code", "Branch code", "Account no", "Amount (LKR)", "Reference", "Employee ID"],
-      ...rows.map((r, i) => [i + 1, r.name, r.bank_code, r.branch_code, r.bank_account_no, rs(r.disbursed_amount),
-        `SAL ${period}`, r.employee_id]),
-      ["", "TOTAL", "", "", settings.company_account_no, rs(rows.reduce((t, r) => t + r.disbursed_amount, 0)), `${rows.length} payments`, ""],
-    ]),
-  },
-};
-
-async function bankFile(db, period) {
-  if (!(await isFinalized(db, period))) throw httpError(409, "Finalize the period before generating the bank file");
-  const settings = await getSettings(db);
-  const format = BANK_FORMATS[settings.bank_format];
-  if (!format) throw httpError(500, `Unknown bank_format "${settings.bank_format}"`);
-  const rows = (await getPeriod(db, period)).rows.filter((r) => r.disbursed_amount > 0 && ["auto_approved", "approved"].includes(r.status));
-  const missing = rows.filter((r) => !r.bank_account_no || !r.bank_code || !r.branch_code);
-  if (missing.length) {
-    throw httpError(409, `Missing bank/branch code or account for: ${missing.map((r) => r.employee_id).join(", ")}`);
-  }
-  return { body: format.build({ rows, period, settings }), filename: `salary-${period}.${format.extension}` };
-}
-
-module.exports = { payslipHtml, registerHtml, registerCsv, bankFile, BANK_FORMATS };
+module.exports = { payslipHtml, registerHtml, registerCsv };

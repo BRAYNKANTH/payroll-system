@@ -75,7 +75,6 @@ export default {
     const s = p.staff;
     const last = p.history[0];
     const canDocs = can("manage_staff") || can("manage_team");
-    const bankState = !s.bank_account_no ? ["amber", "Missing"] : s.bank_account_no !== s.bank_account_verified ? ["red", "Awaiting verification"] : ["green", "Verified"];
 
     el.innerHTML = html`<div class="emp-profile">
       <div class="mb-3"><a href="/employees" data-link class="muted">${icon("left")} All employees</a></div>
@@ -121,11 +120,10 @@ export default {
             <dt>Commission</dt><dd>${pct(s.commission_rate, 2)} of business over target</dd>`}
             <dt>Security rule</dt><dd class="mono">${s.security_deduction_rule}</dd></dl></div></div>`
             : html`<div class="card"><div class="card-head"><h2>How manager pay works</h2></div><div class="card-body muted">Each week: business × profit % − rent − hub fee − security − personal draw. Each month the company return and the guys' net salaries are charged, and the result is carried as a running balance.
-              <dl class="kv mt-4"><dt>Basic salary</dt><dd>${s.basic_pay ? html`Rs ${money(s.basic_pay)} / month, paid to the bank separately` : "None"}</dd></dl></div></div>`}
-          <div class="card"><div class="card-head"><h2>Bank</h2>${badge(bankState[0], bankState[1])}</div><div class="card-body"><dl class="kv">
+              <dl class="kv mt-4"><dt>Basic salary</dt><dd>${s.basic_pay ? html`Rs ${money(s.basic_pay)} / month` : "None"}</dd></dl></div></div>`}
+          <div class="card"><div class="card-head"><h2>Bank details</h2></div><div class="card-body"><dl class="kv">
             <dt>Bank</dt><dd>${s.bank_name || "—"}</dd><dt>Bank / branch</dt><dd class="mono">${s.bank_code || "—"} / ${s.branch_code || "—"}</dd>
-            <dt>Account</dt><dd class="mono">${s.bank_account_no || "—"}</dd>
-            ${s.bank_account_no !== s.bank_account_verified ? html`<dt>Verified account</dt><dd class="mono">${s.bank_account_verified || "none"}</dd>` : ""}</dl></div></div>
+            <dt>Account</dt><dd class="mono">${s.bank_account_no || "—"}</dd></dl></div></div>
         </div></div>`,
       history: () => p.history.length ? html`
         <div class="card mb-4"><div class="card-head"><h2>Net pay over time</h2></div><div class="card-body" id="chart"></div></div>

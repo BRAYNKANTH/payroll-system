@@ -69,66 +69,36 @@ test("edits after submission are audited with user and old value", async () => {
   assert.equal((await svc.auditLog(d, { table: "staff", key: "G1" }))[0].changed_by, "direct-db-edit");
 });
 
-test("flagged entries need approval; bank change approval verifies the account", async () => {
+test("a changed bank account does not hold a line back, and the month can close", async () => {
   const d = await setup();
   await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1000, settled_amount: 1000 }, "clerk");
   await svc.updateEntry(d, "staff", "G1", { bank_account_no: "9999888877" }, "clerk");
   await svc.runPeriod(d, "2026-09", "clerk");
   const g = await row(d, "2026-09", "G1");
-  assert.equal(g.status, "pending_review");
-  assert.deepEqual(g.flags.map((f) => f.code), ["BANK_ACCOUNT_CHANGED"]);
-  await assert.rejects(() => svc.finalizePeriod(d, "2026-09", "boss"), /Resolve before finalizing: .*G1 \(pending_review\)/);
-  await assert.rejects(() => svc.review(d, "2026-09", "G1", "boss", "rejected", ""), /note is required/);
-
-  await svc.review(d, "2026-09", "G1", "boss", "approved", "Called employee, confirmed new account");
-  // The guy's pay is paid by the company, so the manager's balance is not pushed negative by it.
-  assert.deepEqual((await row(d, "2026-09", "M1")).flags, []);
-  assert.equal((await d.get("SELECT bank_account_verified FROM staff WHERE employee_id = 'G1'")).bank_account_verified, "9999888877");
+  assert.equal(g.status, "auto_approved");
+  assert.deepEqual(g.flags, []); // bank details are for information only
+  // Nothing blocks closing the month.
   await svc.finalizePeriod(d, "2026-09", "boss");
-  const file = await reports.bankFile(d, "2026-09");
-  assert.match(file.body, /9999888877,29000\.00,SAL 2026-09/); // below target: basic 30,000 − security 1,000
+  assert.equal((await row(d, "2026-09", "G1")).net_pay, 29000 * 100); // below target: basic 30,000 - security 1,000
 });
 
-test("approving a bank change plus other flags survives the re-run done by finalize", async () => {
-  const d = await setup();
-  await svc.createEntry(d, "stock", { period: "2026-09", employee_id: "G1", product: "Tyre", opening_stock: 1, counted_stock: 0, unit_price: 6000 }, "clerk");
-  await svc.updateEntry(d, "staff", "G1", { bank_account_no: "9999888877" }, "clerk");
-  await svc.runPeriod(d, "2026-09", "clerk");
-  assert.deepEqual((await row(d, "2026-09", "G1")).flags.map((f) => f.code).sort(), ["BANK_ACCOUNT_CHANGED", "STOCK_SHORTFALL"]);
-  await svc.review(d, "2026-09", "G1", "boss", "approved", "checked");
-  await svc.finalizePeriod(d, "2026-09", "boss");
-  const g = await row(d, "2026-09", "G1");
-  assert.equal(g.status, "approved");
-  assert.deepEqual(g.flags.map((f) => f.code), ["STOCK_SHORTFALL"]);
-});
-
-test("approval is reset when a new kind of flag appears", async () => {
-  const d = await setup();
-  await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1000, settled_amount: 1100 }, "clerk");
-  await svc.runPeriod(d, "2026-09", "clerk");
-  await svc.review(d, "2026-09", "G1", "boss", "approved", "ok");
-  await svc.updateEntry(d, "staff", "G1", { bank_account_no: "5555666677" }, "clerk");
-  await svc.runPeriod(d, "2026-09", "clerk");
-  assert.equal((await row(d, "2026-09", "G1")).status, "pending_review");
-});
-
-test("approval is reset when underlying numbers change", async () => {
+test("a flagged line stays automatic when it is worked out again, even after its numbers change", async () => {
   const d = await setup();
   const entry = await svc.createEntry(d, "daily", { date: "2026-09-01", employee_id: "G1", business_amount: 1000, settled_amount: 1100 }, "clerk");
   await svc.runPeriod(d, "2026-09", "clerk");
-  await svc.review(d, "2026-09", "G1", "boss", "approved", "ok");
-  await svc.runPeriod(d, "2026-09", "clerk");
-  assert.equal((await row(d, "2026-09", "G1")).status, "approved");
+  assert.equal((await row(d, "2026-09", "G1")).status, "auto_approved");
   await svc.updateEntry(d, "daily", entry.id, { settled_amount: 1200 }, "clerk");
+  await svc.updateEntry(d, "staff", "G1", { bank_account_no: "5555666677" }, "clerk");
   await svc.runPeriod(d, "2026-09", "clerk");
-  assert.equal((await row(d, "2026-09", "G1")).status, "pending_review");
+  const g = await row(d, "2026-09", "G1");
+  assert.equal(g.status, "auto_approved");
+  assert.ok(g.flags.length > 0);
 });
 
-test("bank file requires finalized period; earlier periods must be finalized first", async () => {
+test("earlier periods must be finalized first", async () => {
   const d = await setup();
   await svc.runPeriod(d, "2026-08", "clerk");
   await svc.runPeriod(d, "2026-09", "clerk");
-  await assert.rejects(() => reports.bankFile(d, "2026-09"), /Finalize/);
   await assert.rejects(() => svc.finalizePeriod(d, "2026-09", "boss"), /earlier periods first: 2026-08/);
 });
 

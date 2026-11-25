@@ -40,7 +40,6 @@ const NAV = [
   { path: "/allowances", label: "Allowances", icon: "gift", page: "allowances", perm: "read" },
   { group: "Payroll" },
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
-  { path: "/approvals", label: "Approvals", icon: "shield", page: "approvals", badge: true, perm: "view_pay" },
   { path: "/loans", label: "Advances & loans", icon: "wallet", page: "loans", perm: "read" },
   { path: "/payslips", label: "Payslips", icon: "file", page: "payslips", perm: "view_pay" },
   { group: "People" },
@@ -74,7 +73,7 @@ const WS_TABS = [
   { key: "money", label: "Money", subs: [["", "Weekly sheet", "weekly"], ["loans", "Advances & loans", "loans"], ["allowances", "Allowances", "allowances"]] },
 ];
 const SECTIONS = {
-  payroll: { label: "Payroll", tabs: [["/payroll", "Payroll run"], ["/approvals", "Approvals"], ["/payslips", "Payslips"]] },
+  payroll: { label: "Payroll", tabs: [["/payroll", "Payroll run"], ["/payslips", "Payslips"]] },
   setup: { label: "Setup", tabs: [["/users", "Users & roles"], ["/settings", "Settings"], ["/audit", "Audit trail"]] },
 };
 const WS_RE = /^\/hubs\/([\w-]+)(?:\/(people|sales|stock|money))?(?:\/([\w-]+))?$/;
@@ -634,7 +633,6 @@ export async function boot() {
   else if (state.hub && !state.hubs.some((h) => h.code === state.hub)) state.hub = "";
   shell();
   await render();
-  if (!isStaff() && can("view_pay")) refreshPending(); // the approvals queue shows pay, so only those who may see pay ask for it
   warmPages();
 }
 

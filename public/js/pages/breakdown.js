@@ -27,7 +27,7 @@ export async function openBreakdown(r, period, opts) {
 
 export function breakdownDrawer(r, { finalized, onChange }) {
   const d = r.detail;
-  const reviewable = can("review") && !finalized && r.flags.length && r.status !== "auto_approved";
+  const reviewable = false; // nothing waits for approval any more; flags are notes
   const body = html`
     <div class="row" style="gap:14px;margin-bottom:18px">
       <div class="avatar lg">${initials(r.name)}</div>
@@ -39,7 +39,7 @@ export function breakdownDrawer(r, { finalized, onChange }) {
 
     <div class="grid halves" style="gap:14px;margin-bottom:18px">
       <div class="card kpi" style="box-shadow:none"><div class="label">Net pay</div><div class="value"><small>Rs</small><span class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</span></div></div>
-      <div class="card kpi" style="box-shadow:none"><div class="label">${r.role === "guy" ? "Paid to bank" : "Closing balance"}</div>
+      <div class="card kpi" style="box-shadow:none"><div class="label">${r.role === "guy" ? "Salary paid" : "Closing balance"}</div>
         <div class="value"><small>Rs</small><span class="${(r.role === "guy" ? r.disbursed_amount : r.closing_balance) < 0 ? "neg" : ""}">${money(r.role === "guy" ? r.disbursed_amount : r.closing_balance)}</span></div></div>
     </div>
 
@@ -69,10 +69,10 @@ export function breakdownDrawer(r, { finalized, onChange }) {
     <table class="breakdown">
       <tr><td>Opening balance (last period's closing)</td><td>${money(r.opening_balance)}</td></tr>
       <tr><td>Net pay this period</td><td>${money(r.net_pay)}</td></tr>
-      ${r.role === "guy" ? html`<tr><td>Paid to bank</td><td>− ${money(r.disbursed_amount)}</td></tr>` : ""}
+      ${r.role === "guy" ? html`<tr><td>Salary paid</td><td>− ${money(r.disbursed_amount)}</td></tr>` : ""}
       <tr class="total"><td>Closing balance</td><td class="${r.closing_balance < 0 ? "neg" : ""}">${money(r.closing_balance)}</td></tr>
     </table>
-    ${r.bank_account_no ? html`<p class="faint" style="margin-top:14px">Bank: ${r.bank_name || ""} · account …${r.bank_account_no.slice(-4)}</p>` : ""}`;
+`;
 
   const dr = drawer({
     title: `${r.period} · ${r.name}`,

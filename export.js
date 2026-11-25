@@ -241,7 +241,7 @@ const REPORTS = {
     const d = await svc.dashboard(db, period, hub || undefined);
     const pay = canPay;
     return { title: "Hub summary", subtitle: monthLabel(period),
-      columns: [C("Hub"), C("Staff", "int", true), C("Hub business", "money", true), C("Guys' business", "money", true), ...(pay ? [C("Gross pay", "money", true), C("Net pay", "money", true), C("To bank", "money", true)] : []),
+      columns: [C("Hub"), C("Staff", "int", true), C("Hub business", "money", true), C("Guys' business", "money", true), ...(pay ? [C("Gross pay", "money", true), C("Net pay", "money", true), C("Salary", "money", true)] : []),
         C("Stock short", "money", true), ...(pay ? [C("Manager balance", "money", true)] : [])],
       rows: d.by_hub.map((h) => [h.name, h.staff, h.hub_business, h.guys_business, ...(pay ? [h.gross_pay, h.net_pay, h.to_bank] : []), h.stock_shortfall, ...(pay ? [h.manager_balance] : [])]) };
   },
@@ -258,7 +258,7 @@ const REPORTS = {
     columns: [C("Employee"), C("Name"), C("Type"), C("Hub"), C("Status"), C("As of"), C("Closing balance", "money", true)],
     rows: byHub(await svc.balancesReport(db), hub).map((r) => [r.employee_id, r.name, r.role === "manager" ? "Manager level" : "Seller", r.hub, r.status, r.period, r.closing_balance]) }),
   months: async ({ db, canPay }) => ({ title: "Month history", subtitle: "Every calculated month",
-    columns: [C("Month"), C("Status"), C("People", "int"), C("Pending", "int"), C("Rejected", "int"), ...(canPay ? [C("Net pay", "money", true), C("To bank", "money", true)] : []), C("Finalized by"), C("Finalized at")],
+    columns: [C("Month"), C("Status"), C("People", "int"), C("Pending", "int"), C("Rejected", "int"), ...(canPay ? [C("Net pay", "money", true), C("Salary", "money", true)] : []), C("Finalized by"), C("Finalized at")],
     rows: (await svc.listPeriods(db)).map((r) => [r.period, r.status, r.employees, r.pending, r.rejected, ...(canPay ? [r.net_pay, r.to_bank] : []), r.finalized_by || "", r.finalized_at || ""]) }),
   "product-profit": async ({ db, period }) => {
     const d = await products.profitReport(db, period);
@@ -368,7 +368,7 @@ async function payslipsPdf(db, period, employeeId, hub) {
       y -= 8;
     }
     pdf.rect(M, y - 24, W - M * 2, 24, [0.957, 0.965, 0.973]);
-    pdf.text(M + 8, y - 16, `Net pay: Rs ${fmtMoney(r.net_pay)}${r.role === "guy" ? `   -   Paid to bank: Rs ${fmtMoney(r.disbursed_amount)}` : ""}`, 11, true); y -= 40;
+    pdf.text(M + 8, y - 16, `Net pay: Rs ${fmtMoney(r.net_pay)}${r.role === "guy" ? `   -   Salary: Rs ${fmtMoney(r.disbursed_amount)}` : ""}`, 11, true); y -= 40;
     pdf.text(M, y - 9, `Opening balance Rs ${fmtMoney(r.opening_balance)}   -   Closing balance Rs ${fmtMoney(r.closing_balance)}`, 8.5, false, 0.35); y -= 14;
     pdf.text(M, y - 9, `Status: ${r.status.replace("_", " ")}${r.reviewed_by ? ` by ${r.reviewed_by}` : ""}`, 8.5, false, 0.35);
   }

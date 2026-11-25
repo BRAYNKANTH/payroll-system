@@ -23,12 +23,8 @@ export function hubInfo({ hubs, staff, live, queue }, period) {
     const attention = [];
     const toReview = queue.filter((r) => r.hub === h.code && r.period === period).length;
     const unconfirmed = sold.reduce((t, p) => t + (p.unconfirmed || 0), 0);
-    const noBank = active.filter((s) => !s.bank_account_no).length;
-    const unverified = active.filter((s) => s.bank_account_no && s.bank_account_no !== s.bank_account_verified).length;
     if (toReview) attention.push(["red", plural(toReview, "pay line to review", "pay lines to review"), toReview]);
     if (unconfirmed) attention.push(["amber", plural(unconfirmed, "day to confirm", "days to confirm"), unconfirmed]);
-    if (noBank) attention.push(["amber", plural(noBank, "person without a bank account", "people without a bank account"), noBank]);
-    if (unverified) attention.push(["amber", plural(unverified, "unverified bank account", "unverified bank accounts"), unverified]);
     return [h.code, {
       all, active, attention,
       sales: sold.reduce((t, p) => t + p.business, 0),

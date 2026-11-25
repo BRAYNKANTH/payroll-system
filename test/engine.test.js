@@ -178,13 +178,11 @@ test("flags: negative deduction, deductions exceed gross, stock threshold", () =
   assert.ok(codes.includes("STOCK_SHORTFALL"));
 });
 
-test("flags: bank account differs from verified only when paying", () => {
+test("flags: bank details are kept for information only, so they never raise a flag", () => {
   const r = engine.computeGuy({ staff: guy, daily: [], stock: [], allowances: [], openingBalance: 0, securityHeldToDate: 0 });
   const changed = { ...guy, bank_account_no: "9999999999" };
-  assert.deepEqual(engine.evaluateFlags(r, { staff: changed, previous: null, settings }).map((f) => f.code), ["BANK_ACCOUNT_CHANGED"]);
-  assert.deepEqual(engine.evaluateFlags(r, { staff: { ...guy, bank_account_no: null }, previous: null, settings }).map((f) => f.code), ["BANK_ACCOUNT_MISSING"]);
-  const unpaid = { ...r, disbursed_amount: 0 };
-  assert.deepEqual(engine.evaluateFlags(unpaid, { staff: changed, previous: null, settings }), []);
+  assert.deepEqual(engine.evaluateFlags(r, { staff: changed, previous: null, settings }), []);
+  assert.deepEqual(engine.evaluateFlags(r, { staff: { ...guy, bank_account_no: null }, previous: null, settings }), []);
 });
 
 test("flags: manager balance going further negative", () => {

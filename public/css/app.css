@@ -2367,3 +2367,46 @@ details.fold + details.fold { margin-top: 8px; }
   .ws-top > select { margin-left: 0; max-width: none; }
   .ws-top .period-picker { flex: none; margin-left: auto; }
 }
+
+/* ===== Minimal home page ===== */
+.dash-min { max-width: 1120px; }
+.dash-min .page-head { margin-bottom: 20px; }
+.dash-min .page-head h1 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -.02em; line-height: 1.1; }
+.dash-min .page-head p { margin-top: 6px; color: var(--text-2); }
+.dash-min .month-card { border-radius: 18px; padding: 28px 32px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); background: var(--surface); }
+.dash-min .month-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--gold); border-radius: 18px 0 0 18px; }
+.dash-min .month-card h2 { font-size: 30px; }
+.dash-min .mc-right dt { font-size: 14px; color: var(--text-3); font-weight: 550; letter-spacing: .01em; }
+.dash-min .mc-right dd { font: 600 34px/1.1 var(--font-display); margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+.dash-min .mc-right dd small { font: 600 16px var(--font); color: var(--text-3); margin-right: 4px; }
+.dash-min .grid.kpis { gap: 14px; margin-bottom: 8px; }
+.dash-min .kpi { padding: 22px 24px; border-radius: 16px; box-shadow: none; border: 1px solid var(--border); background: var(--surface); }
+.dash-min .kpi .label { font-size: 14px; color: var(--text-3); font-weight: 550; }
+.dash-min .kpi .value { font-size: 36px; margin-top: 8px; font-weight: 600; }
+.dash-min .kpi .foot { font-size: 14px; margin-top: 8px; }
+.dash-min .section-title { font: 600 22px var(--font-display); margin: 0; letter-spacing: -.01em; }
+.dash-min .mt-5 { margin-top: 32px; }
+.dash-min .hub-tile { display: grid; gap: 4px; padding: 22px 24px; border-radius: 16px; box-shadow: none; border: 1px solid var(--border); background: var(--surface); text-decoration: none; color: inherit; transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+.dash-min .hub-tile:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); transform: translateY(-1px); text-decoration: none; }
+.dash-min .hub-tile .hub-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dash-min .hub-tile .hub-name { font: 600 20px var(--font-display); }
+.dash-min .hub-tile .hub-count { color: var(--text-2); font-size: 14px; }
+.dash-min .hub-tile .hub-nums { display: flex; gap: 28px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.dash-min .hub-tile .hub-nums small { display: block; font-size: 14px; color: var(--text-3); font-weight: 550; }
+.dash-min .hub-tile .hub-nums b { font: 600 22px var(--font-display); font-variant-numeric: tabular-nums; }
+@media (max-width: 860px) {
+  .dash-min .month-card { padding: 22px 20px; }
+  .dash-min .month-card::before { width: 3px; }
+  .dash-min .kpi { padding: 16px; }
+  .dash-min .grid.kpis .kpi .value { font-size: 26px; }
+  .dash-min .hub-tile { padding: 18px; }
+}
+
+/* Keep touch targets and captions at the audited sizes after the latest card and tab styling */
+@media (max-width: 860px) {
+  .ws-tabs a, .ws-sub a, .eod-jump-btn { min-height: 44px; }
+}
+.m-card .mc-kv .k, .m-card .mc-kv .v, .m-card .mc-kv span, .tp-price, .tp-badge, .th-date, .th-sub, .seg button, .seg button.on { font-size: 14px; }
+#view .seg button, #view .seg button.on { font-size: 14px; }
+.eod-jump-btn { min-height: 44px; }
+.tag, span.tag { font-size: 14px; }

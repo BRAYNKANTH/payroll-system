@@ -42,7 +42,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
           <div class="th-sub">${st.totals.count} ${st.totals.count === 1 ? "sale" : "sales"} · ${st.totals.qty} ${st.totals.qty === 1 ? "piece" : "pieces"} sold today</div>
         </div>
         <div class="th-right">
-          <button type="button" class="eod-jump-btn" data-subtab="eod" aria-label="End of day status">
+          <button type="button" class="eod-jump-btn" data-subtab="eod">
             <span>End of day</span>
             <b class="${day.not_handed_in ? "neg" : ""}">${rs(day.not_handed_in || 0)}</b>
           </button>

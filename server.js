@@ -280,12 +280,7 @@ function createHandler(dbReady) {
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/register$/, "view_pay", async ({ m }) => ({ html: await reports.registerHtml(database, m[1]) })],
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/register\.csv$/, "export", async ({ m }) =>
       ({ csv: await reports.registerCsv(database, m[1]), filename: `payroll-register-${m[1]}.csv` })],
-    ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/bank-file$/, "export", async ({ m, user }) => {
-      const f = await reports.bankFile(database, m[1]);
-      await db.logEvent(database, { user: user.username, table: "periods", key: m[1], action: "bank_file_download" });
-      return { csv: f.body, filename: f.filename };
-    }],
-    // One person's full working. Listed last so it never shadows /register, /payslips or /bank-file.
+    // One person's full working. Listed last so it never shadows /register or /payslips.
     ["GET", /^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, "view_pay", ({ m, user }) => svc.getPeriodRow(database, m[1], m[2], user.hub)],
   ];
 
@@ -352,7 +347,7 @@ const USE = [
   [/^\/api\/payroll\/(\d{4}-\d{2})\/register(\.csv)?$/, (m) => ({ table: "export", action: m[2] ? "export" : "view", key: `register${m[2] || ""} ${m[1]}`, detail: { period: m[1] } })],
   [/^\/api\/payroll\/(\d{4}-\d{2})\/payslips(?:\/([\w.-]+))?$/, (m) => ({ table: "view", action: "view", key: `payslips ${m[1]}${m[2] ? " " + m[2] : ""}`, dedupeMinutes: 10 })],
   [/^\/api\/payroll\/(\d{4}-\d{2})$/, (m) => ({ table: "view", action: "view", key: `payroll ${m[1]}`, dedupeMinutes: 10 })],
-  [/^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, (m) => (m[2] === "register" || m[2] === "payslips" || m[2] === "bank-file" ? null : { table: "view", action: "view", key: `payroll ${m[1]} ${m[2]}`, dedupeMinutes: 10 })],
+  [/^\/api\/payroll\/(\d{4}-\d{2})\/([\w.-]+)$/, (m) => (m[2] === "register" || m[2] === "payslips" ? null : { table: "view", action: "view", key: `payroll ${m[1]} ${m[2]}`, dedupeMinutes: 10 })],
   [/^\/api\/reports\/(commission|balances)$/, (m) => ({ table: "view", action: "view", key: `report ${m[1]}`, dedupeMinutes: 10 })],
   [/^\/api\/(?:me\/)?documents\/(\d+)$/, (m) => ({ table: "staff_documents", action: "view", key: `document ${m[1]}`, dedupeMinutes: 10 })],
 ];

@@ -89,10 +89,9 @@ test("payroll flags days nobody has confirmed, and the flag goes once they are c
   await sales.addSale(d, u, { date: day(), business_amount: 5000, settled_amount: 5000 });
   await svc.runPeriod(d, p, "acct");
   let r = (await svc.getPeriod(d, p)).rows.find((x) => x.employee_id === "D1");
-  assert.equal(r.status, "pending_review");
+  assert.equal(r.status, "auto_approved"); // nothing waits for approval; the flag stays as a note
   assert.ok(r.flags.some((f) => f.code === "UNCONFIRMED_SALES"));
   assert.equal(r.detail.unconfirmed_days, 1);
-  await assert.rejects(() => svc.finalizePeriod(d, p, "admin"), /Resolve before finalizing/);
   await sales.confirm(d, { username: "boss" }, { all: true, period: p });
   await svc.runPeriod(d, p, "acct");
   r = (await svc.getPeriod(d, p)).rows.find((x) => x.employee_id === "D1");

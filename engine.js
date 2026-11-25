@@ -235,7 +235,7 @@ function computeSenior({ staff, belowSales = 0, rate = 0, openingBalance = 0 }) 
       weeks_logged: 0, total_business: belowSales, weeks: [], team: [],
       basic_salary: salary, below_sales: belowSales, commission_rate: rate,
       earnings: [
-        { label: "Basic salary (paid to bank)", amount: salary },
+        { label: "Basic salary", amount: salary },
         { label: `Share of your team's sales (${fmtRate(rate)} of Rs ${fmt(belowSales)})`, amount: commission },
       ],
       deductions: [],
@@ -270,15 +270,6 @@ function evaluateFlags(result, { staff, previous, settings }) {
   if (result.role === "manager" && result.closing_balance < 0 && result.closing_balance < result.opening_balance) {
     add("MANAGER_BALANCE_DEEPER_NEGATIVE",
       `Closing balance Rs ${fmt(result.closing_balance)} is below opening Rs ${fmt(result.opening_balance)}`);
-  }
-
-  if (result.disbursed_amount > 0) {
-    if (!staff.bank_account_no) add("BANK_ACCOUNT_MISSING", "No bank account on file");
-    else if (staff.bank_account_no !== staff.bank_account_verified) {
-      add("BANK_ACCOUNT_CHANGED", staff.bank_account_verified
-        ? `Account ${mask(staff.bank_account_no)} differs from verified ${mask(staff.bank_account_verified)}`
-        : `Account ${mask(staff.bank_account_no)} has never been verified`);
-    }
   }
 
   if (result.detail.unconfirmed_days > 0) {

@@ -209,8 +209,7 @@ export default {
       ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic pay", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),
       { key: "target", label: "Target", align: "r", render: (s) => s.role === "guy" ? money(s.target) : html`<span class="faint">—</span>` },
       ...(!can("view_pay") ? [] : [{ key: "commission_rate", label: "Commission", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` }]),
-      { key: "bank_account_no", label: "Bank", render: (s) => !s.bank_account_no ? html`<span class="badge amber plain">missing</span>`
-        : s.bank_account_no !== s.bank_account_verified ? html`<span class="badge red">unverified</span>` : html`<span class="mono faint">…${s.bank_account_no.slice(-4)}</span>` },
+      { key: "bank_account_no", label: "Bank", render: (s) => s.bank_account_no ? html`<span class="mono faint">…${s.bank_account_no.slice(-4)}</span>` : html`<span class="faint">—</span>` },
       { key: "status", label: "Status", render: (s) => badge(s.status) },
       { key: "report", label: "PDF report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
     ];

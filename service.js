@@ -603,9 +603,10 @@ async function runPeriod(db, period, user) {
       // A reviewer's decision survives a re-run only if the figures are unchanged and no new kind of
       // flag appeared (flags can disappear, e.g. approving a bank change verifies the account).
       const reviewedCodes = new Set(existing ? JSON.parse(existing.flags).map((f) => f.code) : []);
-      const keep = existing && existing.result_hash === hash && ["approved", "rejected"].includes(existing.status)
+      const keep = existing && existing.result_hash === hash && existing.status === "approved"
         && flags.every((f) => reviewedCodes.has(f.code));
-      const status = keep ? existing.status : flags.length ? "pending_review" : "auto_approved";
+      // Nothing waits for approval: a flagged line is processed like any other, and its flags stay on the row as notes to look at.
+      const status = keep ? existing.status : "auto_approved";
       counts[status]++;
       saves.push([id, period, result.role, result.opening_balance, result.gross_earnings, result.total_deductions,
         result.net_pay, result.disbursed_amount, result.closing_balance, JSON.stringify(result.detail), JSON.stringify(flags),

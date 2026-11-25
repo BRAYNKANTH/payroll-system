@@ -55,9 +55,9 @@ export default {
       <div class="sl-months">${nb(d.prev, "prev")}<h1 id="sl-h1">${monthName(period)}</h1>${nb(d.next, "next")}</div>
 
       <section class="sl-hero" aria-label="Your pay">
-        <p class="sl-kicker">${paid ? "Sent to your bank" : "Your pay this month"}</p>
+        <p class="sl-kicker">${paid ? "Your salary" : "Your pay this month"}</p>
         <p class="sl-big"><small>Rs</small> ${money(paid ? d.paid : d.net_pay)}</p>
-        <p class="sl-status"><span class="sl-chip">${icon("check")} Final</span><span>${paid ? (d.bank ? `${d.bank.name}${d.bank.last4 ? ` · account ending ${d.bank.last4}` : ""}` : "To your bank") : "Nothing was sent to your bank this month."}</span></p>
+        <p class="sl-status"><span class="sl-chip">${icon("check")} Final</span><span>${paid ? "Your salary for this month" : "No salary was paid out this month."}</span></p>
       </section>
 
       <section class="sl-eq" aria-label="How it adds up">
@@ -80,7 +80,7 @@ export default {
         <dl class="sl-dl">
           <div><dt>Brought forward from last month</dt><dd>${money(d.opening)}</dd></div>
           <div><dt>Your pay this month</dt><dd>${money(d.net_pay)}</dd></div>
-          <div><dt>Sent to your bank</dt><dd>${money(d.paid)}</dd></div>
+          <div><dt>Your salary</dt><dd>${money(d.paid)}</dd></div>
           <div class="sl-total"><dt>Carried forward to next month</dt><dd>Rs ${money(d.closing)}</dd></div>
         </dl>
         <p class="sl-note">A minus amount means you owe it. It is taken from your next pay.</p></section>

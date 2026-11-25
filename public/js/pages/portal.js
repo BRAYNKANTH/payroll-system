@@ -26,8 +26,8 @@ const readBase64 = (file) => new Promise((ok, fail) => {
 function payRules(p, me, rate) {
   const rs = (c) => `Rs ${money(c)}`;
   const lines = [];
-  if (me?.senior) return [`A fixed salary of <b>${rs(p.basic_pay)}</b> every month, paid to your bank.`, `Plus <b>${pct(rate, 2)}</b> of the sales of everyone below you, worked out by the office when the month closes.`];
-  if (me?.is_manager) return [`Your pay is your basic salary of <b>${rs(p.basic_pay)}</b> plus the weekly commission on your own and your team's sales (20% when the week reaches your target, otherwise 15%) and your own sales commission, less the weekly rent and hub fee and any extra pay or food you give your team.`, `It is all paid to your bank at month end.`];
+  if (me?.senior) return [`A fixed salary of <b>${rs(p.basic_pay)}</b> every month, every month.`, `Plus <b>${pct(rate, 2)}</b> of the sales of everyone below you, worked out by the office when the month closes.`];
+  if (me?.is_manager) return [`Your pay is your basic salary of <b>${rs(p.basic_pay)}</b> plus the weekly commission on your own and your team's sales (20% when the week reaches your target, otherwise 15%) and your own sales commission, less the weekly rent and hub fee and any extra pay or food you give your team.`, `It is all paid at month end.`];
   if (p.pay_scheme === "tiered") {
     lines.push(`If your sales in the month go over <b>${rs(p.target)}</b>: a fixed basic pay of <b>${rs(p.basic_pay)}</b> plus <b>${pct(p.commission_rate, 0)}</b> of the sales above the target.`);
     lines.push(`If your sales are <b>${rs(p.target)}</b> or less: <b>${pct(p.base_commission_rate, 0)}</b> of all your sales, and no basic pay.`);
@@ -216,14 +216,14 @@ export default {
           <div class="h-top"><span>${monthName(d.period)}</span><span class="h-chip">${final ? "Final" : pay ? "Not final" : "Open"}</span></div>
           <div class="h-label">${final ? "Net pay" : "Estimated take-home so far"}</div>
           <div class="h-amount ${pay && pay.net < 0 ? "negative" : ""}">${pay ? raw(`<small>Rs</small>${money(pay.net)}`) : "—"}</div>
-          <div class="h-foot">${final ? `Paid to your bank: Rs ${money(d.official.paid)}` : pay ? "Changes as more days are entered" : me.is_manager ? "Your pay is shown here once the month is closed" : "Your pay appears when your sales are entered"}</div>
+          <div class="h-foot">${final ? `Salary: Rs ${money(d.official.paid)}` : pay ? "Changes as more days are entered" : me.is_manager ? "Your pay is shown here once the month is closed" : "Your pay appears when your sales are entered"}</div>
           ${m.target ? html`<div class="h-bar" role="progressbar" aria-label="Progress to target" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(attain, 1) * 100)}"><span style="width:${Math.min(100, attain * 100)}%"></span></div>
           <div class="h-foot">Sales Rs ${n0(m.business)} of Rs ${n0(m.target)} target · ${pct(attain, 0)}</div>` : ""}
         </section>
         <div class="stats">${raw((me.senior ? [
           stat("Team sales so far", `<small>Rs</small>${n0(d.below_sales)}`, `${d.team.filter((p) => p.business).length} of ${d.team.length} people have sales`, "chart", "blue"),
           stat("People below you", String(d.team.length), "managers, supervisors and distributors", "users", ""),
-          stat("Your salary", `<small>Rs</small>${n0(me.pay.basic_pay)}`, "paid to your bank each month", "wallet", "green"),
+          stat("Your salary", `<small>Rs</small>${n0(me.pay.basic_pay)}`, "each month", "wallet", "green"),
           stat("Your share rate", pct(d.senior_rate, 2), "of the sales below you", "trend", "amber"),
         ] : [
           stat("Sales so far", `<small>Rs</small>${n0(m.business)}`, `${m.days} day${m.days === 1 ? "" : "s"} worked`, "chart", "blue"),
@@ -247,7 +247,7 @@ export default {
                 ${final ? html`<a class="btn sm primary" href="/api/me/payslip/${d.period}" target="_blank" rel="noopener">${icon("printer")} Payslip</a>` : badge("amber", "Not final")}</div>
               ${raw(payGroups(pay))}
               ${final ? raw(group("Balance", [row("Brought forward", money(d.official.opening)), row("Net pay", money(d.official.net), { strong: true, cls: d.official.net < 0 ? "neg" : "" }),
-                row("Paid to your bank", money(d.official.paid)), row("Carried to next month", money(d.official.closing), { cls: d.official.closing < 0 ? "neg" : "" })])) : ""}
+                row("Salary paid", money(d.official.paid)), row("Carried to next month", money(d.official.closing), { cls: d.official.closing < 0 ? "neg" : "" })])) : ""}
               ${final ? "" : html`<div class="card-foot muted">The office calculates the final figure at the end of the month and may check some entries first. Your payslip appears here after the month is closed.</div>`}
             </section>` : html`<div class="card mb-4">${emptyState("No sales entered yet this month", "When your daily sales are entered, your progress and an estimate of your pay appear here.", "chart")}</div>`}
           </div>
@@ -301,7 +301,7 @@ export default {
           row("NIC", me.nic || "—"),
           row("Joined", me.join_date || "—"),
         ]))}</section>
-        <section class="card glist"><div class="card-head"><h2>Bank</h2></div>
+        <section class="card glist"><div class="card-head"><h2>Bank details</h2></div>
         ${raw(group("", [
           row("Bank", me.bank_name || "—"),
           row("Account", `<span class="mono">${me.bank_last4 ? "…" + esc(me.bank_last4) : "—"}</span>`),
@@ -435,7 +435,7 @@ export default {
               { key: "gross_earnings", label: "Earned", align: "r", render: (r) => money(r.gross_earnings) },
               { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions) },
               { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>` },
-              { key: "disbursed_amount", label: "Paid to bank", align: "r", render: (r) => money(r.disbursed_amount) },
+              { key: "disbursed_amount", label: "Salary", align: "r", render: (r) => money(r.disbursed_amount) },
               { key: "closing_balance", label: "Carried forward", align: "r", render: (r) => html`<span class="${r.closing_balance < 0 ? "neg" : ""}">${money(r.closing_balance)}</span>` },
               { key: "slip", label: "", sort: false, align: "r", render: (r) => html`<a class="btn sm" href="/me/payslips/${r.period}" data-link aria-label="Open the payslip for ${monthName(r.period)}">${icon("file")} Payslip</a>` },
             ],

@@ -7,7 +7,7 @@ const ROLES = [
   ["staff", "Staff portal", "Distributors & supervisors: own sales, pay and daily sheets"],
   ["coacher", "Coacher (hub head)", "Heads one hub: all people, stock and confirmation"],
   ["manager", "Manager", "Own team: sales, stock and members. Never sees pay"],
-  ["admin", "Admin", "Full access: payroll, approvals, users and settings"],
+  ["admin", "Admin", "Full access: payroll, users and settings"],
 ];
 const roleBadge = (r) => badge(r === "admin" ? "admin" : "green", ROLES.find((x) => x[0] === r)?.[1] || r);
 
