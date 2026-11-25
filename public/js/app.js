@@ -3,6 +3,7 @@ import { get, post, setUnauthorizedHandler } from "./api.js";
 import { $, $$, esc, icon, initials, monthName, toast, announce, confirmDialog, ensureLive } from "./ui.js";
 import { mountSearch } from "./search.js";
 import { swipeTabs } from "./phone.js";
+import { fxEnhance } from "./fx.js"; // also switches the page animations on or off for this device
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -149,10 +150,13 @@ async function confirmLeave() {
 }
 window.addEventListener("beforeunload", (e) => { if (dirtyCount()) { e.preventDefault(); e.returnValue = ""; } });
 
+// Which way the last move went, so the new page slides in from the right (forward) or the left (back). Used once, by the next render.
+let navDir = "";
 export async function navigate(path, replace = false) {
   if (!(await confirmLeave())) return;
   if (location.pathname === path && !replace) return render({ moveFocus: true });
   history[replace ? "replaceState" : "pushState"]({}, "", path);
+  navDir = replace ? "" : "fwd";
   render({ moveFocus: true });
 }
 
@@ -567,7 +571,12 @@ export async function render({ moveFocus = false, restoreY = 0 } = {}) {
     if (seq === renderSeq) { clampIntro(view); showActiveTab(view); }
     if (seq !== renderSeq) return;
     view.removeAttribute("aria-busy");
+    view.style.setProperty("--sx", navDir === "back" ? "-28px" : navDir === "fwd" ? "28px" : "0px");
+    navDir = "";
     view.classList.add("page-in");
+    // The entrance animations are tied to this class; taking it off afterwards means a page that redraws part of itself later does not replay them.
+    setTimeout(() => view.classList.remove("page-in"), 1400);
+    fxEnhance(view);
     nameTables(view);
     enhanceTabs(view);
     fadeScrollers(view);
@@ -613,6 +622,7 @@ window.addEventListener("popstate", async () => {
     history.pushState({}, "", target);
   }
   currentPath = location.pathname + location.search;
+  navDir = "back";
   render({ moveFocus: true, restoreY: scrollAt.get(currentPath) || 0 });
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sidebarOpen) setSidebar(false); });

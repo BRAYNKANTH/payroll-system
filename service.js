@@ -866,6 +866,9 @@ async function dashboard(db, period, hub, range = null) {
   // The sales and cash numbers: the chosen days, or the whole pay month when no range is given.
   const sales = range ? (await db.all(`SELECT employee_id, SUM(business_amount) AS business, SUM(settle_up_minus) AS settle_up FROM daily_log
       WHERE date >= ? AND date <= ? GROUP BY employee_id`, range.from, range.to)).filter((r) => ids.has(r.employee_id)) : daily;
+  // Days sellers entered themselves that nobody has approved yet, per hub, for the pay month (the hub cards show it as "to confirm").
+  const unconfirmedBy = new Map((await db.all(`SELECT s.hub, COUNT(*) AS n FROM daily_log d JOIN staff s USING (employee_id)
+      WHERE d.source = 'portal' AND d.confirmed_by IS NULL AND d.date >= ? AND d.date < ? GROUP BY s.hub`, ...monthBounds(period))).map((r) => [r.hub, Number(r.n)]));
   const sum = (arr, k) => arr.reduce((t, r) => t + (Number(r[k]) || 0), 0);
   const guys = summaries.filter((r) => r.role === "guy");
   const managers = summaries.filter((r) => r.role === "manager");
@@ -887,6 +890,7 @@ async function dashboard(db, period, hub, range = null) {
       staff: staff.filter((s) => s.hub === h.code && s.status === "active").length,
       guys_business: sum(sales.filter((r) => inHub(r)), "business"),
       hub_business: sum(sales.filter((r) => inHub(r)), "business"),
+      unconfirmed: unconfirmedBy.get(h.code) || 0,
       gross_pay: sum(hubGuys, "gross_earnings"),
       net_pay: sum(hubGuys, "net_pay"),
       to_bank: sum(hubGuys, "disbursed_amount"),

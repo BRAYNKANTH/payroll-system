@@ -5,12 +5,15 @@ import { LEVELS } from "./ui.js";
 export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // Everything the cards need, fetched once. `pay` says whether the signed-in user may see pay (only then is the review queue fetched).
-export async function loadHubData(period, pay) {
-  const [hubs, staff, live, queue] = await Promise.all([
-    get("/api/hubs"), get("/api/staff"),
-    get("/api/live" + qs({ period })).catch(() => ({ people: [] })),
+// The sales and unconfirmed-day counts come from the small dashboard answer (a page that already has it passes it in, or the promise of it),
+// not from the whole Live sales feed, which is about 30 times larger.
+export async function loadHubData(period, pay, dash) {
+  const dashP = dash || get("/api/dashboard" + qs({ period })).catch(() => ({ by_hub: [] }));
+  const [hubs, staff, d, queue] = await Promise.all([
+    get("/api/hubs"), get("/api/staff"), dashP,
     pay ? get("/api/review-queue").catch(() => []) : Promise.resolve([]),
   ]);
+  const live = { people: (d.by_hub || []).map((h) => ({ hub: h.code, business: h.hub_business || 0, unconfirmed: h.unconfirmed || 0 })) };
   return { hubs, staff, live, queue };
 }
 

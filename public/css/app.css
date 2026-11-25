@@ -2490,3 +2490,97 @@ details.fold + details.fold { margin-top: 8px; }
 #view .seg button, #view .seg button.on { font-size: 14px; }
 .eod-jump-btn { min-height: 44px; }
 .tag, span.tag { font-size: 14px; }
+
+/* =====================================================================================================================
+   Motion: pages slide in, cards rise one after another, glows on hover, numbers count up.
+   Everything here is under html.fx, which public/js/fx.js switches on only when the device allows it (not reduced-motion, not a
+   weak phone, not data-saver; or when My account says On). With fx off nothing below applies and the pages simply appear.
+   Only transform and opacity are animated (the cheap ones for a phone), and entrances run just on a page change (#view.page-in),
+   so a page that redraws part of itself later does not flicker.
+   ===================================================================================================================== */
+:root { --ease-out: cubic-bezier(.2, .8, .2, 1); --glow: color-mix(in srgb, var(--primary) 42%, transparent); --glow-soft: color-mix(in srgb, var(--primary) 16%, transparent); }
+
+/* a lighter glass on weak devices and phones: the blur behind the bars is the most expensive thing the browser draws here */
+html.lite { --glass-blur: none; --glass-bg: var(--surface); }
+@media (max-width: 860px) { :root { --glass-blur: saturate(150%) blur(10px); } }
+
+@keyframes rise { from { opacity: 0; transform: translate(var(--sx, 0px), 18px) scale(.985); } }
+@keyframes slide-title { from { opacity: 0; transform: translate(var(--sx, 0px), 8px); } }
+@keyframes glow-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--glow); } 60% { box-shadow: 0 0 0 7px transparent; } }
+@keyframes line-draw { from { transform: scaleY(0); } }
+@keyframes fade-in-only { from { opacity: 0; } }
+
+/* ---- a new page: the title slides, then the cards rise in one after another (the stagger counts the position among siblings) */
+html.fx #view.page-in .page-head { animation: slide-title .4s var(--ease-out) backwards; }
+html.fx #view.page-in :is(.card, .kpi, .hub-tile, .stat, .hero, .glist, .alert, .org-scroll, .range-bar, .tabs) {
+  animation: rise .55s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 55ms + 70ms);
+}
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(2) { --i: 1; }
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(3) { --i: 2; }
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(4) { --i: 3; }
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(5) { --i: 4; }
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(6) { --i: 5; }
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(7) { --i: 6; }
+html.fx #view.page-in :is(#view, .grid, .stack, .dash, [class$="-page"]) > :nth-child(n+8) { --i: 7; }
+/* the org chart: the boss first, then each level a little later (the depth is set on each person) */
+html.fx #view.page-in .org-card { animation: rise .6s var(--ease-out) backwards; animation-delay: calc(var(--d, 0) * 140ms + 200ms); }
+html.fx #view.page-in .org-kids { animation: fade-in-only .5s ease backwards; animation-delay: calc(var(--d, 0) * 140ms + 260ms); }
+
+/* ---- a panel or tab that changes inside a page slides in too */
+html.fx .pane-in { animation: pane-in .3s var(--ease-out); }
+
+/* ---- hover: a soft glow in the brand colour, and the small cards lift (only where there is a mouse) */
+@media (hover: hover) {
+  html.fx .card { transition: box-shadow .3s var(--ease-out), border-color .3s var(--ease-out), transform .3s var(--ease-out); }
+  html.fx .card:hover { border-color: color-mix(in srgb, var(--primary) 32%, var(--border-strong, var(--border))); box-shadow: var(--shadow-md), 0 0 0 1px var(--glow-soft), 0 16px 46px -18px var(--glow); }
+  html.fx :is(.kpi, .hub-tile, .stat):hover { transform: translateY(-3px); }
+  html.fx a.card:active, html.fx .hub-tile:active { transform: translateY(-1px) scale(.99); }
+  html.fx .org-card:hover { box-shadow: 0 12px 34px -10px var(--lv), 0 0 0 1px color-mix(in srgb, var(--lv) 40%, transparent); }
+  html.fx .nav a { transition: background-color .2s, color .2s, transform .2s var(--ease-out); }
+  html.fx .nav a:not(.active):hover { transform: translateX(3px); }
+}
+html.fx .kpi .icon, html.fx .stat .s-ic { box-shadow: 0 6px 18px -8px currentColor; }
+html.fx .kpi:hover .icon { transform: scale(1.12) rotate(-4deg); }
+
+/* ---- buttons: the main button glows, and a light sweeps across it on hover */
+html.fx .btn.primary { position: relative; overflow: hidden; box-shadow: var(--shadow-sm), 0 8px 22px -10px var(--glow); transition: box-shadow .3s var(--ease-out), transform .12s ease, background-color .2s; }
+html.fx .btn.primary::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(110deg, transparent 32%, rgba(255, 255, 255, .26) 50%, transparent 68%); transform: translateX(-130%); }
+@media (hover: hover) {
+  html.fx .btn.primary:hover { box-shadow: var(--shadow-md), 0 12px 30px -10px var(--glow); }
+  html.fx .btn.primary:hover::after { transform: translateX(130%); transition: transform .7s var(--ease-out); }
+}
+
+/* ---- the current page in the menu glows; badges that need attention pulse gently */
+html.fx .nav a.active::before { box-shadow: 0 0 14px 1px var(--gold, var(--primary)); }
+html.fx .nav a.active { box-shadow: inset 0 0 22px -14px var(--primary); }
+html.fx .bottom-nav a { transition: color .2s, transform .25s var(--ease-out); }
+html.fx .bottom-nav a[aria-current="page"], html.fx .bottom-nav a.active { transform: translateY(-2px); }
+html.fx .bottom-nav a[aria-current="page"] svg, html.fx .bottom-nav a.active svg { filter: drop-shadow(0 4px 8px var(--glow)); }
+html.fx .nav .count, html.fx .bottom-nav .dot:not([hidden]) { animation: glow-pulse 2.4s ease-in-out infinite; }
+
+/* ---- profile circles glow in their own colour */
+html.fx .org-av { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--lv, var(--primary)), 0 8px 20px -6px var(--lv, var(--primary)); }
+html.fx .profile-head .avatar, html.fx .user-chip .avatar { box-shadow: 0 0 0 2px var(--surface), 0 6px 16px -6px var(--glow); }
+
+/* ---- segmented choices and tabs ease between states; the chosen one glows a little */
+html.fx .seg button.on, html.fx .tabs button.on { box-shadow: 0 2px 8px rgba(0, 0, 0, .08), 0 0 0 1px var(--glow-soft), 0 6px 18px -8px var(--glow); }
+html.fx .seg button, html.fx .tabs button { transition: background-color .25s var(--ease-out), color .2s, box-shadow .3s var(--ease-out), transform .12s ease; }
+
+/* ---- bars and lines draw themselves */
+html.fx #view.page-in .progress span { animation: grow .9s var(--ease-out) backwards; animation-delay: .25s; }
+html.fx .org-kids::before { transform-origin: top; }
+html.fx #view.page-in .org-kids::before { animation: line-draw .5s var(--ease-out) backwards; animation-delay: calc(var(--d, 0) * 140ms + 300ms); }
+
+/* ---- drawers, dialogs and toasts: a little more life than the plain slide */
+html.fx .drawer { animation: drawerSlide .38s var(--ease-out); }
+html.fx .modal { animation: modalPop .32s var(--ease-out); }
+html.fx .toast { animation: toastPop .4s cubic-bezier(.3, 1.4, .5, 1); }
+
+/* ---- numbers hold still while they count */
+.kpi .value, .stat .s-value, .hub-nums b, .dstat b, .mc-right dd { font-variant-numeric: tabular-nums; }
+
+/* ---- with motion off, the older page fade stays out of the way as well */
+html.lite #view.page-in { animation: none; }
+
+/* touch screens: the sort buttons in table headers are finger-sized */
+@media (pointer: coarse) { .th-sort { min-height: 44px; } }

@@ -8,7 +8,8 @@ export default {
   async render(ctx) {
     const { el } = ctx;
     const pay = can("view_pay");
-    const [data, dash] = await Promise.all([loadHubData(state.period, pay), get("/api/dashboard" + qs({ period: state.period }))]);
+    const dashP = get("/api/dashboard" + qs({ period: state.period })); // one request feeds both the cards and the totals
+    const [data, dash] = await Promise.all([loadHubData(state.period, pay, dashP), dashP]);
     const { hubs, staff } = data;
     state.hubs = hubs;
     const stats = Object.fromEntries(dash.by_hub.map((h) => [h.code, h]));

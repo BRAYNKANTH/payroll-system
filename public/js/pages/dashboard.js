@@ -43,11 +43,13 @@ export default {
     const lastDay = (p) => { const [y, m] = p.split("-").map(Number); return `${p}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
     const effective = (r) => (r.preset === "month" ? { ...r, from: `${state.period}-01`, to: state.period === today().slice(0, 7) ? today() : lastDay(state.period) } : r);
 
-    const hubData = await loadHubData(state.period, pay);
-    let seq = 0, picker = null;
+    let seq = 0, picker = null, hubData = null;
     const load = async () => {
       const mine = ++seq, r = picker.get();
-      const d = await get("/api/dashboard" + qs({ period: state.period, hub: scopeHub(), from: r.from, to: r.to }));
+      const dashP = get("/api/dashboard" + qs({ period: state.period, hub: scopeHub(), from: r.from, to: r.to }));
+      // The hub list, people and review queue are fetched once, alongside the first dashboard answer; later date changes only ask for the numbers.
+      if (!hubData) hubData = await loadHubData(state.period, pay, dashP);
+      const d = await dashP;
       if (mine !== seq) return;
       const k = d.kpis;
       const info = hubInfo(hubData, state.period);

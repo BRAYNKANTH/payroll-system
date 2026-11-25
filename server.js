@@ -4,6 +4,7 @@
 // Binds to 127.0.0.1 locally unless PAYROLL_HOST is set. Cookies get the Secure flag automatically
 // whenever the request arrived over HTTPS (or PAYROLL_SECURE_COOKIE=1).
 const http = require("http");
+const zlib = require("zlib");
 const fs = require("fs");
 const path = require("path");
 const db = require("./db");
@@ -28,10 +29,24 @@ const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe
 const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:; base-uri 'none'";
 const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "loans", "loan_repayments", "products", "product_receipts", "periods", "pay_period_summary", "audit_log"];
 
+// Text answers are sent gzip-compressed when the browser accepts it (a 500 KB list becomes about 50 KB). Vercel and most hosts compress for us,
+// so this is skipped there; it matters on a plain Node host. Files that are already compressed (PDF, Excel, images, fonts) are left alone.
+const COMPRESSIBLE = /^(application\/json|application\/javascript|application\/manifest|text\/|image\/svg)/;
+const SKIP_COMPRESSION = !!process.env.VERCEL || process.env.PAYROLL_NO_GZIP === "1";
 function send(res, status, body, type = "application/json; charset=utf-8", extra = {}) {
-  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", ...BASE_HEADERS, ...extra });
+  const headers = { "Content-Type": type, "Cache-Control": "no-store", ...BASE_HEADERS, ...extra };
   const raw = typeof body === "string" || Buffer.isBuffer(body);
-  res.end(type.startsWith("application/json") && !raw ? JSON.stringify(body) : body);
+  const data = type.startsWith("application/json") && !raw ? JSON.stringify(body) : body;
+  const accepts = db.requestContext.getStore()?.enc || "";
+  if (!SKIP_COMPRESSION && /\bgzip\b/.test(accepts) && COMPRESSIBLE.test(type) && !headers["Content-Encoding"] && data != null && Buffer.byteLength(data) > 1024) {
+    return zlib.gzip(data, { level: 5 }, (err, z) => {
+      if (err) { res.writeHead(status, headers); return res.end(data); }
+      res.writeHead(status, { ...headers, "Content-Encoding": "gzip", Vary: "Accept-Encoding" });
+      res.end(z);
+    });
+  }
+  res.writeHead(status, headers);
+  res.end(data);
 }
 
 async function readJson(req) {
@@ -57,16 +72,25 @@ function sessionCookie(req, token, maxAge) {
   return `sid=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${isHttps(req) ? "; Secure" : ""}`;
 }
 
-function serveStatic(res, pathname) {
+function serveStatic(req, res, pathname) {
   let rel;
   try { rel = decodeURIComponent(pathname); } catch { return send(res, 400, "Bad request", "text/plain"); }
   if (rel === "/" || !path.extname(rel)) rel = "/index.html"; // SPA routes
   const file = path.normalize(path.join(PUBLIC, rel));
   if (!file.startsWith(PUBLIC + path.sep)) return send(res, 403, "Forbidden", "text/plain");
-  fs.readFile(file, (err, data) => {
-    if (err) return send(res, 404, "Not found", "text/plain");
-    send(res, 200, data, MIME[path.extname(file)] || "application/octet-stream",
-      { "Content-Security-Policy": APP_CSP, "Cache-Control": rel === "/index.html" ? "no-store" : "no-cache" });
+  fs.stat(file, (serr, st) => {
+    if (serr || !st.isFile()) return send(res, 404, "Not found", "text/plain");
+    // "no-cache" means: ask again each time, but a 304 (nothing changed) costs almost nothing. The tag comes from the file's size and time.
+    const etag = `W/"${st.size.toString(16)}-${Math.round(st.mtimeMs).toString(16)}"`;
+    if (rel !== "/index.html" && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag, "Cache-Control": "no-cache", ...BASE_HEADERS });
+      return res.end();
+    }
+    fs.readFile(file, (err, data) => {
+      if (err) return send(res, 404, "Not found", "text/plain");
+      send(res, 200, data, MIME[path.extname(file)] || "application/octet-stream",
+        { "Content-Security-Policy": APP_CSP, "Cache-Control": rel === "/index.html" ? "no-store" : "no-cache", ...(rel === "/index.html" ? {} : { ETag: etag }) });
+    });
   });
 }
 
@@ -301,7 +325,7 @@ function createHandler(dbReady) {
   // Every request runs with its address and browser, so each audit row (including those the database writes itself) can say where it came from.
   return function handler(req, res) {
     const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-    const ctx = { ip: (forwarded || req.socket?.remoteAddress || "").replace(/^::ffff:/, "").slice(0, 64), agent: String(req.headers["user-agent"] || "").slice(0, 220) };
+    const ctx = { ip: (forwarded || req.socket?.remoteAddress || "").replace(/^::ffff:/, "").slice(0, 64), agent: String(req.headers["user-agent"] || "").slice(0, 220), enc: String(req.headers["accept-encoding"] || "") };
     return db.requestContext.run(ctx, () => handle(req, res));
   };
 
@@ -311,7 +335,7 @@ function createHandler(dbReady) {
     try {
       if (!url.pathname.startsWith("/api/")) {
         if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method not allowed", "text/plain");
-        return serveStatic(res, url.pathname);
+        return serveStatic(req, res, url.pathname);
       }
       database = database || (await dbReady);
       const route = routes.find(([method, re]) => method === req.method && re.test(url.pathname));

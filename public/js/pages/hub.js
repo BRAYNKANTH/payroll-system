@@ -30,9 +30,9 @@ export default {
     // The org chart: each person is a card (profile circle, name, position, sales); the people who report to them hang below on branches.
     // Click a card to open that person. The small button under a card folds or opens its branch.
     const levelKey = (s) => s.staff_level || (s.role === "manager" ? "manager" : "distributor");
-    const node = (s) => {
+    const node = (s, depth = 0) => {
       const direct = kids[s.employee_id] || [], n = count(s.employee_id), own = sales[s.employee_id]?.business || 0;
-      return html`<li class="org-item" data-id="${s.employee_id}">
+      return html`<li class="org-item" data-id="${s.employee_id}" style="--d:${depth}">
         <a href="/employees/${encodeURIComponent(s.employee_id)}" data-link class="org-card lv-${levelKey(s)}" aria-label="${s.name}, ${levelLabel(s.staff_level)}. Open record">
           <span class="avatar org-av" aria-hidden="true">${initials(s.name)}</span>
           <b class="org-name">${s.name}</b>
@@ -41,7 +41,7 @@ export default {
           <span class="org-sales"><b class="num">${compact(own)}</b> own${n ? html` · <b class="num">${compact(total(s.employee_id))}</b> team` : ""}</span>
         </a>
         ${direct.length ? html`<button type="button" class="org-toggle" aria-expanded="true" aria-label="Show or hide the ${n} below ${s.name}"><span class="org-toggle-dot"><span class="org-chev" aria-hidden="true">▾</span> ${direct.length}</span></button>
-          <ul class="org-kids">${direct.map((c) => node(c))}</ul>` : ""}
+          <ul class="org-kids" style="--d:${depth + 1}">${direct.map((c) => node(c, depth + 1))}</ul>` : ""}
       </li>`;
     };
     const legend = [...new Set(active.map(levelKey))].sort((a, b) => levelRank(b) - levelRank(a));
