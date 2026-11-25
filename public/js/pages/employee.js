@@ -189,6 +189,9 @@ export default {
         ] });
         $("#hist").innerHTML = dataTable({
           rows: p.history, onRow: (r) => breakdownDrawer({ ...r, name: s.name, hub: s.hub, staff_level: s.staff_level }, { finalized: r.period_status === "finalized", onChange: () => this.render(ctx) }),
+          // On a phone: the month, what was earned and taken off, and the net pay (the figure people look for). Tap a month for the full working.
+          card: (r) => html`<span class="mc-main"><b>${monthName(r.period)}${r.period_status === "finalized" ? html` <span class="faint">${icon("lock")}</span>` : ""}</b><span class="mc-sub">Earned ${money(r.gross_earnings)} · taken off ${money(r.total_deductions)}</span></span>
+            <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br><span class="muted">net pay</span></span>`,
           cols: [
             { key: "period", label: "Month", render: (r) => html`<b>${monthName(r.period)}</b>` },
             { key: "opening_balance", label: "Opening", align: "r", render: (r) => money(r.opening_balance) },

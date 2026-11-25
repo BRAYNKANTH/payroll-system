@@ -2718,3 +2718,12 @@ body[data-filters="none"] #filters, body[data-filters="none"] #filterbar, body[d
 }
 html.fx #view.page-in .hub-tile.ht .ht-badge { animation: pop-badge .6s cubic-bezier(.3, 1.5, .5, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms + 200ms); }
 @keyframes pop-badge { from { opacity: 0; transform: scale(.4); } }
+
+/* a card that has more facts than fit: the rest fold behind "Show more" */
+.mc-more { margin-top: 6px; }
+.mc-more summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--primary); font-size: 14px; font-weight: 650; list-style: none; }
+.mc-more summary::-webkit-details-marker { display: none; }
+.mc-more[open] summary { margin-bottom: 4px; }
+.mc-more[open] summary::before { content: "Show less"; }
+.mc-more[open] summary { font-size: 0; }
+.mc-more[open] summary::before { font-size: 14px; }

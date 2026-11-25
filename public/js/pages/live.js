@@ -1,5 +1,5 @@
 import { get, post, qs } from "../api.js";
-import { state, can, scopeHub } from "../app.js";
+import { state, can, scopeHub, navigate } from "../app.js";
 import { exportButtons, $, $$, html, icon, money, badge, toast, busy, dataTable, emptyState, pct, monthName, dateLabel, dateTime, levelLabel } from "../ui.js";
 import { mountRange, monthsIn, singleMonth, today } from "../range.js";
 
@@ -64,9 +64,12 @@ export default {
       if (tab === "feed") {
         pane.innerHTML = d.feed.length ? html`<div class="card"><div class="card-body flush">${dataTable({
           rows: d.feed, sortable: false, pageSize: 25, empty: "No sales entered yet", emptyHint: "Sales appear here as soon as they are entered on the daily sheet.",
-          // On a phone each sale is a short card: who, which day, the amount and any shortfall, and the Confirm button when one is waiting.
-          card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${dateLabel(r.date)} · ${r.employee_id}${r.self_entered ? " · entered by the seller" : ""}</span>${confirmButton(r)}</span>
-            <span class="mc-end"><b>${money(r.business)}</b><br>${r.business > r.settled ? html`<span class="neg">short ${money(r.business - r.settled)}</span>` : html`<span class="muted">handed in</span>`}<br>${r.confirmed ? badge("green", r.self_entered ? "Confirmed" : "Entered") : badge("amber", "To confirm")}</span>`,
+          // The feed reads like a diary: a heading for each day with its count and total, then that day's sales, newest day first.
+          groupBy: (r) => r.date,
+          groupLabel: (key, rs) => `<b>${dateLabel(key)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "sale" : "sales"} · Rs ${money(rs.reduce((t, x) => t + x.business, 0))}${rs.some((x) => !x.confirmed) ? ` · ${rs.filter((x) => !x.confirmed).length} to confirm` : ""}</span>`,
+          // On a phone each sale is a short card: who, the amount and any shortfall, and the Confirm button when one is waiting.
+          card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id}${r.self_entered ? " · entered by the seller" : ""}</span>${confirmButton(r)}</span>
+            <span class="mc-end"><b>${money(r.business)}</b><br>${r.business > r.settled ? html`<span class="neg">short ${money(r.business - r.settled)}</span>` : html`<span class="muted">all handed in</span>`}${r.confirmed ? "" : html`<br>${badge("amber", "To confirm")}`}</span>`,
           cols: [
             { key: "date", label: "Day", render: (r) => html`<b>${dateLabel(r.date)}</b><div class="faint text-sm">${r.self_entered ? `entered ${dateTime(r.entered_at)}` : "entered by the office"}</div>` },
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>` },
@@ -87,6 +90,10 @@ export default {
       } else {
         pane.innerHTML = d.people.length ? html`<div class="card"><div class="card-body flush">${dataTable({
           rows: d.people, footer: true, pageSize: 25, empty: "Nobody has sales in this period", emptyHint: "People show here once they have a sale in the dates you chose.",
+          onRow: (r) => navigate(`/employees/${encodeURIComponent(r.employee_id)}`), rowLabel: (r) => `Open ${r.name}`,
+          // A ranking: who sold most, how far each is from the target (when that makes sense), and who has days waiting. Tap a person for the rest.
+          card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${levelLabel(r.staff_level)} · ${r.days} ${r.days === 1 ? "day" : "days"}</span>${d.monthToDate ? bar(r.target_pct) : ""}${r.unconfirmed ? badge("amber", `${r.unconfirmed} to confirm`) : ""}</span>
+            <span class="mc-end"><b>${money(r.business)}</b>${d.can_pay && r.pay ? html`<br><span class="muted">earned ${money(r.pay.gross)}</span>` : ""}</span>`,
           cols: [
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>`, total: () => "Total" },
             { key: "days", label: "Days", align: "r" },

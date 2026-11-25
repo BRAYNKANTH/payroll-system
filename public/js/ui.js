@@ -340,9 +340,13 @@ export function dataTable({ cols, rows, onRow, rowLabel = () => "Open", rowActio
   // On a phone a list of cards is easier to read and tap than a wide table. Each card is one button, so the whole row works as one control.
   // A table with more than four columns and no card of its own becomes cards too: the first column is the title, the rest are label and value pairs.
   const labelled = cols.filter((c) => c.label);
+  // The card shows the title and the first three facts only. A card that opens something (onRow) keeps the rest for there; one that does not
+  // folds the rest behind "Show more", so a card is never a wall of every column.
   if (!card && labelled.length > 4 && matchMedia("(max-width: 860px)").matches) {
-    card = (r) => `<span class="mc-main"><b>${cols[0].render ? cols[0].render(r) : esc(r[cols[0].key])}</b>${labelled.slice(1).map((c) =>
-      `<span class="mc-kv"><span class="k">${esc(c.label)}</span><span class="v">${c.render ? c.render(r) : esc(r[c.key])}</span></span>`).join("")}</span>`;
+    const pair = (c, r) => `<span class="mc-kv"><span class="k">${esc(c.label)}</span><span class="v">${c.render ? c.render(r) : esc(r[c.key])}</span></span>`;
+    const rest = labelled.slice(1);
+    card = (r) => `<span class="mc-main"><b>${cols[0].render ? cols[0].render(r) : esc(r[cols[0].key])}</b>${rest.slice(0, 3).map((c) => pair(c, r)).join("")}${
+      rest.length > 3 && !onRow ? `<details class="mc-more"><summary>Show ${rest.length - 3} more</summary>${rest.slice(3).map((c) => pair(c, r)).join("")}</details>` : ""}</span>`;
   }
   if (card && matchMedia("(max-width: 860px)").matches) {
     let shownCards = Math.min(rows.length, pageSize);
