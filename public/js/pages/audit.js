@@ -1,5 +1,6 @@
 import { get, qs } from "../api.js";
 import { can } from "../app.js";
+import { PRESETS, rangeOf } from "../range.js";
 import { readQuery, writeQuery, exportButtons, $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
 
 const MONEY = new Set(["business_amount", "settled_amount", "settle_up_minus", "personal_minus", "business_total", "rent", "hub_fee", "security_cost",
@@ -65,7 +66,9 @@ export default {
         <div class="actions"><span id="xaudit"></span><button class="btn" id="csv">${icon("download")} CSV</button></div>
       </div>
       <div class="card">
-        <div class="card-head"><form class="row" id="af">
+        <div class="card-head" style="flex-wrap:wrap;gap:12px">
+          <div class="seg range-quick" id="ap" role="group" aria-label="Quick dates">${PRESETS.filter(([k]) => k !== "custom").map(([k, l]) => html`<button type="button" data-p="${k}">${l}</button>`)}</div>
+          <form class="row" id="af">
           <select class="input sm" name="table" aria-label="Record type" style="width:auto">${TABLES.filter(([v]) => (can("view_pay") || !["pay_period_summary", "settings"].includes(v)) && (can("manage_users") || !ACCESS.has(v))).map(([v, l]) => html`<option value="${v}" ${f.table === v ? "selected" : ""}>${l}</option>`)}</select>
           <select class="input sm" name="action" aria-label="Action" style="width:auto">${ACTIONS.map(([v, l]) => html`<option value="${v}" ${f.action === v ? "selected" : ""}>${l}</option>`)}</select>
           <input class="input sm" name="user" aria-label="User" placeholder="User" value="${f.user}" style="width:130px">
@@ -92,6 +95,14 @@ export default {
           { key: "ip", label: "From", render: (a) => (a.ip ? html`<span class="mono">${a.ip}</span><div class="faint text-sm">${device(a.agent)}</div>` : html`<span class="faint">—</span>`) },
         ],
       }).toString();
+    };
+    // Quick dates: Today, Yesterday, This week, This month, Last month fill the From and To boxes and filter.
+    $("#ap").onclick = (e) => {
+      const b = e.target.closest("[data-p]");
+      if (!b) return;
+      const r = rangeOf(b.dataset.p);
+      $("#af").elements.from.value = r.from; $("#af").elements.to.value = r.to;
+      $("#af").requestSubmit();
     };
     $("#af").onsubmit = (e) => { e.preventDefault(); f = Object.fromEntries(new FormData(e.target)); writeQuery(f, AUDIT_BLANK); load(); };
     $("#clear").onclick = () => { f = { ...AUDIT_BLANK }; writeQuery(f, AUDIT_BLANK); $("#af").reset(); $$reset(); load(); };

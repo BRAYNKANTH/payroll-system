@@ -273,10 +273,17 @@ async function poolOf(db, hub) {
 
 // One hub's stock in detail, for its coacher or stock keeper: per product what came from the office, what was given out, what the hub and the sellers
 // hold and what sold today; per seller what they hold; and the latest stock received and given out.
-async function stockOverview(db, { hub, date } = {}) {
+async function stockOverview(db, { hub, date, from, to } = {}) {
   const h = await db.get("SELECT code, name, status FROM hubs WHERE code = ?", String(hub || ""));
   if (!h) throw httpError(400, "Choose a hub");
-  const day = String(date || sales.today());
+  // The date range the page is filtered to. Without one it is the single day asked for (today by default), as before.
+  const asked = !!(from || to);
+  const dayRe = /^\d{4}-\d{2}-\d{2}$/;
+  const rFrom = String(from || to || date || sales.today()), rTo = String(to || from || date || sales.today());
+  if (!dayRe.test(rFrom) || !dayRe.test(rTo) || isNaN(Date.parse(rFrom)) || isNaN(Date.parse(rTo))) throw httpError(400, "from and to must be YYYY-MM-DD");
+  if (rFrom > rTo) throw httpError(400, "The start date is after the end date");
+  if ((Date.parse(rTo) - Date.parse(rFrom)) / 864e5 > 366) throw httpError(400, "Choose a range of at most a year");
+  const day = rTo;
   const products = await db.all("SELECT id, name, list_price, status FROM products ORDER BY lower(name)");
   const pname = new Map(products.map((p) => [key(p.id), p.name]));
   const pool = await poolOf(db, h.code);
@@ -290,12 +297,26 @@ async function stockOverview(db, { hub, date } = {}) {
   const soldMonth = await db.all("SELECT l.product_id, SUM(l.qty) AS n FROM sale_lines l JOIN staff s ON s.employee_id = l.employee_id WHERE s.hub = ? AND l.date >= ? AND l.date <= ? GROUP BY l.product_id", h.code, day.slice(0, 7) + "-01", day);
   const sold = new Map(soldAll.map((r) => [key(r.product_id), num(r.n)]));
   const month = new Map(soldMonth.map((r) => [key(r.product_id), num(r.n)]));
+  // What moved inside the chosen range, per product and per seller (the numbers that change with the date filter).
+  const inRange = (table) => db.all(`SELECT t.product_id, t.employee_id, SUM(t.qty) AS n FROM ${table} t JOIN staff s ON s.employee_id = t.employee_id
+    WHERE s.hub = ? AND t.date >= ? AND t.date <= ? GROUP BY t.product_id, t.employee_id`, h.code, rFrom, rTo);
+  const beforeRange = (table) => db.all(`SELECT t.employee_id, SUM(t.qty) AS n FROM ${table} t JOIN staff s ON s.employee_id = t.employee_id
+    WHERE s.hub = ? AND t.date < ? GROUP BY t.employee_id`, h.code, rFrom);
+  const [givenIn, soldIn, givenBefore, soldBefore] = await Promise.all([inRange("stock_issues"), inRange("sale_lines"), beforeRange("stock_issues"), beforeRange("sale_lines")]);
+  const receivedIn = await db.all("SELECT product_id, SUM(qty) AS n FROM hub_issues WHERE hub = ? AND date >= ? AND date <= ? GROUP BY product_id", h.code, rFrom, rTo);
+  const sumBy = (rows, k) => rows.reduce((m, r) => m.set(key(r[k]), (m.get(key(r[k])) || 0) + num(r.n)), new Map());
+  const pGiven = sumBy(givenIn, "product_id"), pSold = sumBy(soldIn, "product_id"), pReceived = sumBy(receivedIn, "product_id");
+  const eGiven = sumBy(givenIn, "employee_id"), eSold = sumBy(soldIn, "employee_id");
+  const eCarried = new Map();
+  for (const r of givenBefore) eCarried.set(key(r.employee_id), (eCarried.get(key(r.employee_id)) || 0) + num(r.n));
+  for (const r of soldBefore) eCarried.set(key(r.employee_id), (eCarried.get(key(r.employee_id)) || 0) - num(r.n));
   const rows = products.map((p) => {
     const x = pool.get(key(p.id)) || { received: 0, given: 0, left: 0 };
     let withSellers = 0, today = 0, givenToday = 0;
     for (const m of per.values()) { const s = m.get(key(p.id)); if (s) { withSellers += s.left; today += s.sold; givenToday += s.issued; } }
     return { product_id: Number(p.id), product: p.name, price: num(p.list_price), status: p.status, received: x.received, given: x.given, in_hub: x.left, with_sellers: withSellers,
-      given_today: givenToday, sold_today: today, sold_month: month.get(key(p.id)) || 0, sold_total: sold.get(key(p.id)) || 0 };
+      given_today: givenToday, sold_today: today, sold_month: month.get(key(p.id)) || 0, sold_total: sold.get(key(p.id)) || 0,
+      received_in: pReceived.get(key(p.id)) || 0, given_in: pGiven.get(key(p.id)) || 0, sold_in: pSold.get(key(p.id)) || 0 };
   }).filter((r) => r.received || r.given || r.with_sellers); // products with no stock movement here are left out, so the list stays short
   const sellers = people.map((p) => {
     const m = per.get(p.employee_id);
@@ -303,15 +324,20 @@ async function stockOverview(db, { hub, date } = {}) {
     const items = [];
     for (const [pid, s] of m) { carried += s.carried; givenToday += s.issued; soldToday += s.sold; left += s.left; if (s.left > 0) items.push({ product: pname.get(key(pid)), left: s.left }); }
     items.sort((a, b) => b.left - a.left);
-    return { employee_id: p.employee_id, name: p.name, staff_level: p.staff_level, team: teamOf(p, everyone), carried, given_today: givenToday, sold_today: soldToday, left, items };
+    return { employee_id: p.employee_id, name: p.name, staff_level: p.staff_level, team: teamOf(p, everyone), carried, given_today: givenToday, sold_today: soldToday, left, items,
+      carried_in: eCarried.get(key(p.employee_id)) || 0, given_in: eGiven.get(key(p.employee_id)) || 0, sold_in: eSold.get(key(p.employee_id)) || 0 };
   });
-  const received = await db.all("SELECT id, date, product_id, qty, note, created_by FROM hub_issues WHERE hub = ? ORDER BY date DESC, id DESC LIMIT 20", h.code);
-  const gave = ids.length ? await db.all(`SELECT i.id, i.date, i.employee_id, i.product_id, i.qty, i.created_by FROM stock_issues i WHERE i.employee_id = ANY(?::text[]) ORDER BY i.date DESC, i.id DESC LIMIT 20`, ids) : [];
+  // With a date range chosen, the lists show what happened in that range; otherwise the latest 20 as before.
+  const received = await db.all(`SELECT id, date, product_id, qty, note, created_by FROM hub_issues WHERE hub = ?${asked ? " AND date >= ? AND date <= ?" : ""} ORDER BY date DESC, id DESC LIMIT ${asked ? 200 : 20}`,
+    ...(asked ? [h.code, rFrom, rTo] : [h.code]));
+  const gave = ids.length ? await db.all(`SELECT i.id, i.date, i.employee_id, i.product_id, i.qty, i.created_by FROM stock_issues i WHERE i.employee_id = ANY(?::text[])${asked ? " AND i.date >= ? AND i.date <= ?" : ""} ORDER BY i.date DESC, i.id DESC LIMIT ${asked ? 200 : 20}`,
+    ...(asked ? [ids, rFrom, rTo] : [ids])) : [];
   const nameOf = new Map(people.map((p) => [p.employee_id, p.name]));
   const sum = (f) => rows.reduce((t, r) => t + f(r), 0);
   return {
-    hub: { code: h.code, name: h.name }, date: day,
-    totals: { received: sum((r) => r.received), given: sum((r) => r.given), in_hub: sum((r) => r.in_hub), with_sellers: sum((r) => r.with_sellers), sold_today: sum((r) => r.sold_today), given_today: sum((r) => r.given_today) },
+    hub: { code: h.code, name: h.name }, date: day, range: { from: rFrom, to: rTo },
+    totals: { received: sum((r) => r.received), given: sum((r) => r.given), in_hub: sum((r) => r.in_hub), with_sellers: sum((r) => r.with_sellers), sold_today: sum((r) => r.sold_today), given_today: sum((r) => r.given_today),
+      received_in: sum((r) => r.received_in), given_in: sum((r) => r.given_in), sold_in: sum((r) => r.sold_in) },
     products: rows, sellers,
     received: received.map((r) => ({ id: Number(r.id), date: r.date, product: pname.get(key(r.product_id)), qty: r.qty, note: r.note, by: r.created_by })),
     gave: gave.map((r) => ({ id: Number(r.id), date: r.date, seller: nameOf.get(r.employee_id) || r.employee_id, product: pname.get(key(r.product_id)), qty: r.qty, by: r.created_by })),

@@ -270,7 +270,7 @@ test("the stock overview adds up: received, given out, in the hub, with the sell
   await give(d, hubHead, { employee_id: "D3", lines: [{ product_id: shine, qty: 20 }] }, "H1");
   await pos.sell(d, seller, { product_id: shine, qty: 4 });
   const o = await pos.stockOverview(d, { hub: "H1" });
-  assert.deepEqual(o.totals, { received: 100, given: 50, in_hub: 50, with_sellers: 46, sold_today: 4, given_today: 50 });
+  assert.deepEqual(o.totals, { received: 100, given: 50, in_hub: 50, with_sellers: 46, sold_today: 4, given_today: 50, received_in: 100, given_in: 50, sold_in: 4 });
   const row = o.products.find((p) => p.product === "Shine");
   assert.equal(row.in_hub, 50); assert.equal(row.sold_today, 4); assert.equal(row.with_sellers, 46);
   assert.equal(o.sellers.find((s) => s.employee_id === "D1").left, 26);
@@ -278,4 +278,28 @@ test("the stock overview adds up: received, given out, in the hub, with the sell
   assert.equal(o.gave.length, 2);
   assert.ok(o.products.every((p) => p.product !== "Vim"), "a product with no stock movement is left out");
   await assert.rejects(() => pos.stockOverview(d, { hub: "NOPE" }), /Choose a hub/);
+});
+
+test("the stock overview follows a date range: period numbers change, what is held now does not", async () => {
+  const { d, shine, hubHead, seller } = await setup({ hubStock: false });
+  await pos.giveToHub(d, ADMIN, { hub: "H1", lines: [{ product_id: shine, qty: 100 }] });
+  await give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 30 }] }, "H1");
+  await pos.sell(d, seller, { product_id: shine, qty: 4 });
+  const t = sales.today(), y = sales.addDays(t, -1), last = sales.addDays(t, -10);
+  // a range that ends yesterday saw nothing move, yet the hub still holds what it holds
+  const before = await pos.stockOverview(d, { hub: "H1", from: last, to: y });
+  assert.deepEqual([before.totals.received_in, before.totals.given_in, before.totals.sold_in], [0, 0, 0]);
+  assert.deepEqual(before.range, { from: last, to: y });
+  assert.equal(before.received.length, 0, "the received list holds only the range");
+  assert.equal(before.totals.in_hub, 70, "in the hub now is not a period number");
+  // a range that includes today sees today's movement, and a seller's carried-over is what they held at the start of the range
+  const inc = await pos.stockOverview(d, { hub: "H1", from: y, to: t });
+  assert.deepEqual([inc.totals.received_in, inc.totals.given_in, inc.totals.sold_in], [100, 30, 4]);
+  const d1 = inc.sellers.find((s) => s.employee_id === "D1");
+  assert.deepEqual([d1.carried_in, d1.given_in, d1.sold_in, d1.left], [0, 30, 4, 26]);
+  assert.equal(inc.received.length, 1);
+  // bad ranges are refused
+  await assert.rejects(() => pos.stockOverview(d, { hub: "H1", from: t, to: y }), /start date is after/);
+  await assert.rejects(() => pos.stockOverview(d, { hub: "H1", from: "2026-13-01", to: t }), /YYYY-MM-DD/);
+  await assert.rejects(() => pos.stockOverview(d, { hub: "H1", from: "2020-01-01", to: t }), /at most a year/);
 });

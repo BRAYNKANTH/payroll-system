@@ -1927,6 +1927,26 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
 /* ---------- Hub overview: the chain and the member list ---------- */
 .hubpage .btn, .page-head .btn { min-height: 44px; }
+/* The date-range filter used on pages about days: presets, then From and To when Custom is chosen. */
+.range-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.range-bar .seg { flex-wrap: wrap; max-width: 100%; }
+.range-bar .seg button { min-height: 44px; flex: 0 0 auto; }
+@media (max-width: 760px) {
+  .range-bar { align-items: stretch; }
+  .range-bar .seg, .range-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .range-bar .seg button { padding-inline: 6px; }
+  .range-custom label { flex: 1 1 100%; justify-content: space-between; }
+  .range-custom .input { flex: 1 1 auto; max-width: 220px; }
+}
+.range-quick { flex-wrap: wrap; }
+.range-custom { display: flex; flex-wrap: wrap; gap: 10px; }
+.range-custom label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); }
+.range-custom .input { min-height: 44px; width: auto; }
+.range-text { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-3); }
+.range-text svg { width: 16px; height: 16px; }
+.grid.kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .grid.kpis.kpis-3 { grid-template-columns: 1fr; } }
+
 /* The org chart: a tree that grows downward. Each <li> is a person with their branch (<ul>) underneath; the lines are drawn with borders. */
 .org-tools { display: flex; gap: 8px; flex-wrap: wrap; }
 .org-tools .btn { min-width: 44px; justify-content: center; }
