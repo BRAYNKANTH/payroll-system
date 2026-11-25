@@ -27,17 +27,24 @@ export default {
     const total = (id) => (sales[id]?.business || 0) + (kids[id] || []).reduce((t, c) => t + total(c.employee_id), 0);
     const count = (id) => (kids[id] || []).reduce((t, c) => t + 1 + count(c.employee_id), 0);
 
-    const node = (s, depth) => {
-      const n = count(s.employee_id), own = sales[s.employee_id]?.business || 0;
-      return html`<li class="cn-item">
-        <a href="/employees/${s.employee_id}" data-link class="cn">
-          <span class="avatar cn-av" aria-hidden="true">${initials(s.name)}</span>
-          <span class="cn-who"><b>${s.name}</b> <span class="faint">${s.employee_id}</span><span class="cn-sub">${levelLabel(s.staff_level)}${n ? ` · ${n} below` : ""}</span></span>
-          <span class="cn-sales"><b class="num">${compact(own)}</b><span>${n ? `team ${compact(total(s.employee_id))}` : "own sales"}</span></span>
+    // The org chart: each person is a card (profile circle, name, position, sales); the people who report to them hang below on branches.
+    // Click a card to open that person. The small button under a card folds or opens its branch.
+    const levelKey = (s) => s.staff_level || (s.role === "manager" ? "manager" : "distributor");
+    const node = (s) => {
+      const direct = kids[s.employee_id] || [], n = count(s.employee_id), own = sales[s.employee_id]?.business || 0;
+      return html`<li class="org-item" data-id="${s.employee_id}">
+        <a href="/employees/${encodeURIComponent(s.employee_id)}" data-link class="org-card lv-${levelKey(s)}" aria-label="${s.name}, ${levelLabel(s.staff_level)}. Open record">
+          <span class="avatar org-av" aria-hidden="true">${initials(s.name)}</span>
+          <b class="org-name">${s.name}</b>
+          <span class="org-id">${s.employee_id}</span>
+          <span class="org-role">${levelLabel(s.staff_level)}</span>
+          <span class="org-sales"><b class="num">${compact(own)}</b> own${n ? html` · <b class="num">${compact(total(s.employee_id))}</b> team` : ""}</span>
         </a>
-        ${(kids[s.employee_id] || []).length ? html`<ul class="cn-kids">${(kids[s.employee_id] || []).map((c) => node(c, depth + 1))}</ul>` : ""}
+        ${direct.length ? html`<button type="button" class="org-toggle" aria-expanded="true" aria-label="Show or hide the ${n} below ${s.name}"><span class="org-toggle-dot"><span class="org-chev" aria-hidden="true">▾</span> ${direct.length}</span></button>
+          <ul class="org-kids">${direct.map((c) => node(c))}</ul>` : ""}
       </li>`;
     };
+    const legend = [...new Set(active.map(levelKey))].sort((a, b) => levelRank(b) - levelRank(a));
     const tops = kids[""] || [];
 
     el.innerHTML = html`
@@ -47,9 +54,31 @@ export default {
           ${can(["manage_staff", "manage_team"]) ? html`<a class="btn primary" href="/hubs/${encodeURIComponent(code)}/people" data-link>${icon("users")} People in this hub</a>` : ""}
         </div>
       </div>
-      <div class="card mb-4 hubpage"><div class="card-head"><div><h2>Reporting chain</h2><div class="sub">Top of the chain first. Tap anyone to open their record.</div></div></div>
-        <div class="card-body">${tops.length ? html`<ul class="cn-root">${tops.map((s) => node(s, 0))}</ul>` : emptyState("No members yet", "Add employees to this hub and set who each reports to.", "users")}</div></div>
+      <div class="card mb-4 hubpage"><div class="card-head"><div><h2>Reporting chain</h2><div class="sub">Top of the chain first, each person under the one they report to. Tap anyone to open their record.</div></div>
+        ${tops.length ? html`<div class="org-tools" role="group" aria-label="Chart controls">
+          <button type="button" class="btn" id="org-out" aria-label="Zoom out">−</button><button type="button" class="btn" id="org-in" aria-label="Zoom in">+</button>
+          <button type="button" class="btn" id="org-all">Open all</button><button type="button" class="btn" id="org-none">Fold all</button></div>` : ""}</div>
+        <div class="card-body">${tops.length ? html`
+          <div class="org-legend">${legend.map((l) => html`<span class="org-key lv-${l}"><i class="org-dot"></i>${levelLabel(l)}</span>`)}</div>
+          <div class="org-scroll" id="org-scroll" tabindex="0" role="region" aria-label="Reporting chain chart, scroll sideways to see everyone"><div class="org" id="org"><ul class="org-root">${tops.map((s) => node(s))}</ul></div></div>`
+          : emptyState("No members yet", "Add employees to this hub and set who each reports to.", "users")}</div></div>
       <div class="card hubpage"><div class="card-head"><div><h2>Members</h2><div class="sub">${members.length} in total, grouped by position</div></div></div><div class="card-body flush" id="mem"></div></div>`.toString();
+
+    // Chart controls: fold or open a branch, fold/open everything, zoom.
+    const org = $("#org", el);
+    if (org) {
+      const fold = (li, closed) => { li.classList.toggle("folded", closed); const b = li.querySelector(":scope > .org-toggle"); if (b) { b.setAttribute("aria-expanded", String(!closed)); b.querySelector(".org-chev").textContent = closed ? "▸" : "▾"; } };
+      org.addEventListener("click", (e) => { const b = e.target.closest(".org-toggle"); if (b) fold(b.parentElement, !b.parentElement.classList.contains("folded")); });
+      $("#org-all", el).onclick = () => org.querySelectorAll(".org-item").forEach((li) => fold(li, false));
+      $("#org-none", el).onclick = () => org.querySelectorAll(".org-item").forEach((li) => { if (!tops.some((t) => t.employee_id === li.dataset.id)) fold(li, true); });
+      let z = 1;
+      const zoom = (d) => { z = Math.min(1.4, Math.max(0.5, +(z + d).toFixed(2))); org.style.zoom = z; };
+      $("#org-in", el).onclick = () => zoom(0.1);
+      $("#org-out", el).onclick = () => zoom(-0.1);
+      // Start centred on the top of the chain when the chart is wider than the screen.
+      const sc = $("#org-scroll", el);
+      sc.scrollLeft = Math.max(0, (sc.scrollWidth - sc.clientWidth) / 2);
+    }
 
     // Members are grouped by position, in chain order: coacher first, then promoting manager, manager, supervisor, distributor.
     const lvl = (s) => LEVELS.findIndex(([v]) => v === (s.staff_level || (s.role === "manager" ? "manager" : "distributor")));

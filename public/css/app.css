@@ -1927,21 +1927,56 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
 /* ---------- Hub overview: the chain and the member list ---------- */
 .hubpage .btn, .page-head .btn { min-height: 44px; }
-.cn-root, .cn-kids { list-style: none; margin: 0; padding: 0; }
-.cn-kids { margin-left: 20px; padding-left: 14px; border-left: 2px solid var(--border); }
-.cn-item { margin: 8px 0; }
-.cn { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); text-decoration: none; color: inherit; }
-.cn:hover { border-color: var(--primary); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.08)); }
-.cn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.cn-av { width: 36px; height: 36px; font-size: 13px; flex: none; }
-.cn-who { flex: 1; min-width: 0; font-size: 15px; }
-.cn-sub { display: block; font-size: 14px; color: var(--text-3); }
-.cn-sales { text-align: right; display: flex; flex-direction: column; font-size: 14px; color: var(--text-3); }
-.cn-sales b { font-size: 17px; color: var(--text); font-variant-numeric: tabular-nums; }
+/* The org chart: a tree that grows downward. Each <li> is a person with their branch (<ul>) underneath; the lines are drawn with borders. */
+.org-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.org-tools .btn { min-width: 44px; justify-content: center; }
+.org-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; font-size: 14px; color: var(--text-3); }
+.org-key { display: inline-flex; align-items: center; gap: 6px; }
+.org-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--lv, var(--primary)); display: inline-block; }
+.org-scroll { overflow-x: auto; overflow-y: hidden; padding: 4px 4px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); -webkit-overflow-scrolling: touch; }
+.org-scroll:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.org { width: max-content; min-width: 100%; padding: 16px 12px; --line: color-mix(in srgb, var(--text-3) 55%, transparent); }
+.org ul { list-style: none; margin: 0; padding: 0; display: flex; justify-content: center; position: relative; }
+.org-root { align-items: flex-start; gap: 24px; }
+.org-kids { padding-top: 26px; }
+.org-item { position: relative; display: flex; flex-direction: column; align-items: center; padding: 26px 8px 0; }
+.org-root > .org-item { padding: 0; }
+/* the line down from a person to their branch */
+.org-kids::before { content: ""; position: absolute; top: 0; left: 50%; height: 26px; border-left: 2px solid var(--line); }
+/* the bar across the children and the short drop to each child */
+.org-kids > .org-item::before, .org-kids > .org-item::after { content: ""; position: absolute; top: 0; width: 50%; height: 26px; border-top: 2px solid var(--line); }
+.org-kids > .org-item::before { right: 50%; }
+.org-kids > .org-item::after { left: 50%; border-left: 2px solid var(--line); }
+.org-kids > .org-item:only-child { padding-top: 26px; }
+.org-kids > .org-item:only-child::before { display: none; }
+.org-kids > .org-item:only-child::after { border-top: 0; }
+.org-kids > .org-item:first-child::before, .org-kids > .org-item:last-child::after { border-top-color: transparent; }
+.org-kids > .org-item:last-child::before { border-right: 2px solid var(--line); border-radius: 0 10px 0 0; }
+.org-kids > .org-item:first-child::after { border-radius: 10px 0 0 0; }
+.org-kids > .org-item:only-child::after { border-radius: 0; }
+.org-item.folded > .org-kids { display: none; }
+.org-card { width: 172px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 10px 12px; text-align: center; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--lv, var(--primary)); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0, 0, 0, .06); transition: box-shadow .15s, transform .15s, border-color .15s; }
+.org-card:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, .14); transform: translateY(-2px); border-color: var(--lv, var(--primary)); }
+.org-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.org-av { width: 56px; height: 56px; font-size: 20px; background: var(--lv, var(--primary)); box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--lv, var(--primary)); margin-bottom: 8px; }
+.org-name { font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+.org-id { font-size: 14px; color: var(--text-3); }
+.org-role { font-size: 14px; font-weight: 600; color: var(--lv, var(--primary)); }
+.org-sales { margin-top: 4px; font-size: 14px; color: var(--text-3); }
+.org-sales b { color: var(--text); font-variant-numeric: tabular-nums; }
+.org-toggle { min-width: 44px; min-height: 44px; margin-top: -2px; margin-bottom: -6px; padding: 0; background: none; border: 0; cursor: pointer; display: grid; place-items: center; position: relative; z-index: 2; }
+.org-toggle-dot { display: inline-flex; align-items: center; gap: 3px; padding: 2px 9px; font-size: 14px; font-weight: 600; color: var(--text); background: var(--surface); border: 2px solid var(--line); border-radius: 999px; }
+.org-toggle:hover .org-toggle-dot { border-color: var(--primary); color: var(--primary); }
+.org-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 0; border-radius: 999px; }
+.org-item.folded > .org-toggle { margin-bottom: 0; }
+.lv-coacher { --lv: #7c3aed; } .lv-promoting_manager { --lv: #4f46e5; } .lv-manager { --lv: #0f766e; } .lv-supervisor { --lv: #b45309; } .lv-distributor { --lv: #0071e3; }
+:root[data-theme="dark"] .lv-coacher { --lv: #a78bfa; } :root[data-theme="dark"] .lv-promoting_manager { --lv: #818cf8; } :root[data-theme="dark"] .lv-manager { --lv: #2dd4bf; } :root[data-theme="dark"] .lv-supervisor { --lv: #fbbf24; } :root[data-theme="dark"] .lv-distributor { --lv: #409cff; }
+:root[data-theme="dark"] .org-av { color: #0b1526; }
+@media (max-width: 860px) { .org-card { width: 150px; } .org-item { padding-inline: 5px; } }
+@media (prefers-reduced-motion: reduce) { .org-card { transition: none; } .org-card:hover { transform: none; } }
 .hubpage .table-wrap { max-height: 70vh; overflow: auto; }
 .hubpage .table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-2, var(--surface)); }
 .hubpage .table td .btn.sm, .hubpage .table td a.btn { min-height: 44px; }
-@media (max-width: 860px) { .cn-kids { margin-left: 10px; padding-left: 8px; } .cn { padding: 10px; } }
 
 /* ---------- Employees: touch-size filters and row actions, readable small text ---------- */
 .emp-page .btn, .emp-page .btn.sm, .emp-page .input.sm, .emp-page .seg button, .emp-page .colpick summary { min-height: 44px; }
