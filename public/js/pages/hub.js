@@ -56,7 +56,8 @@ export default {
       </div>
       <div class="card mb-4 hubpage"><div class="card-head"><div><h2>Reporting chain</h2><div class="sub">Top of the chain first, each person under the one they report to. Tap anyone to open their record.</div></div>
         ${tops.length ? html`<div class="org-tools" role="group" aria-label="Chart controls">
-          <button type="button" class="btn" id="org-out" aria-label="Zoom out">−</button><button type="button" class="btn" id="org-in" aria-label="Zoom in">+</button>
+          <button type="button" class="btn org-zoom" id="org-out" aria-label="Zoom out">−</button><button type="button" class="btn org-zoom" id="org-in" aria-label="Zoom in">+</button>
+          <button type="button" class="btn org-zoom" id="org-fit">Fit</button>
           <button type="button" class="btn" id="org-all">Open all</button><button type="button" class="btn" id="org-none">Fold all</button></div>` : ""}</div>
         <div class="card-body">${tops.length ? html`
           <div class="org-legend">${legend.map((l) => html`<span class="org-key lv-${l}"><i class="org-dot"></i>${levelLabel(l)}</span>`)}</div>
@@ -71,13 +72,25 @@ export default {
       org.addEventListener("click", (e) => { const b = e.target.closest(".org-toggle"); if (b) fold(b.parentElement, !b.parentElement.classList.contains("folded")); });
       $("#org-all", el).onclick = () => org.querySelectorAll(".org-item").forEach((li) => fold(li, false));
       $("#org-none", el).onclick = () => org.querySelectorAll(".org-item").forEach((li) => { if (!tops.some((t) => t.employee_id === li.dataset.id)) fold(li, true); });
-      let z = 1;
-      const zoom = (d) => { z = Math.min(1.4, Math.max(0.5, +(z + d).toFixed(2))); org.style.zoom = z; };
-      $("#org-in", el).onclick = () => zoom(0.1);
-      $("#org-out", el).onclick = () => zoom(-0.1);
-      // Start centred on the top of the chain when the chart is wider than the screen.
       const sc = $("#org-scroll", el);
-      sc.scrollLeft = Math.max(0, (sc.scrollWidth - sc.clientWidth) / 2);
+      const narrow = window.matchMedia("(max-width: 900px)"); // a phone or tablet: the chart grows downward (see the CSS), so it never needs to scroll sideways
+      let z = 1, touched = false;
+      const setZoom = (v) => { z = Math.min(1.4, Math.max(0.3, +v.toFixed(2))); org.style.zoom = narrow.matches ? "" : z; };
+      // Fit the whole chart into the width of the screen (never bigger than life size, never so small it cannot be read).
+      const fit = () => {
+        if (narrow.matches) { org.style.zoom = ""; sc.scrollLeft = 0; return; }
+        org.style.zoom = ""; org.style.width = "max-content";
+        const natural = org.scrollWidth, room = sc.clientWidth - 8;
+        setZoom(Math.min(1, Math.max(0.5, room / natural)));
+        sc.scrollLeft = Math.max(0, (sc.scrollWidth - sc.clientWidth) / 2);
+      };
+      $("#org-in", el).onclick = () => { touched = true; setZoom(z + 0.1); };
+      $("#org-out", el).onclick = () => { touched = true; setZoom(z - 0.1); };
+      $("#org-fit", el).onclick = () => { touched = false; fit(); };
+      fit();
+      // Keep it fitted when the window is resized or the phone is turned (unless the person zoomed by hand).
+      let t; const refit = () => { clearTimeout(t); t = setTimeout(() => { if (!document.body.contains(org)) { window.removeEventListener("resize", refit); return; } if (!touched) fit(); }, 150); };
+      window.addEventListener("resize", refit);
     }
 
     // Members are grouped by position, in chain order: coacher first, then promoting manager, manager, supervisor, distributor.

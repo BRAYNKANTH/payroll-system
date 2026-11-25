@@ -1939,7 +1939,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .org ul { list-style: none; margin: 0; padding: 0; display: flex; justify-content: center; position: relative; }
 .org-root { align-items: flex-start; gap: 24px; }
 .org-kids { padding-top: 26px; }
-.org-item { position: relative; display: flex; flex-direction: column; align-items: center; padding: 26px 8px 0; }
+.org-item { position: relative; display: flex; flex-direction: column; align-items: center; padding: 26px 5px 0; }
 .org-root > .org-item { padding: 0; }
 /* the line down from a person to their branch */
 .org-kids::before { content: ""; position: absolute; top: 0; left: 50%; height: 26px; border-left: 2px solid var(--line); }
@@ -1955,10 +1955,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .org-kids > .org-item:first-child::after { border-radius: 10px 0 0 0; }
 .org-kids > .org-item:only-child::after { border-radius: 0; }
 .org-item.folded > .org-kids { display: none; }
-.org-card { width: 172px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 10px 12px; text-align: center; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--lv, var(--primary)); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0, 0, 0, .06); transition: box-shadow .15s, transform .15s, border-color .15s; }
+.org-card { width: 136px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px 10px; text-align: center; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--lv, var(--primary)); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0, 0, 0, .06); transition: box-shadow .15s, transform .15s, border-color .15s; }
 .org-card:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, .14); transform: translateY(-2px); border-color: var(--lv, var(--primary)); }
 .org-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
-.org-av { width: 56px; height: 56px; font-size: 20px; background: var(--lv, var(--primary)); box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--lv, var(--primary)); margin-bottom: 8px; }
+.org-av { width: 48px; height: 48px; font-size: 17px; background: var(--lv, var(--primary)); box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--lv, var(--primary)); margin-bottom: 8px; }
 .org-name { font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
 .org-id { font-size: 14px; color: var(--text-3); }
 .org-role { font-size: 14px; font-weight: 600; color: var(--lv, var(--primary)); }
@@ -1972,7 +1972,31 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .lv-coacher { --lv: #7c3aed; } .lv-promoting_manager { --lv: #4f46e5; } .lv-manager { --lv: #0f766e; } .lv-supervisor { --lv: #b45309; } .lv-distributor { --lv: #0071e3; }
 :root[data-theme="dark"] .lv-coacher { --lv: #a78bfa; } :root[data-theme="dark"] .lv-promoting_manager { --lv: #818cf8; } :root[data-theme="dark"] .lv-manager { --lv: #2dd4bf; } :root[data-theme="dark"] .lv-supervisor { --lv: #fbbf24; } :root[data-theme="dark"] .lv-distributor { --lv: #409cff; }
 :root[data-theme="dark"] .org-av { color: #0b1526; }
-@media (max-width: 860px) { .org-card { width: 150px; } .org-item { padding-inline: 5px; } }
+/* Phone: the tree grows downward instead of sideways. Each person is a full-width card; the people below them are indented under a line. */
+@media (max-width: 900px) {
+  .org-zoom { display: none; }
+  .org-scroll { overflow: visible; border: 0; background: none; padding: 0; }
+  .org { width: auto !important; min-width: 0; padding: 0; }
+  .org ul, .org-root { display: block; }
+  .org-item { display: block; padding: 10px 0 0; }
+  .org-root > .org-item { padding: 0; }
+  .org .org-kids { padding: 0 0 0 10px; margin: 0 0 0 8px; }
+  .org .org-kids::before { display: none; }
+  .org .org-kids > .org-item { padding-top: 10px; }
+  /* the vertical line down the left of the branch, and the elbow into each card */
+  .org .org-kids > .org-item::before { display: block; content: ""; position: absolute; top: 0; bottom: 0; left: -10px; right: auto; width: 0; height: auto; border: 0; border-left: 2px solid var(--line); border-radius: 0; }
+  .org .org-kids > .org-item:last-child::before { bottom: auto; height: 44px; border-right: 0; }
+  .org .org-kids > .org-item::after { display: block; content: ""; position: absolute; top: 44px; left: -10px; right: auto; width: 10px; height: 0; border: 0; border-top: 2px solid var(--line); border-radius: 0; }
+  .org-card { width: 100%; display: grid; grid-template-columns: 44px 1fr; grid-template-areas: "av name" "av role" "av sales"; column-gap: 12px; row-gap: 0; align-items: center; text-align: left; justify-items: start; padding: 10px 52px 10px 12px; }
+  .org-av { grid-area: av; margin: 0; align-self: center; width: 44px; height: 44px; font-size: 16px; }
+  .org-name { grid-area: name; }
+  .org-role { grid-area: role; }
+  .org-sales { grid-area: sales; margin: 0; }
+  .org-id { display: none; }
+  .org-toggle { position: absolute; right: 0; top: 14px; margin: 0; z-index: 3; }
+  .org-root > .org-item > .org-toggle { top: 4px; }
+  .org-item.folded > .org-toggle { margin: 0; }
+}
 @media (prefers-reduced-motion: reduce) { .org-card { transition: none; } .org-card:hover { transform: none; } }
 .hubpage .table-wrap { max-height: 70vh; overflow: auto; }
 .hubpage .table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-2, var(--surface)); }
