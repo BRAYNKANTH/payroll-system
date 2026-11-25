@@ -67,7 +67,16 @@ const readBase64 = (file) => new Promise((ok, fail) => {
   r.readAsDataURL(file);
 });
 
+// "pct_business:1;cap:5000" -> "1% of total business (up to Rs 5,000)"
+function securityText(rule) {
+  const m = /^(fixed|pct_gross|pct_basic|pct_business):([\d.]+)(?:;cap:([\d.]+))?$/.exec(String(rule || "").trim());
+  if (!m) return "None";
+  const what = m[1] === "fixed" ? `Rs ${money(Number(m[2]))} a month` : `${Number(m[2])}% of ${{ pct_gross: "gross pay", pct_basic: "basic pay", pct_business: "total business" }[m[1]]}`;
+  return m[3] ? `${what} (up to Rs ${money(Number(m[3]))})` : what;
+}
+
 export default {
+  filters: "month", // the hub choice means nothing on one person's page; the month still sets the PDF and figures
   title: "Employee",
   async render(ctx) {
     const { el, params } = ctx;
@@ -85,14 +94,14 @@ export default {
             <h1>${s.name}</h1>
             <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
           </div>
-          <div class="row" style="gap:28px" ${can("view_pay") ? "" : "hidden"}>
+          <div class="row ph-stats" style="gap:28px" ${can("view_pay") ? "" : "hidden"}>
             <div><div class="faint text-sm">Latest net pay</div><div class="num stat-lg ${last?.net_pay < 0 ? "neg" : ""}">${last ? `Rs ${money(last.net_pay)}` : "—"}</div><div class="faint text-sm">${last ? monthName(last.period) : ""}</div></div>
             <div><div class="faint text-sm">Balance carried</div><div class="num stat-lg ${last?.closing_balance < 0 ? "neg" : ""}">${last ? `Rs ${money(last.closing_balance)}` : "—"}</div></div>
             ${s.role === "guy" ? html`<div><div class="faint text-sm">Security held</div><div class="num stat-lg">Rs ${money(p.security_held ?? 0)}</div></div>` : ""}
           </div>
-          <div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener">${icon("file")} PDF report (${monthName(state.period)})</a></div>
-          ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<div class="row" style="gap:8px"><button class="btn" id="edit">${icon("edit")} Edit</button>
-            ${s.status === "active" ? html`<button class="btn" id="leave">${icon("logout")} Mark as left</button>` : html`<button class="btn primary" id="rehire">${icon("refresh")} Re-hire</button>`}</div>` : ""}
+          <div class="row ph-actions" style="gap:8px;flex-wrap:wrap"><div class="row ph-pdf" style="gap:8px;flex-wrap:wrap"><a class="btn" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${monthName(state.period)}">${icon("file")} <span class="ph-long">PDF report (${monthName(state.period)})</span><span class="ph-short">PDF</span></a></div>
+          ${(can("manage_staff") || can("manage_team")) && !(state.user.hub && s.role === "manager") ? html`<div class="row ph-acts" style="gap:8px"><button class="btn" id="edit">${icon("edit")} Edit</button>
+            ${s.status === "active" ? html`<button class="btn" id="leave">${icon("logout")} Mark as left</button>` : html`<button class="btn primary" id="rehire">${icon("refresh")} Re-hire</button>`}</div>` : ""}</div>
         </div>
       </div>
 
@@ -118,7 +127,7 @@ export default {
             <dt>Food</dt><dd>${s.food_per_day ? html`Rs ${money(s.food_per_day)} / day${s.food_min_days ? ` once ${s.food_min_days}+ days worked` : ""}` : "None"}</dd>`
             : html`<dt>Basic pay</dt><dd>Rs ${money(s.basic_pay)} / month</dd><dt>Target</dt><dd>Rs ${money(s.target)} / month</dd>
             <dt>Commission</dt><dd>${pct(s.commission_rate, 2)} of business over target</dd>`}
-            <dt>Security rule</dt><dd class="mono">${s.security_deduction_rule}</dd></dl></div></div>`
+            <dt>Security deposit</dt><dd>${securityText(s.security_deduction_rule)}</dd></dl></div></div>`
             : html`<div class="card"><div class="card-head"><h2>How manager pay works</h2></div><div class="card-body muted">Each week: business × profit % − rent − hub fee − security − personal draw. Each month the company return and the guys' net salaries are charged, and the result is carried as a running balance.
               <dl class="kv mt-4"><dt>Basic salary</dt><dd>${s.basic_pay ? html`Rs ${money(s.basic_pay)} / month` : "None"}</dd></dl></div></div>`}
           ${can("view_pay") ? html`<div class="card"><div class="card-head"><h2>Bank details</h2></div><div class="card-body"><dl class="kv">
@@ -130,6 +139,7 @@ export default {
         <div class="card"><div class="card-body flush" id="hist"></div></div>` : html`<div class="card">${emptyState("No pay history yet", "Pay appears here after the first month is calculated.", "file")}</div>`,
       team: () => html`<div class="card"><div class="card-body flush">${dataTable({
         rows: p.team, empty: "No guys report to this manager", emptyHint: "People appear here when they are set to report to this manager.", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),
+        card: (g) => html`<span class="mc-main"><b>${g.name}</b><span class="mc-sub">${[g.employee_id, g.staff_level ? levelLabel(g.staff_level) : "", can("view_pay") && g.target != null ? `Target ${money(g.target)}` : ""].filter(Boolean).join(" · ")}</span></span><span class="mc-end">${badge(g.status)}</span>`,
         cols: [{ key: "name", label: "Name", render: (g) => html`<b>${g.name}</b> <span class="faint">${g.employee_id}</span>` },
           ...(can("view_pay") ? [{ key: "basic_pay", label: "Basic", align: "r", render: (g) => money(g.basic_pay) }] : []),
           { key: "target", label: "Target", align: "r", render: (g) => money(g.target) }, { key: "status", label: "Status", render: (g) => badge(g.status) }],

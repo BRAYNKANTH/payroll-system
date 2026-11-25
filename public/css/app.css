@@ -2763,3 +2763,65 @@ html.fx #view.page-in .hub-tile.ht .ht-badge { animation: pop-badge .6s cubic-be
   .role-kpis .kpi { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; }
   .role-kpis .kpi .value { font-size: 24px; margin: 0; }
 }
+
+/* Hubs page: every hub is listed, so the hub choice is not shown (month only) */
+body[data-filters="month"] #hub-filter { display: none !important; }
+.hub-kpis .v-short { display: none; }
+
+/* Hubs page on a phone: a short summary row, then one compact card per hub */
+@media (max-width: 760px) {
+  .hub-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .hub-kpis .kpi { padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 6px; }
+  .hub-kpis .kpi .foot { display: none; }
+  .hub-kpis .kpi .value { font-size: 22px; margin: 0; }
+  .hub-kpis .v-full { display: none; }
+  .hub-kpis .v-short { display: inline; }
+  .hubs-page > div > p { display: none; }
+  #cards.grid { gap: 10px; }
+  .hubc-head { padding: 14px 16px 6px; gap: 10px; }
+  .hubc-ic { width: 38px; height: 38px; }
+  .hubc-title h2 { font-size: 17px; }
+  .hubc-addr { display: none; }
+  .hubc-body { padding: 2px 16px 6px; }
+  .hubc-levels { display: none; }
+  .hubc-people { margin-bottom: 8px; }
+  .hubc-nums { margin: 0 0 10px; padding: 8px 0; gap: 8px; }
+  .hubc-nums dd { font-size: 16px; }
+  .hubc-month { display: none; }
+  .hubc-foot { padding: 8px 16px 14px; gap: 8px; flex-wrap: nowrap; }
+  .hubc-foot .btn { min-height: 44px; }
+  .hubc-foot .btn:not(.primary) { flex: 0 0 auto; }
+  .hubc-edit-lbl { display: none; }
+}
+.hub-kpis .kpi .value { white-space: nowrap; }
+
+/* Employee profile on a phone: name and key figures first, actions in one row */
+.ph-short { display: none; }
+@media (max-width: 760px) {
+  .emp-profile .profile-head { display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; padding: 14px; align-items: center; }
+  .emp-profile .profile-head > div:nth-child(2) { min-width: 0 !important; }
+  .emp-profile .profile-head .avatar.lg { width: 52px; height: 52px; font-size: 18px; }
+  .emp-profile .profile-head h1 { font-size: 20px; }
+  .ph-stats { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px !important; padding: 10px 0; border-block: 1px solid var(--border); }
+  .ph-stats[hidden] { display: none !important; }
+  .ph-stats .stat-lg { font-size: 15px; white-space: nowrap; }
+  .ph-stats .text-sm { font-size: 12px; }
+  .ph-pdf, .ph-acts { grid-column: 1 / -1; }
+  .emp-profile .profile-head { grid-auto-flow: row; }
+  .ph-pdf { grid-column: 1; grid-row: auto; }
+  .ph-long { display: none; }
+  .ph-short { display: inline; }
+}
+@media (max-width: 760px) {
+  .emp-profile .ph-actions { grid-column: 1 / -1; display: flex; flex-wrap: nowrap !important; gap: 8px; }
+  .emp-profile .ph-actions > div { display: contents; }
+  .emp-profile .ph-actions .btn { flex: 1 1 0; justify-content: center; min-height: 44px; padding-inline: 8px; }
+  .emp-profile .ph-pdf, .emp-profile .ph-acts { grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 760px) { .ph-stats .stat-lg + .text-sm { display: none; } }
+@media (max-width: 760px) {
+  .emp-profile .card-head { padding: 12px 16px; }
+  .emp-profile .card-body:not(.flush) { padding: 12px 16px 14px; }
+  .emp-profile .kv { gap: 6px 12px; grid-template-columns: 104px minmax(0, 1fr); }
+  .emp-profile .grid.halves { gap: 10px; }
+}

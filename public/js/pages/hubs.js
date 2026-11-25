@@ -4,6 +4,7 @@ import { $, html, icon, badge, toast, busy, drawer, emptyState, compact, money, 
 import { loadHubData, hubInfo, plural } from "../hubinfo.js";
 
 export default {
+  filters: "month", // all hubs are listed here, so the hub choice is not shown; the month still is
   title: "Hubs",
   async render(ctx) {
     const { el } = ctx;
@@ -27,10 +28,10 @@ export default {
         <div><h1>Hubs</h1><p>The places where distributors, supervisors and managers work. Figures are for ${monthLabel}.</p></div>
         <div class="actions">${can("manage_hubs") ? html`<button class="btn primary" id="add">${icon("plus")} Add hub</button>` : ""}</div>
       </div>
-      ${hubs.length ? html`<div class="grid kpis mb-4">
+      ${hubs.length ? html`<div class="grid kpis hub-kpis mb-4">
         <div class="card kpi"><div class="label">Hubs</div><div class="value">${hubs.filter((h) => h.status === "active").length}</div><div class="foot">${hubs.length === 1 ? "1 hub in total" : `${hubs.length} hubs in total`}</div></div>
         <div class="card kpi"><div class="label">People</div><div class="value">${totals.people}</div><div class="foot">Active across all hubs</div></div>
-        <div class="card kpi"><div class="label">Sales this month</div><div class="value"><small>Rs</small>${money(totals.sales)}</div><div class="foot">From the daily sheets</div></div>
+        <div class="card kpi"><div class="label">Sales this month</div><div class="value"><span class="v-full"><small>Rs</small>${money(totals.sales)}</span><span class="v-short">${compact(totals.sales)}</span></div><div class="foot">From the daily sheets</div></div>
         <div class="card kpi"><div class="label">Needs attention</div><div class="value ${totals.attention ? "neg" : ""}">${totals.attention}</div><div class="foot">${totals.attention ? `Items in ${plural(totals.hubsWithIssues, "hub", "hubs")}` : "All hubs are clear"}</div></div>
       </div>` : ""}
       <div class="grid three" id="cards"></div>`;
@@ -40,7 +41,7 @@ export default {
       const st = stats[h.code] || {};
       return html`<article class="card hubc" aria-label="${h.name}">
         <header class="hubc-head"><span class="icon blue hubc-ic" aria-hidden="true">${icon("store")}</span>
-          <div class="hubc-title"><h2><a href="/hubs/${encodeURIComponent(h.code)}" data-link class="hub-link">${h.name}</a></h2><div class="sub">${h.code}${h.location ? ` · ${h.location}` : ""}${h.phone ? ` · ${h.phone}` : ""}</div></div>${badge(h.status)}</header>
+          <div class="hubc-title"><h2><a href="/hubs/${encodeURIComponent(h.code)}" data-link class="hub-link">${h.name}</a></h2><div class="sub">${h.code}<span class="hubc-addr">${h.location ? ` · ${h.location}` : ""}${h.phone ? ` · ${h.phone}` : ""}</span></div></div>${h.status !== "active" ? badge(h.status) : ""}</header>
         <div class="hubc-body">
           <div class="hubc-people"><b>${plural(x.active.length, "person", "people")}</b><span class="muted">${x.head ? `Coacher: ${x.head.name}` : "No coacher yet"}</span></div>
           <div class="muted hubc-levels">${x.levels.map(([v, n]) => `${n} ${levelLabel(v, n).toLowerCase()}`).join(" · ") || "Nobody yet"}${x.all.length > x.active.length ? ` · ${x.all.length - x.active.length} inactive` : ""}</div>
@@ -53,7 +54,7 @@ export default {
             : html`<span role="listitem" class="badge green">All clear</span>`}</div>
           ${x.joined || x.left ? html`<div class="muted hubc-month">This month: ${[x.joined ? `${x.joined} joined` : "", x.left ? `${x.left} left` : ""].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
-        <footer class="hubc-foot"><a class="btn primary" href="/hubs/${encodeURIComponent(h.code)}" data-link>${icon("users")} Open hub</a>${can("manage_hubs") ? html`<button class="btn" data-edit="${h.code}" aria-label="Edit ${h.name}">${icon("edit")} Edit</button>` : ""}</footer>
+        <footer class="hubc-foot"><a class="btn primary" href="/hubs/${encodeURIComponent(h.code)}" data-link>${icon("users")} Open hub</a>${can("manage_hubs") ? html`<button class="btn" data-edit="${h.code}" aria-label="Edit ${h.name}">${icon("edit")} <span class="hubc-edit-lbl">Edit</span></button>` : ""}</footer>
       </article>`;
     }).join("") : html`<div class="card hubs-empty">${emptyState("No hubs yet", "Create your first hub to start adding employees.", "store")}</div>`.toString();
 

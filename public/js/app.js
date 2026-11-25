@@ -567,7 +567,8 @@ export async function render({ moveFocus = false, restoreY = 0 } = {}) {
     document.title = `${ws ? `${ws.subLabel} · ${state.hubs.find((h) => h.code === ws.hub)?.name || ws.hub}` : mod.title} · ${state.settings.company_name || "Payroll"}`;
     view.dataset.page = page; // lets the styles treat every page the same way
     document.body.dataset.page = page;
-    document.body.dataset.filters = mod.filters === false ? "none" : ""; // the hub and month bar is hidden on pages that do not use it
+    // the hub and month bar is hidden on pages that do not use it; a page can ask for the month only (filters: "month")
+    document.body.dataset.filters = mod.filters === false ? "none" : mod.filters === "month" ? "month" : "";
     await mod.render({ el: view, params, isCurrent: () => seq === renderSeq });
     if (seq === renderSeq) { clampIntro(view); showActiveTab(view); }
     if (seq !== renderSeq) return;
