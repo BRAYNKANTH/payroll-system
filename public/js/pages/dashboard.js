@@ -55,13 +55,18 @@ export default {
       const info = hubInfo(hubData, state.period);
       const stats = Object.fromEntries(d.by_hub.map((h) => [h.code, h]));
       // One card per hub: people, sales for the chosen dates and (for those who may see pay) salaries. The whole card opens the hub.
-      const hubTile = (h) => {
+      // Each hub is its own card: a coloured band with the hub's code in a circle, the name and headcount centred, then the numbers side by side.
+      const ACCENTS = ["#0071e3", "#7c3aed", "#0f766e", "#c2410c", "#db2777", "#4f46e5"];
+      const hubTile = (h, i) => {
         const x = info[h.code], st = stats[h.code] || {};
-        return html`<a class="card hub-tile" href="/hubs/${encodeURIComponent(h.code)}" data-link>
-          <span class="hub-top"><b class="hub-name">${h.name}</b><span class="faint">${h.code}${h.status !== "active" ? " · inactive" : ""}</span></span>
-          <span class="hub-count">${plural(x.active.length, "person", "people")}</span>
-          <span class="hub-nums"><span><small>Sales</small><b class="num">${compact(st.hub_business || 0)}</b></span>
-            ${pay ? html`<span><small>Salaries</small><b class="num">${compact(st.to_bank || 0)}</b></span>` : ""}</span></a>`;
+        return html`<a class="card hub-tile ht" style="--hc:${ACCENTS[i % ACCENTS.length]}" href="/hubs/${encodeURIComponent(h.code)}" data-link aria-label="${h.name}: open this hub">
+          <span class="ht-badge" aria-hidden="true">${h.code}</span>
+          <b class="ht-name">${h.name}</b>
+          <span class="ht-count">${plural(x.active.length, "person", "people")}${h.status !== "active" ? " · inactive" : ""}</span>
+          ${x.attention.length ? html`<span class="ht-chips">${x.attention.map(([tone, text]) => badge(tone, text))}</span>` : ""}
+          <span class="ht-nums ${pay ? "" : "one"}"><span class="ht-stat"><small>Sales</small><b class="num">${compact(st.hub_business || 0)}</b></span>
+            ${pay ? html`<span class="ht-stat"><small>Salaries</small><b class="num">${compact(st.to_bank || 0)}</b></span>` : ""}</span>
+          <span class="ht-open">Open hub</span></a>`;
       };
       $("#dash-sub").innerHTML = html`${monthName(d.period)} · ${badge(d.status)}`.toString();
       $("#dash-body").innerHTML = html`

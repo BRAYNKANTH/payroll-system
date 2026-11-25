@@ -2678,3 +2678,43 @@ body[data-filters="none"] #filters, body[data-filters="none"] #filterbar, body[d
 @media (max-width: 760px) { .hs-row { padding-inline: 14px; } .hs-flags { flex-direction: column; align-items: flex-end; } }
 @media (max-width: 760px) { #view .range-quick button { flex: 0 0 auto !important; min-width: max-content !important; } }
 .m-card .mc-main .badge { align-self: flex-start; }
+
+/* ---- Dashboard hub cards: each hub is its own card, details centred ---- */
+.grid.three:has(> .hub-tile.ht) { gap: 20px; }
+.dash-min .hub-tile.ht {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  padding: 0 0 18px; border-radius: 22px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-md);
+}
+.hub-tile.ht::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 86px; pointer-events: none;
+  background: linear-gradient(135deg, var(--hc), color-mix(in srgb, var(--hc) 40%, transparent));
+}
+.hub-tile.ht::after { /* a soft light in the band */
+  content: ""; position: absolute; top: -40px; right: -30px; width: 130px; height: 130px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, .28), transparent 70%);
+}
+.ht-badge {
+  position: relative; z-index: 1; margin-top: 46px; width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface); color: var(--hc); font: 700 22px var(--font-display); letter-spacing: .02em;
+  box-shadow: 0 0 0 5px var(--surface), 0 12px 26px -10px var(--hc);
+}
+.ht-name { position: relative; z-index: 1; margin-top: 8px; font: 650 21px/1.2 var(--font-display); color: var(--text); }
+.ht-count { font-size: 14px; color: var(--text-2); }
+.ht-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding-inline: 12px; }
+.ht-nums { display: grid; grid-template-columns: 1fr 1fr; width: calc(100% - 36px); margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ht-nums.one { grid-template-columns: 1fr; }
+.ht-stat { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.ht-stat + .ht-stat { border-left: 1px solid var(--border); }
+.ht-stat small { font-size: 13px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.ht-stat b { font: 650 24px/1.1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--text); }
+.ht-open { margin-top: 12px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 650; color: var(--hc); }
+.ht-open::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-top: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s var(--ease-out, ease); }
+.hub-tile.ht:hover .ht-open::after { transform: rotate(45deg) translate(2px, -2px); }
+.dash-min .hub-tile.ht:hover { border-color: color-mix(in srgb, var(--hc) 45%, var(--border)); box-shadow: var(--shadow-md), 0 18px 46px -18px var(--hc); }
+@media (max-width: 760px) {
+  .grid.three:has(> .hub-tile.ht) { gap: 16px; }
+  .hub-tile.ht::before { height: 70px; }
+  .ht-badge { margin-top: 36px; width: 68px; height: 68px; font-size: 20px; }
+}
+html.fx #view.page-in .hub-tile.ht .ht-badge { animation: pop-badge .6s cubic-bezier(.3, 1.5, .5, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms + 200ms); }
+@keyframes pop-badge { from { opacity: 0; transform: scale(.4); } }
