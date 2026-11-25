@@ -46,7 +46,8 @@ export default {
         people = [...by.values()].sort((a, b) => b.business - a.business);
       }
       data = { can_pay: parts[0].can_pay && monthToDate, feed_pay: parts[0].can_pay, monthToDate, feed, people, unconfirmed: feed.filter((f) => !f.confirmed).length, unconfirmedIds: feed.filter((f) => !f.confirmed).map((f) => f.id), range: r };
-      $("#lv-export").innerHTML = singleMonth(r) && r.from.endsWith("-01") ? exportButtons("live", { period: r.from.slice(0, 7), hub: scopeHub() }).toString() : "";
+      // Excel and PDF only for those allowed to download reports (a manager is not: the buttons would only fail).
+      $("#lv-export").innerHTML = can("read") && singleMonth(r) && r.from.endsWith("-01") ? exportButtons("live", { period: r.from.slice(0, 7), hub: scopeHub() }).toString() : "";
       draw();
     };
 

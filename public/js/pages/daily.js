@@ -2,6 +2,7 @@ import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck, navigate } from "../app.js";
 import { exportButtons, $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount, dataTable } from "../ui.js";
 import { mountRange } from "../range.js";
+import { wireFilters } from "../foldfilters.js";
 import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons, managerGroupOf, teamOrder } from "./shared.js";
 import { isPhone } from "../phone.js";
 import { announce, badge, initials } from "../ui.js";
@@ -54,11 +55,14 @@ export default {
     el.innerHTML = html`<div class="daily-page">
       <div class="page-head">
         <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for everyone who sells: distributors, supervisors and managers. Settle-up minus is calculated automatically.</p></div>
-        <div class="actions">
+        <div class="actions" data-filters-host>
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button><button data-mode="range" class="${mode === "range" ? "on" : ""}">Date range</button></div>
-          ${editable && mode !== "range" ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}
-          <button class="btn" id="export">${icon("download")} <span class="lbl-sm">CSV</span></button>
-          ${mode === "range" ? "" : exportButtons("daily", { period: state.period, hub: scopeHub() })}
+          <button type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="dl-more">${icon("download")} Import / export</button>
+          <div class="filter-panel" id="dl-more">
+            ${editable && mode !== "range" ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}
+            <button class="btn" id="export">${icon("download")} <span class="lbl-sm">CSV</span></button>
+            ${mode === "range" || !can("read") ? "" : exportButtons("daily", { period: state.period, hub: scopeHub() })}
+          </div>
         </div>
       </div>
       ${locked && mode !== "range" ? lockedBanner(state.period) : ""}
@@ -67,6 +71,7 @@ export default {
         <div class="card-body flush" id="grid"></div>
       </div></div>`;
 
+    wireFilters(el);
     $$("[data-mode]", el).forEach((b) => (b.onclick = () => { mode = b.dataset.mode; this.render(ctx); }));
     $("#export").onclick = async () => {
       // In Date range the file holds the days on screen; in the other views it holds the pay month.

@@ -28,6 +28,19 @@ function monthCard(d, k) {
   </section>`;
 }
 
+// What is waiting for a hub head today. Each line is one tap to the place where it is done.
+function todoCard(hub, unconfirmed, noStock) {
+  const h = encodeURIComponent(hub);
+  const row = (href, ic, tone, title, sub) => html`<li><a class="hs-row todo-row" href="${href}" data-link><span class="todo-ic ${tone}">${icon(ic)}</span>
+    <span class="hs-main"><b>${title}</b><span class="muted">${sub}</span></span><span class="hs-chev" aria-hidden="true"></span></a></li>`;
+  const rows = [
+    unconfirmed ? row(`/hubs/${h}/sales`, "check", "amber", `${unconfirmed} ${unconfirmed === 1 ? "day" : "days"} to confirm`, "Sellers entered these. Check them and confirm.") : "",
+    noStock ? row(`/hubs/${h}/stock/give`, "box", "red", `${noStock} ${noStock === 1 ? "seller has" : "sellers have"} no stock`, "Give them today's stock.") : "",
+  ].filter(Boolean);
+  const done = html`<li class="todo-done"><span class="todo-ic green">${icon("checkCircle")}</span><span class="hs-main"><b>All done</b><span class="muted">Nothing is waiting. The hub is up to date.</span></span></li>`;
+  return html`<section class="card hs-list todo mb-4" aria-label="To do"><div class="todo-head"><b>To do</b></div><ul role="list">${rows.length ? rows : done}</ul></section>`;
+}
+
 export default {
   title: "Dashboard",
   periodic: true,
@@ -36,6 +49,7 @@ export default {
     const first = state.user.full_name.split(" ")[0];
     el.innerHTML = html`<div class="dash dash-min">
       <div class="page-head"><div><h1>${greeting()}, ${first}</h1><p id="dash-sub"></p></div></div>
+      <div id="dash-todo"></div>
       <div id="dash-range" class="mb-4"></div>
       <div id="dash-body"><div class="loading-screen"><div class="spinner"></div></div></div></div>`.toString();
 
@@ -43,7 +57,7 @@ export default {
     const lastDay = (p) => { const [y, m] = p.split("-").map(Number); return `${p}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
     const effective = (r) => (r.preset === "month" ? { ...r, from: `${state.period}-01`, to: state.period === today().slice(0, 7) ? today() : lastDay(state.period) } : r);
 
-    let seq = 0, picker = null, hubData = null;
+    let seq = 0, picker = null, hubData = null, todoStock;
     const load = async () => {
       const mine = ++seq, r = picker.get();
       const dashP = get("/api/dashboard" + qs({ period: state.period, hub: scopeHub(), from: r.from, to: r.to }));
@@ -68,6 +82,11 @@ export default {
             ${pay ? html`<span class="ht-stat"><small>Salaries</small><b class="num">${compact(st.to_bank || 0)}</b></span>` : ""}</span>
           <span class="ht-open">Open hub</span></a>`;
       };
+      // A hub head's day starts with what is waiting for them: days sellers entered that need confirming, and sellers with no stock to sell.
+      if (state.user.hub && can("enter_data")) {
+        if (todoStock === undefined) todoStock = await get("/api/stock-issues").then((x) => x.hubs?.[0]?.without_stock ?? 0).catch(() => null);
+        $("#dash-todo").innerHTML = todoCard(state.user.hub, d.by_hub[0]?.unconfirmed || 0, todoStock || 0).toString();
+      }
       $("#dash-sub").innerHTML = html`${monthName(d.period)} · ${badge(d.status)}`.toString();
       $("#dash-body").innerHTML = html`
         ${pay ? monthCard(d, k) : ""}
@@ -78,12 +97,12 @@ export default {
           ${kpi("Stock short", money(k.stock_shortfall), `From the stock count for ${monthName(d.period)}`)}
         </div>
 
-        <section class="mt-5" aria-labelledby="hubs-h">
+        ${scopeHub() ? "" : html`<section class="mt-5" aria-labelledby="hubs-h">
           <div class="row between" style="margin-bottom:12px"><h2 id="hubs-h" class="section-title">${scopeHub() ? "Your hub" : "Hubs"}</h2>
             <a class="btn sm" href="/hubs" data-link>All hubs and people</a></div>
           ${hubData.hubs.length ? html`<div class="grid three">${hubData.hubs.map(hubTile)}</div>`
             : html`<div class="card">${emptyState("No hubs yet", "Add your first hub to start adding people.", "store", can("manage_hubs") ? `<a class="btn primary" href="/hubs" data-link>Add a hub</a>` : "")}</div>`}
-        </section>`.toString();
+        </section>`}`.toString();
     };
     picker = mountRange($("#dash-range"), { page: "dashboard", fallback: "month", resolve: effective, onChange: () => load().catch((e) => toast(e.message, "warn")) });
     await load();

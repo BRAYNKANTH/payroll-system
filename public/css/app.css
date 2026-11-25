@@ -2736,3 +2736,20 @@ html.fx #view.page-in .hub-tile.ht .ht-badge { animation: pop-badge .6s cubic-be
 @media (max-width: 860px) {
   #view[data-tab="payslips"] .portal-head, #view[data-tab="documents"] .portal-head, #view[data-tab="details"] .portal-head, #view[data-tab="loans"] .portal-head { display: none; }
 }
+
+/* A hub head's "To do" block on Home */
+.todo-head { padding: 14px 18px 4px; font-size: 14px; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+.todo-row { text-decoration: none; }
+.todo-ic { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; }
+.todo-ic svg { width: 22px; height: 22px; }
+.todo-ic.amber { background: var(--warning-soft); color: var(--warning); }
+.todo-ic.red { background: var(--danger-soft); color: var(--danger); }
+.todo-ic.green { background: var(--success-soft); color: var(--success); }
+.todo-done { display: flex; align-items: center; gap: 12px; padding: 14px 18px 18px; }
+
+/* Page buttons that fold away on a phone (Daily sheet: Import / export) */
+@media (max-width: 760px) {
+  .actions[data-filters-host] > .filter-panel { display: none; flex: 1 1 100%; }
+  .actions[data-filters-host].filters-open > .filter-panel { display: flex; flex-wrap: wrap; gap: 8px; }
+  .actions[data-filters-host] > .seg { flex: 1 1 100%; }
+}
