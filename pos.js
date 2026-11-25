@@ -128,8 +128,9 @@ async function endOfDay(db, user, body) {
   const personal = sales.rupees("Advance", body.personal_minus, { required: false });
   await withUser(db, user.username, async (t) => {
     await assertOpenDay(t, s, date);
-    const row = await t.get("SELECT id FROM daily_log WHERE employee_id = ? AND date = ?", s.employee_id, date);
+    const row = await t.get("SELECT id, business_amount FROM daily_log WHERE employee_id = ? AND date = ?", s.employee_id, date);
     if (!row) throw httpError(409, "Record a sale first, then enter the money you handed in");
+    sales.assertHandIn(settled, num(row.business_amount));
     await t.run(`UPDATE daily_log SET settled_amount = ?, personal_minus = ?, updated_by = ?, updated_at = ${NOW} WHERE id = ?`, settled, personal, user.username, row.id);
   }, { lockKey: "pos:" + s.employee_id });
   return state(db, user);

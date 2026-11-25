@@ -86,13 +86,16 @@ function hidePay(d) {
 function assertInTeam(user, employeeId) {
   if (user.teamIds && !user.teamIds.includes(String(employeeId))) throw svc.httpError(403, "That person is not in your team");
 }
-const visibleSettings = (user, settings) => (auth.can(user, "view_pay") ? settings : { ...settings, position_defaults: "{}" });
+// Someone who may not see pay gets only the harmless settings (company name, closed days), never a rate, threshold or pay default.
+const PUBLIC_SETTINGS = ["company_name", "closed_weekdays"];
+const visibleSettings = (user, settings) => (auth.can(user, "view_pay") ? settings
+  : { ...Object.fromEntries(PUBLIC_SETTINGS.filter((k) => k in settings).map((k) => [k, settings[k]])), position_defaults: "{}" });
 
 // A hub manager registers and edits their own team without seeing or setting pay: a new person gets the position's usual pay terms
 // from Settings, and any pay field sent for someone already there is ignored.
 async function staffBody(database, user, body, creating) {
   if (auth.can(user, "view_pay")) return body;
-  const out = svc.withoutPayFields(body);
+  const out = svc.withoutLockedFields(body); // pay terms, bank details and the target are the admin's alone
   if (creating) {
     let defaults = {};
     try { defaults = JSON.parse((await db.getSettings(database)).position_defaults || "{}")[out.staff_level] || {}; } catch { /* no defaults saved */ }
@@ -195,10 +198,13 @@ function createHandler(dbReady) {
         .then((rows) => (m[1] === "staff" && !auth.can(user, "view_pay") ? rows.map(svc.withoutPayFields) : rows))],
     ["GET", /^\/api\/weekly-view$/, "read", ({ user, q }) => svc.weeklyView(database, q.get("period") || "", user.hub || q.get("hub") || undefined)
       .then((rows) => (auth.can(user, "view_pay") ? rows : rows.map((r) => ({ ...r, weeks: r.weeks.map((w) => ({ week_start: w.week_start, week_end: w.week_end, business_total: w.business_total })) })))) ],
-    ["GET", /^\/api\/(daily|weekly|stock|hubstock|allowances)$/, "read", ({ user, m, q }) =>
+    ["GET", /^\/api\/(daily|stock|hubstock)$/, "read", ({ user, m, q }) =>
       svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
-        hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })
-        .then((rows) => (m[1] === "staff" && !auth.can(user, "view_pay") ? rows.map(svc.withoutPayFields) : rows))],
+        hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })],
+    // Weekly accounts (rent, hub fee, draws) and allowances are pay: the admin's alone. A coacher sees the weekly business on the weekly view.
+    ["GET", /^\/api\/(weekly|allowances)$/, "view_pay", ({ user, m, q }) =>
+      svc.listEntries(database, m[1], { period: q.get("period") || undefined, employee_id: q.get("employee_id") || undefined,
+        hub: user.hub || q.get("hub") || undefined, from: q.get("from") || undefined, to: q.get("to") || undefined })],
     ["POST", /^\/api\/hubs$/, "manage_hubs", ({ user, body }) => svc.createEntry(database, "hubs", body, user.username)],
     ["PUT", /^\/api\/hubs\/([\w-]+)$/, "manage_hubs", ({ user, body, m }) => svc.updateEntry(database, "hubs", m[1], body, user.username)],
     ["POST", /^\/api\/staff$/, ["manage_staff", "manage_team"], async ({ user, body }) => svc.createEntry(database, "staff", await staffBody(database, user, body, true), user.username, user.hub)],
@@ -207,7 +213,10 @@ function createHandler(dbReady) {
       assertInTeam(user, m[1]);
       const p = await svc.employeeProfile(database, m[1]);
       if (user.hub && p.staff.hub !== user.hub) throw svc.httpError(403, "Outside your hub");
-      return auth.can(user, "view_pay") ? p : { ...p, staff: svc.withoutPayFields(p.staff), history: [], security_held: null }; // no pay terms or pay history for those who may not see pay
+      if (auth.can(user, "view_pay")) return p;
+      // No pay terms, bank details or pay history for those who may not see pay; the team list and the change log carry none either.
+      return { ...p, staff: svc.withoutPayFields(p.staff), history: [], security_held: null,
+        team: p.team.map(({ employee_id, name, status, target }) => ({ employee_id, name, status, target })), changes: p.changes.map(svc.stripStaffLog) };
     }],
     ["GET", /^\/api\/staff\/([\w.-]+)\/documents$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.listDocuments(database, m[1], user.hub)],
     ["POST", /^\/api\/staff\/([\w.-]+)\/documents$/, ["manage_staff", "manage_team"], ({ m, user, body }) => svc.addDocument(database, m[1], body, user.username, user.hub)],
@@ -217,9 +226,13 @@ function createHandler(dbReady) {
     }],
     ["DELETE", /^\/api\/documents\/(\d+)$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.deleteDocument(database, m[1], user.username, user.hub)],
     ["POST", /^\/api\/(daily|stock|hubstock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, user.hub)],
-    ["POST", /^\/api\/(daily|stock|hubstock|allowances)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
-    ["PUT", /^\/api\/(daily|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
-    ["DELETE", /^\/api\/(daily|stock|hubstock|allowances)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
+    ["POST", /^\/api\/(daily|stock|hubstock)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
+    ["PUT", /^\/api\/(daily|stock|hubstock)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
+    ["DELETE", /^\/api\/(daily|stock|hubstock)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],
+    // Allowances add to pay, so only the admin may add, change or remove one.
+    ["POST", /^\/api\/allowances$/, "view_pay", ({ user, body }) => svc.createEntry(database, "allowances", body, user.username, user.hub)],
+    ["PUT", /^\/api\/allowances\/(\d+)$/, "view_pay", ({ user, body, m }) => svc.updateEntry(database, "allowances", m[1], body, user.username, user.hub)],
+    ["DELETE", /^\/api\/allowances\/(\d+)$/, "view_pay", ({ user, m }) => svc.deleteEntry(database, "allowances", m[1], user.username, user.hub)],
 
     // Live sales: everyone who can read sees the sales; only those who may see pay get the commission and pay-so-far columns.
     ["GET", /^\/api\/live$/, ["read", "read_team"], ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined, ids: user.teamIds }, auth.can(user, "view_pay"))],
@@ -236,7 +249,7 @@ function createHandler(dbReady) {
     ["GET", /^\/api\/reports\/product-profit$/, "manage_products", ({ q }) => products.profitReport(database, q.get("period"))],
     ["POST", /^\/api\/staff\/([\w.-]+)\/leave$/, ["manage_staff", "manage_team"], ({ user, body, m }) => people.leave(database, m[1], body, user.username, user.hub)],
     ["POST", /^\/api\/staff\/([\w.-]+)\/rehire$/, ["manage_staff", "manage_team"], ({ user, body, m }) => people.rehire(database, m[1], body, user.username, user.hub)],
-    ["GET", /^\/api\/loans$/, "read", ({ user, q }) => loans.list(database, { employee_id: q.get("employee_id") || undefined,
+    ["GET", /^\/api\/loans$/, "view_pay", ({ user, q }) => loans.list(database, { employee_id: q.get("employee_id") || undefined,
       hub: user.hub || q.get("hub") || undefined, status: q.get("status") || undefined, period: q.get("period") || undefined })],
     ["POST", /^\/api\/loans$/, "manage_loans", ({ user, body }) => loans.create(database, body, user.username, user.hub)],
     ["PUT", /^\/api\/loans\/(\d+)$/, "manage_loans", ({ user, body, m }) => loans.update(database, m[1], body, user.username, user.hub)],

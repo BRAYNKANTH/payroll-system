@@ -82,6 +82,24 @@ test("a closed month takes no more self-entered days", async () => {
   await assert.rejects(() => sales.addSale(d, u, { date: day(), business_amount: 1, settled_amount: 1 }), /closed/);
 });
 
+test("a seller cannot hand in more than they sold: extra cash would otherwise raise their own pay", async () => {
+  const d = await setup();
+  const u = await login(d, "D1", "u-d1");
+  await assert.rejects(() => sales.addSale(d, u, { date: day(), business_amount: 1000, settled_amount: 1001 }), /cannot be more than your sales/);
+  await sales.addSale(d, u, { date: day(), business_amount: 1000, settled_amount: 1000 }); // exactly the sales is fine
+});
+
+test("a month cannot be closed while sellers' days wait for the coacher's approval", async () => {
+  const d = await setup();
+  const u = await login(d, "D1", "u-d1");
+  const p = period();
+  await sales.addSale(d, u, { date: day(), business_amount: 5000, settled_amount: 5000 });
+  await assert.rejects(() => svc.finalizePeriod(d, p, "admin"), /not approved yet/);
+  await sales.confirm(d, { username: "coach" }, { all: true, period: p }, "H1");
+  await svc.finalizePeriod(d, p, "admin"); // approved: it closes
+  assert.equal((await svc.getPeriod(d, p)).status, "finalized");
+});
+
 test("payroll flags days nobody has confirmed, and the flag goes once they are confirmed", async () => {
   const d = await setup();
   const u = await login(d, "D1", "u-d1");

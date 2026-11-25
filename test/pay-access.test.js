@@ -38,14 +38,16 @@ test("pay pages and routes refuse a hub manager; the admin gets them", async () 
   try {
     const PAY_ROUTES = ["/api/payroll/2026-09", "/api/payroll/2026-09/G1", "/api/payroll/2026-09/payslips", "/api/payroll/2026-09/payslips/G1", "/api/payroll/2026-09/register",
       "/api/review-queue", "/api/reports/commission?period=2026-09", "/api/reports/balances"];
-    const SALES_ROUTES = ["/api/daily?period=2026-09", "/api/live?period=2026-09", "/api/staff", "/api/hubs", "/api/loans", "/api/reports/stock?period=2026-09", "/api/stock?period=2026-09", "/api/weekly?period=2026-09"];
+    const SALES_ROUTES = ["/api/daily?period=2026-09", "/api/live?period=2026-09", "/api/staff", "/api/hubs", "/api/reports/stock?period=2026-09", "/api/stock?period=2026-09", "/api/weekly-view?period=2026-09"];
+    // advances and loans, allowances and the weekly accounts (rent, draws) are pay: the admin's alone
+    const ADMIN_ONLY = ["/api/loans", "/api/allowances?period=2026-09", "/api/weekly?period=2026-09"];
     for (const who of ["owner"]) {
       const c = await signIn(who);
-      for (const p of PAY_ROUTES) assert.equal((await get(p, c)).status, 200, `${who} ${p}`);
+      for (const p of [...PAY_ROUTES, ...ADMIN_ONLY]) assert.equal((await get(p, c)).status, 200, `${who} ${p}`);
     }
     for (const who of ["mgr"]) {
       const c = await signIn(who);
-      for (const p of PAY_ROUTES) assert.equal((await get(p, c)).status, 403, `${who} ${p}`);
+      for (const p of [...PAY_ROUTES, ...ADMIN_ONLY]) assert.equal((await get(p, c)).status, 403, `${who} ${p}`);
       for (const p of SALES_ROUTES) assert.equal((await get(p, c)).status, 200, `${who} ${p}`);
     }
 
@@ -94,7 +96,22 @@ test("a hub manager registers their team without seeing or setting pay terms", a
     // the list and the profile carry no pay terms for a manager, and everything for the admin
     const list = (await call("GET", "/api/staff", mgr)).json;
     assert.ok(list.length >= 2 && list.every((s) => PAY.every((k) => !(k in s))));
-    assert.ok(list.every((s) => "target" in s && "bank_account_no" in s), "targets and bank details are still there");
+    assert.ok(list.every((s) => "target" in s), "targets stay visible (progress)");
+    assert.ok(list.every((s) => ["bank_account_no", "bank_name", "bank_code", "branch_code"].every((k) => !(k in s))), "bank details are the admin's alone");
+    assert.ok((await call("GET", "/api/staff", boss)).json.every((s) => "bank_account_no" in s));
+    // a manager's profile: no basic pay in the team list, no pay or bank values in the change log
+    await svc.updateEntry(d, "staff", "G1", { bank_account_no: "99887766" }, "owner");
+    const mp = (await call("GET", "/api/staff/M1/profile", mgr)).json;
+    assert.ok(mp.team.length && mp.team.every((t) => !("basic_pay" in t)));
+    assert.ok(!/basic_pay|bank_account_no|commission_rate/.test(JSON.stringify((await call("GET", "/api/staff/G1/profile", mgr)).json.changes)));
+    // settings: no rate or threshold reaches a coacher
+    const st = (await call("GET", "/api/settings", mgr)).json;
+    assert.ok(!Object.keys(st).some((k) => /commission|retain|rent|hub_fee|own_sales|share|security/.test(k)), "no pay rate in the settings a coacher sees");
+    // a coacher can add no allowance and cannot set the target or the bank account
+    assert.equal((await call("POST", "/api/allowances", mgr, { period: "2026-09", employee_id: "G1", description: "x", amount: 5000 })).status, 403);
+    assert.equal((await call("PUT", "/api/staff/G1", mgr, { target: 1000, bank_account_no: "11110000", bank_name: "X" })).status, 200);
+    const locked = (await call("GET", "/api/staff", boss)).json.find((s) => s.employee_id === "G1");
+    assert.deepEqual([locked.target, locked.bank_account_no], [10000000, "99887766"]);
     const profileStaff = (await call("GET", "/api/staff/G1/profile", mgr)).json.staff;
     assert.ok(PAY.every((k) => !(k in profileStaff)));
     assert.equal((await call("GET", "/api/staff", boss)).json.find((s) => s.employee_id === "G1").basic_pay, 2500000);

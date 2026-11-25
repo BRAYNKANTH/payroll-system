@@ -50,7 +50,7 @@ test("additions are in the trail with who added them and what was added, and nev
   assert.equal(JSON.parse(day[0].new_value).business_amount, 12000000);
 });
 
-test("sign-ins, failed sign-ins, lockouts, sign-outs and password changes are recorded with the address and the browser", async () => {
+test("sign-ins, failed sign-ins, sign-outs and password changes are recorded with the address and the browser", async () => {
   const { d } = await setup();
   const { srv, call, json, signIn } = await serve(d);
   try {
@@ -72,11 +72,10 @@ test("sign-ins, failed sign-ins, lockouts, sign-outs and password changes are re
     assert.equal(by("password_change", "owner").length, 1);
     assert.equal(by("logout", "owner").length, 1);
     assert.ok(!JSON.stringify(await rows(d)).includes("not-the-password-1"), "a typed password is never written down");
-    // five wrong tries lock the name, and the lockout is recorded once, not once per attempt
+    // wrong tries never lock the name; every one is recorded
     for (let i = 0; i < 7; i++) await signIn("mgr2", "wrong-password-" + i);
-    const locked = await rows(d, "action = 'login_locked' AND changed_by = 'mgr2'");
-    assert.equal(locked.length, 1);
-    assert.equal((await rows(d, "action = 'login_failed' AND changed_by = 'mgr2'")).length, 5);
+    assert.equal((await rows(d, "action = 'login_locked' AND changed_by = 'mgr2'")).length, 0);
+    assert.equal((await rows(d, "action = 'login_failed' AND changed_by = 'mgr2'")).length, 7);
   } finally { srv.close(); }
 });
 

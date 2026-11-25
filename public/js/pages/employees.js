@@ -69,7 +69,7 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Bank code</label><input class="input" name="bank_code" value="${e.bank_code || ""}" placeholder="e.g. 7010"></div>
       <div class="field"><label>Bank branch code</label><input class="input" name="branch_code" value="${e.branch_code || ""}" placeholder="e.g. 001"></div>
       <div class="field"><label>Account number</label><input class="input mono" name="bank_account_no" value="${e.bank_account_no || ""}" inputmode="numeric"></div>
-      ${existing ? html`<div class="full alert info">${icon("shield")}<div>Changing the account number flags this employee's next payment for review. Another user must approve it before it is paid.</div></div>` : ""}
+      ${existing && can("view_pay") ? html`<div class="full alert info">${icon("shield")}<div>Every change to the account number is recorded in the audit trail with who changed it.</div></div>` : ""}
       ${!existing && can("manage_users") ? html`<div class="form-section">Sign-in</div>
       <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ef-login" name="make_login" checked> Create a sign-in so this person can open their own page</label></div>
       <div class="field" data-login><label>Username (mobile number)</label><input class="input" id="ef-user" name="login_username" autocomplete="off" inputmode="tel"><span class="hint">Filled from the phone number above</span></div>
@@ -112,8 +112,10 @@ export async function employeeForm(existing, onSaved) {
     $("#sec-val-lbl", f).textContent = k === "fixed" ? "Amount (Rs / month)" : "Percentage (%)";
     // Those who may not see pay never see or set a person's pay terms: a new person gets the position's usual terms from the server.
     if (!can("view_pay")) {
-      for (const n of ["pay_scheme", "basic_pay", "base_commission_pct", "commission_pct", "food_per_day", "food_min_days", "sec_kind", "sec_value", "sec_cap", "opening_balance"]) f[n].closest(".field").hidden = true;
-      $$(".form-section", f).forEach((x) => { if (["Pay setup", "Food and security", "Starting balance"].includes(x.textContent.trim())) x.hidden = true; });
+      // The target and the bank details are the admin's too: the target sets the commission, the bank account is where the pay goes.
+      for (const n of ["pay_scheme", "basic_pay", "target", "base_commission_pct", "commission_pct", "food_per_day", "food_min_days", "sec_kind", "sec_value", "sec_cap", "opening_balance", "bank_name", "bank_code", "branch_code", "bank_account_no"]) f[n].closest(".field").hidden = true;
+      $$(".form-section", f).forEach((x) => { if (["Pay setup", "Food and security", "Starting balance", "Bank details"].includes(x.textContent.trim())) x.hidden = true; });
+      $$("[data-target]", f).forEach((x) => (x.hidden = true));
     }
   };
   // New staff start from the position's pay defaults (Settings); every field stays editable for this person.

@@ -37,14 +37,18 @@ async function leave(db, id, body, user, scopeHub) {
     if (replacement.staff_level !== s.staff_level) throw httpError(400, `The replacement must also be a ${s.staff_level.replace("_", " ")}`);
     if (replacement.hub !== s.hub) throw httpError(400, "The replacement must be in the same hub");
   }
+  let deactivated = 0;
   await withUser(db, user, async (t) => {
     if (replacement) {
       await t.run("UPDATE staff SET upline_id = ?, updated_by = ?, updated_at = " + NOW + " WHERE upline_id = ? AND status = 'active'", replacement.employee_id, user, id);
       await t.run("UPDATE staff SET manager_id = ?, updated_by = ?, updated_at = " + NOW + " WHERE manager_id = ? AND status = 'active'", replacement.employee_id, user, id);
     }
     await t.run("UPDATE staff SET status = 'inactive', leave_date = ?, leave_reason = ?, updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ?", leaveDate, reason, user, id);
+    // Their sign-in is switched off at once and any open session ends. The user record and the history stay; the admin can turn it on again (Users & roles).
+    await t.run("DELETE FROM sessions WHERE username IN (SELECT username FROM users WHERE employee_id = ?)", id);
+    deactivated = (await t.run("UPDATE users SET status = 'disabled', updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ? AND status = 'active'", user, id)).rowCount;
   });
-  return { employee_id: id, left_on: leaveDate, moved: replacement ? reports.length : 0, replacement: replacement?.employee_id || null };
+  return { employee_id: id, left_on: leaveDate, moved: replacement ? reports.length : 0, replacement: replacement?.employee_id || null, login_deactivated: deactivated > 0 };
 }
 
 async function rehire(db, id, body, user, scopeHub) {
@@ -58,6 +62,7 @@ async function rehire(db, id, body, user, scopeHub) {
     if (!up || up.status !== "active") throw httpError(400, "The person they used to report to has left. Edit their record to choose a new person to report to, then re-hire");
   }
   await withUser(db, user, (t) => t.run("UPDATE staff SET status = 'active', join_date = ?, leave_date = NULL, leave_reason = NULL, updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ?", joinDate, user, id));
+  // The sign-in stays switched off until the admin turns it on again (Users & roles): a person coming back does not get access by themselves.
   return { employee_id: id, joined_on: joinDate };
 }
 

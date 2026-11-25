@@ -27,11 +27,32 @@ test("setup creates the first admin only once; bad credentials are refused", asy
   assert.ok(await auth.login(d, "OWNER", PW.owner), "usernames are case-insensitive");
 });
 
-test("repeated failed sign-ins lock the username", async () => {
+test("failed sign-ins never lock an account (the owner's rule); they are only recorded", async () => {
   const { d, admin } = await setup();
   await auth.createUser(d, admin, { username: "lockme", full_name: "L", role: "coacher", hub: "COL", password: PW.lock });
-  for (let i = 0; i < 5; i++) await assert.rejects(() => auth.login(d, "lockme", "wrong-9999"), /Incorrect/);
-  await assert.rejects(() => auth.login(d, "lockme", PW.lock), /Too many/);
+  for (let i = 0; i < 8; i++) await assert.rejects(() => auth.login(d, "lockme", "wrong-9999"), /Incorrect/);
+  assert.ok((await auth.login(d, "lockme", PW.lock)).token, "the right password still works after many wrong ones");
+  assert.equal((await svc.auditSearch(d, { table: "session", key: "lockme", action: "login_failed" })).length, 8);
+});
+
+test("someone who has left cannot sign in, their open sessions end, and their record and history stay", async () => {
+  const { d, admin } = await setup();
+  const people = require("../people");
+  await svc.createEntry(d, "staff", { employee_id: "G9", name: "G9", staff_level: "distributor", hub: "COL", upline_id: "M1" }, "owner");
+  await auth.createUser(d, admin, { username: "leaver", full_name: "Leaver", role: "staff", employee_id: "G9", password: PW.clerk });
+  const s = await auth.login(d, "leaver", PW.clerk);
+  assert.ok(await auth.userFromToken(d, s.token));
+  const out = await people.leave(d, "G9", { leave_date: "2026-09-10", reason: "resigned" }, "owner", null);
+  assert.equal(out.login_deactivated, true);
+  assert.equal(await auth.userFromToken(d, s.token), null, "the open session ended");
+  await assert.rejects(() => auth.login(d, "leaver", PW.clerk), /Incorrect/);
+  assert.equal((await d.get("SELECT status FROM users WHERE username = 'leaver'")).status, "disabled", "the user stays, deactivated");
+  assert.equal((await d.get("SELECT status FROM staff WHERE employee_id = 'G9'")).status, "inactive", "the employee record stays");
+  // re-hiring does not switch the sign-in back on by itself
+  await people.rehire(d, "G9", { join_date: "2026-10-01" }, "owner", null);
+  await assert.rejects(() => auth.login(d, "leaver", PW.clerk), /Incorrect/);
+  await auth.updateUser(d, admin, "leaver", { status: "active" });
+  assert.ok((await auth.login(d, "leaver", PW.clerk)).token, "the admin turns it back on");
 });
 
 test("password hashes never reach the audit log", async () => {

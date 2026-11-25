@@ -698,6 +698,9 @@ async function finalizePeriod(db, period, user) {
   const openEarlier = await db.all(`SELECT DISTINCT s.period FROM pay_period_summary s LEFT JOIN periods p USING (period)
     WHERE s.period < ? AND COALESCE(p.status,'open') <> 'finalized' ORDER BY s.period`, period);
   if (openEarlier.length) throw httpError(409, `Finalize earlier periods first: ${openEarlier.map((r) => r.period).join(", ")}`);
+  // A day a seller entered must be approved by the hub's coacher (or the admin) before its money is made final.
+  const unapproved = await db.get("SELECT COUNT(*) AS n FROM daily_log WHERE source = 'portal' AND confirmed_by IS NULL AND date >= ? AND date < ?", ...monthBounds(period));
+  if (Number(unapproved.n) > 0) throw httpError(409, `${unapproved.n} day${Number(unapproved.n) > 1 ? "s" : ""} entered by sellers ${Number(unapproved.n) > 1 ? "are" : "is"} not approved yet. The coacher must approve ${Number(unapproved.n) > 1 ? "them" : "it"} (Live sales) before the month can be closed.`);
   await runPeriod(db, period, user); // always finalize fresh numbers
   await withUser(db, user, async (t) => {
     const blocking = await t.all(`SELECT employee_id, status FROM pay_period_summary WHERE period = ? AND status IN ('pending_review','rejected')
@@ -713,7 +716,20 @@ async function finalizePeriod(db, period, user) {
 
 // The fields of a person's record that are their pay terms. People who may not see pay never receive them.
 const PAY_FIELDS = ["basic_pay", "commission_rate", "base_commission_rate", "food_per_day", "food_min_days", "security_deduction_rule", "pay_scheme", "opening_balance", "team_commission_rate"];
-const withoutPayFields = (row) => { const o = { ...row }; for (const k of PAY_FIELDS) delete o[k]; return o; };
+// Bank details belong with pay: only the admin (view_pay) sees or sets them. Everyone else sees a person's sales, not their money.
+const BANK_FIELDS = ["bank_name", "bank_code", "branch_code", "bank_account_no", "bank_account_verified"];
+// What a person who may not see pay never receives about someone else.
+const HIDDEN_FIELDS = [...PAY_FIELDS, ...BANK_FIELDS];
+// What a hub user (coacher) can never set: pay terms, bank details and the target (the target decides the commission).
+const LOCKED_FIELDS = [...HIDDEN_FIELDS, "target"];
+const without = (row, keys) => { const o = { ...row }; for (const k of keys) delete o[k]; return o; };
+const withoutPayFields = (row) => without(row, HIDDEN_FIELDS);
+const withoutLockedFields = (row) => without(row, LOCKED_FIELDS);
+// A change-log row of a person's record with the pay and bank values taken out of its old and new copies.
+const stripStaffLog = (r) => {
+  const strip = (json) => { try { return json ? JSON.stringify(withoutPayFields(JSON.parse(json))) : json; } catch { return json; } };
+  return r.table_name === "staff" ? { ...r, old_value: strip(r.old_value), new_value: strip(r.new_value) } : r;
+};
 
 // noPay leaves out the pay calculations' own history (approvals of a person's pay), for people who may not see pay.
 // Events about use rather than change: sign-ins, downloads, views. Only the admin sees them.
@@ -733,9 +749,8 @@ async function auditSearch(db, { table, key, user, from, to, action, limit = 300
   args.push(Math.min(Number(limit) || 300, 2000));
   const rows = await db.all(`SELECT * FROM audit_log ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY id DESC LIMIT ?`, ...args);
   if (!noPay) return rows;
-  // A change to a person's record shows, but not their pay terms.
-  const strip = (json) => { try { return json ? JSON.stringify(withoutPayFields(JSON.parse(json))) : json; } catch { return json; } };
-  return rows.map((r) => (r.table_name === "staff" ? { ...r, old_value: strip(r.old_value), new_value: strip(r.new_value) } : r));
+  // A change to a person's record shows, but not their pay terms or bank details.
+  return rows.map(stripStaffLog);
 }
 const auditLog = auditSearch;
 
@@ -1039,6 +1054,6 @@ module.exports = {
   weeklyView,
   ENTITIES, listEntries, createEntry, updateEntry, deleteEntry, bulkUpsert,
   runPeriod, getPeriod, getPeriodRow, review, finalizePeriod, auditLog, auditSearch, updateSettings, isFinalized, httpError, assertPeriod,
-  PAY_FIELDS, withoutPayFields, ACCESS_TABLES, listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
+  PAY_FIELDS, HIDDEN_FIELDS, LOCKED_FIELDS, withoutPayFields, withoutLockedFields, stripStaffLog, ACCESS_TABLES, listDocuments, addDocument, getDocument, deleteDocument, LEVEL_RANK, LEVEL_NAME, MANAGER_LEVELS,
   dashboard, employeeProfile, balancesReport, stockReport, commissionReport, reviewQueue, listPeriods, shiftPeriod,
 };

@@ -47,7 +47,9 @@ const publicUser = (u) => u && ({
   last_login_at: u.last_login_at, created_at: u.created_at, permissions: permissionsOf(u),
 });
 // A login with the employee it belongs to (their position and stock-keeper tag decide what it may see).
-const WITH_EMPLOYEE = "SELECT u.*, s.staff_level, s.stock_keeper FROM users u LEFT JOIN staff s ON s.employee_id = u.employee_id";
+const WITH_EMPLOYEE = "SELECT u.*, s.staff_level, s.stock_keeper, s.status AS employee_status FROM users u LEFT JOIN staff s ON s.employee_id = u.employee_id";
+// A login is usable only while its user is active and the employee it belongs to has not left.
+const usable = (u) => !!u && u.status === "active" && u.employee_status !== "inactive";
 const findUser = (db, username) => db.get(`${WITH_EMPLOYEE} WHERE lower(u.username) = lower(?)`, String(username || ""));
 
 // A manager sees only the people under them: everyone who reports to them, directly or through others, and themselves.
@@ -76,32 +78,20 @@ async function setup(db, { username, full_name, password }) {
   return login(db, username, password);
 }
 
-// Brute-force protection: 5 failures locks the username for 5 minutes (stored in the DB, so it
-// holds across serverless instances).
-const LOCK_FAILS = 5;
-const LOCK_MINUTES = 5;
+// Accounts are never locked by failed attempts (the owner's decision): a wrong password only says "incorrect" and is written to the audit trail.
 async function login(db, username, password) {
   const key = String(username || "").toLowerCase();
-  const f = await db.get(`SELECT count, last_at > now() - make_interval(mins => ?) AS recent FROM login_failures WHERE username = ?`, LOCK_MINUTES, key);
-  if (f && f.recent && f.count >= LOCK_FAILS) {
-    await logEvent(db, { user: key || "unknown", table: "session", key: key || "unknown", action: "login_locked", detail: { reason: "too many failed attempts" }, dedupeMinutes: LOCK_MINUTES });
-    throw httpError(429, `Too many failed attempts. Try again in ${LOCK_MINUTES} minutes.`);
-  }
   const user = await findUser(db, username);
-  const ok = user && user.status === "active" && verifyPassword(password, user.password_hash);
+  const ok = usable(user) && verifyPassword(password, user.password_hash);
   if (!ok) {
-    await db.run(`INSERT INTO login_failures (username, count, last_at) VALUES (?, 1, now())
-      ON CONFLICT (username) DO UPDATE SET count = CASE WHEN login_failures.last_at > now() - make_interval(mins => ?)
-        THEN login_failures.count + 1 ELSE 1 END, last_at = now()`, key, LOCK_MINUTES);
     // Never the password, only who tried and why it failed.
     await logEvent(db, { user: key || "unknown", table: "session", key: key || "unknown", action: "login_failed",
-      detail: { reason: !user ? "unknown username" : user.status !== "active" ? "account disabled" : "wrong password" } });
+      detail: { reason: !user ? "unknown username" : user.status !== "active" ? "account disabled" : user.employee_status === "inactive" ? "employee has left" : "wrong password" } });
     throw httpError(401, "Incorrect username or password");
   }
   const token = crypto.randomBytes(32).toString("hex");
   const hours = Number((await getSettings(db)).session_hours) || 12;
   await db.tx(async (t) => {
-    await t.run("DELETE FROM login_failures WHERE username = ?", key);
     await t.run(`DELETE FROM sessions WHERE expires_at < ${NOW}`);
     await t.run(`INSERT INTO sessions (token_hash, username, expires_at)
       VALUES (?, ?, to_char((now() + make_interval(hours => ?)) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))`,
@@ -117,7 +107,7 @@ async function userFromToken(db, token) {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const row = await db.get(`
     SELECT u.*, s.staff_level, s.stock_keeper FROM sessions x JOIN users u USING (username) LEFT JOIN staff s ON s.employee_id = u.employee_id
-    WHERE x.token_hash = ? AND x.expires_at > ${NOW} AND u.status = 'active'`, sha256(token));
+    WHERE x.token_hash = ? AND x.expires_at > ${NOW} AND u.status = 'active' AND COALESCE(s.status, 'active') <> 'inactive'`, sha256(token));
   if (!row) return null;
   const user = publicUser(row);
   if (row.role === "manager") {

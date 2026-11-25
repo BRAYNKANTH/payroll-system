@@ -33,6 +33,12 @@ function rupees(name, raw, { required = true } = {}) {
   return Math.round(n * 100);
 }
 
+// A seller can never hand in more than they sold: extra cash would show as a negative deduction and raise their own pay.
+// Paying back an earlier shortage is recorded by the coacher on the daily sheet, who sees and approves it.
+function assertHandIn(settled, business) {
+  if (settled > business) throw httpError(400, "Money handed in cannot be more than your sales for the day. To pay back an earlier shortage, ask your coacher to record it");
+}
+
 async function myself(db, user) {
   if (!user?.employee_id) throw httpError(403, "This login is not linked to an employee");
   const s = await db.get("SELECT employee_id, name, role, staff_level, status, hub FROM staff WHERE employee_id = ?", user.employee_id);
@@ -53,6 +59,7 @@ async function addSale(db, user, body) {
   const business = rupees("Sales", body.business_amount);
   const settled = rupees("Money handed in", body.settled_amount);
   const personal = rupees("Advance", body.personal_minus, { required: false });
+  assertHandIn(settled, business);
   const notes = String(body.notes || "").trim().slice(0, 200) || null;
 
   const existing = await db.get("SELECT id, source, confirmed_by FROM daily_log WHERE date = ? AND employee_id = ?", date, s.employee_id);
@@ -156,4 +163,4 @@ async function live(db, { period, hub, ids }, canPay) {
   return { period, can_pay: !!canPay, unconfirmed: people.reduce((t, p) => t + p.unconfirmed, 0), feed, people };
 }
 
-module.exports = { addSale, removeSale, confirm, live, today, addDays, rupees, myself, DAYS_BACK };
+module.exports = { addSale, removeSale, confirm, live, today, addDays, rupees, myself, assertHandIn, DAYS_BACK };

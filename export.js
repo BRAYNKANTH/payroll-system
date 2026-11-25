@@ -294,7 +294,7 @@ const REPORTS = {
       .map((a) => [a.changed_at, a.changed_by, a.table_name, a.row_key, a.action, (a.old_value || "").slice(0, 300), (a.new_value || "").slice(0, 300), a.ip || "", (a.agent || "").slice(0, 80)]) }),
   loans: async ({ db, hub }) => {
     const names = await staffNames(db);
-    return { title: "Advances and loans", subtitle: "What was given, paid back and is still owed",
+    return { title: "Advances and loans", subtitle: "What was given, paid back and is still owed", pay: true,
       columns: [C("Employee"), C("Name"), C("Type"), C("Given on"), C("Amount", "money", true), C("Each month", "money"), C("Paid back", "money", true), C("Still owed", "money", true), C("Status"), C("Note")],
       rows: (await loans.list(db, { hub: hub || undefined })).map((l) => [l.employee_id, names.get(l.employee_id)?.name || "", l.kind, l.issued_on, l.amount, l.kind === "loan" ? l.instalment : "", l.repaid, l.outstanding, l.state, l.note || ""]) };
   },
