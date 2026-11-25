@@ -1,10 +1,13 @@
 // Stock to hubs: the admin sends products to a particular hub. The hub's coacher then gives that stock out to the sellers (Morning stock).
-// One card per hub shows what the hub holds now and the latest stock sent to it.
+// The page is a short list of the hubs, each with what it holds in one line. Tap a hub to see its stock per product, the latest stock sent
+// to it (and take a mistake back), and the Send stock button.
 import { get, post, del } from "../api.js";
-import { $, $$, html, icon, toast, busy, drawer, confirmDialog, emptyState } from "../ui.js";
+import { $, $$, html, icon, toast, busy, drawer, confirmDialog, emptyState, badge } from "../ui.js";
 
 const rs = (c) => `Rs ${(Number(c) / 100).toLocaleString("en-LK", { maximumFractionDigits: 2 })}`;
 const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const n0 = (n) => Number(n).toLocaleString("en-LK");
+const LOW = 10; // a product with this many pieces or fewer in the hub is "low"
 
 export default {
   filters: false, // this page has no use for the hub and month bar, so it is not shown
@@ -13,31 +16,49 @@ export default {
     const { el } = ctx;
     const d = await get("/api/hub-stock");
     const noProducts = !d.hubs.length || !d.hubs[0].stock.length;
+    const office = Object.fromEntries((d.office || []).map((o) => [o.product_id, o.left])); // what the office holds
+    const sum = (h) => h.stock.reduce((t, x) => t + x.left, 0);
+    const out = (h) => h.stock.filter((x) => x.left === 0).length;
+    const low = (h) => h.stock.filter((x) => x.left > 0 && x.left <= LOW).length;
 
-    const card = (h) => html`<article class="card hubsupply" aria-label="${h.name}">
-      <div class="card-head"><div><h2>${h.name}</h2><div class="sub">${h.code}</div></div>
-        <button type="button" class="btn primary" data-send="${h.code}" ${h.status !== "active" ? "disabled" : ""}>${icon("plus")} Send stock</button></div>
-      <div class="card-body flush">
-        <table class="till-stock"><caption class="sr-only">Stock held by ${h.name}</caption>
-          <thead><tr><th scope="col">Product</th><th scope="col">Sent</th><th scope="col">Given out</th><th scope="col">In the hub</th></tr></thead>
-          <tbody>${h.stock.map((x) => html`<tr class="${x.left === 0 ? "none" : ""}"><th scope="row">${x.product}</th><td>${x.received}</td><td>${x.given}</td>
-            <td class="left ${x.left > 0 && x.left <= 10 ? "low" : ""}"><b>${x.left}</b>${x.left > 0 && x.left <= 10 ? html`<span class="tag">Low</span>` : ""}</td></tr>`)}</tbody></table>
-      </div>
-      ${h.recent.length ? html`<div class="card-body"><div class="mc-label" style="margin-bottom:8px">Latest stock sent</div>
-        <ul class="till-lines" role="list" style="margin:0 -18px -16px">${h.recent.slice(0, 5).map((r) => html`<li><div class="tl-main"><b>${r.qty} × ${r.product}</b><span class="muted">${dayLabel(r.date)} · by ${r.by}${r.note ? ` · ${r.note}` : ""}</span></div><span></span>
-          <button type="button" class="btn sm ghost icon" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">${icon("x")}</button></li>`)}</ul></div>` : ""}
-    </article>`;
+    // One line per hub.
+    const row = (h) => html`<li><button type="button" class="hs-row" data-open="${h.code}" aria-label="${h.name}: open its stock">
+      <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${n0(sum(h))} ${sum(h) === 1 ? "piece" : "pieces"} in the hub${h.status !== "active" ? " · inactive" : ""}</span></span>
+      <span class="hs-flags">${out(h) ? badge("red", `${out(h)} out`) : ""}${low(h) ? badge("amber", `${low(h)} low`) : ""}${!out(h) && !low(h) && sum(h) ? badge("green", "Enough") : ""}</span>
+      <span class="hs-chev" aria-hidden="true"></span></button></li>`;
 
     el.innerHTML = html`<div class="hsup-page">
       <div class="page-head">
         <div><h1>Stock to hubs</h1><p>Send products to a hub. The hub's coacher then gives the stock out to the sellers, and can only give what the hub holds.</p></div>
       </div>
       ${noProducts ? html`<div class="card">${emptyState("No products yet", "Add your products first, then send them to the hubs.", "box", `<a class="btn primary" href="/products" data-link>Add products</a>`)}</div>`
-        : html`<div class="grid three">${d.hubs.map(card)}</div>`}</div>`;
+        : html`<div class="card hs-list"><ul role="list">${d.hubs.map(row)}</ul></div><p class="muted hs-hint">Tap a hub to see its stock and send more.</p>`}</div>`;
 
-    $$("[data-send]", el).forEach((b) => (b.onclick = () => {
-      const h = d.hubs.find((x) => x.code === b.dataset.send);
-      const office = Object.fromEntries((d.office || []).map((o) => [o.product_id, o.left])); // what the office holds
+    // A hub opened: its stock per product and the latest stock sent. From here: Send stock, or take a mistake back.
+    const openHub = (h) => {
+      const dr = drawer({
+        title: h.name,
+        body: html`<div class="hs-detail">
+          <div class="muted" style="margin:0 0 10px">${h.code} · ${n0(sum(h))} pieces in the hub</div>
+          <div class="table-wrap"><table class="till-stock"><caption class="sr-only">Stock held by ${h.name}</caption>
+            <thead><tr><th scope="col">Product</th><th scope="col">Sent</th><th scope="col">Given out</th><th scope="col">In the hub</th></tr></thead>
+            <tbody>${h.stock.map((x) => html`<tr class="${x.left === 0 ? "none" : ""}"><th scope="row">${x.product}</th><td>${x.received}</td><td>${x.given}</td>
+              <td class="left ${x.left > 0 && x.left <= LOW ? "low" : ""}"><b>${x.left}</b>${x.left > 0 && x.left <= LOW ? html`<span class="tag">Low</span>` : ""}</td></tr>`)}</tbody></table></div>
+          ${h.recent.length ? html`<div class="mc-label" style="margin:16px 0 6px">Latest stock sent</div>
+            <ul class="till-lines" role="list" style="margin:0">${h.recent.slice(0, 8).map((r) => html`<li><div class="tl-main"><b>${r.qty} × ${r.product}</b><span class="muted">${dayLabel(r.date)} · by ${r.by}${r.note ? ` · ${r.note}` : ""}</span></div><span></span>
+              <button type="button" class="btn sm ghost icon" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">${icon("x")}</button></li>`)}</ul>` : html`<p class="muted" style="margin-top:14px">Nothing has been sent to this hub yet.</p>`}
+        </div>`.toString(),
+        foot: `<button class="btn" data-close>Close</button><button class="btn primary" id="hs-send" ${h.status !== "active" ? "disabled" : ""}>${icon("plus")} Send stock</button>`,
+      });
+      $("#hs-send", dr.panel).onclick = () => { dr.close(); sendStock(h); };
+      $$("[data-del]", dr.panel).forEach((b) => (b.onclick = async () => {
+        if (!(await confirmDialog({ title: "Take this stock back?", message: "It is removed from the hub's stock. This only works while the coacher has not given it to sellers.", confirmText: "Take back", danger: true }))) return;
+        await busy(b, async () => { await del(`/api/hub-stock/${b.dataset.del}`); toast("Stock taken back"); dr.close(); await this.render(ctx); });
+      }));
+    };
+
+    // Send stock: search a product, tap it, set how many. Only what the office holds can be sent.
+    const sendStock = (h) => {
       const cart = new Map(); // product id -> qty
       const dr = drawer({
         title: `Send stock to ${h.name}`,
@@ -83,11 +104,8 @@ export default {
         await this.render(ctx);
       });
       drawResults(); drawCart(); q.focus();
-    }));
+    };
 
-    $$("[data-del]", el).forEach((b) => (b.onclick = async () => {
-      if (!(await confirmDialog({ title: "Take this stock back?", message: "It is removed from the hub's stock. This only works while the coacher has not given it to sellers.", confirmText: "Take back", danger: true }))) return;
-      await busy(b, async () => { await del(`/api/hub-stock/${b.dataset.del}`); toast("Stock taken back"); await this.render(ctx); });
-    }));
+    $$("[data-open]", el).forEach((b) => (b.onclick = () => openHub(d.hubs.find((x) => x.code === b.dataset.open))));
   },
 };
