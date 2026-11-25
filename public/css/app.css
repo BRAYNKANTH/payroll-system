@@ -1954,7 +1954,6 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .range-text svg { width: 16px; height: 16px; }
 .dr-head { flex-wrap: wrap; gap: 12px 16px; align-items: center; justify-content: space-between; }
 .grid.kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 760px) { .grid.kpis.kpis-3 { grid-template-columns: 1fr; } }
 
 /* The org chart: a tree that grows downward. Each <li> is a person with their branch (<ul>) underneath; the lines are drawn with borders. */
 .org-tools { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -2602,4 +2601,63 @@ body[data-filters="none"] #filters, body[data-filters="none"] #filterbar, body[d
   #af .input { width: 100% !important; min-width: 0; min-height: 44px; font-size: 16px; }
   #af .btn { min-height: 44px; grid-column: 1 / -1; justify-content: center; }
   .range-quick button { padding-inline: 14px; min-height: 44px; }
+}
+
+/* =====================================================================================================================
+   Phone: the data comes first. Filters fold away behind one button, the page's buttons share one row, and three-number
+   summaries are compact tiles, so the list or table starts near the top of the screen instead of below a wall of controls.
+   ===================================================================================================================== */
+.filters-toggle { display: none; }
+.filter-panel { display: contents; }
+.fcount { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 99px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; }
+.fcount[hidden] { display: none; }
+@media (max-width: 760px) {
+  .filters-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; flex: 0 0 auto; }
+  /* Employees (and the People tab of a hub): search and one Filters button; the rest opens on tap */
+  .emp-page .filters-row { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; align-items: center; }
+  .emp-page .filters-row .search { flex: 1 1 0; min-width: 0; }
+  .emp-page .filters-row .search input { width: 100% !important; }
+  .filters-row .filter-panel { display: none; flex: 1 1 100%; }
+  .filters-row.filters-open .filter-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .filters-row.filters-open .filter-panel .input { width: 100% !important; }
+  .emp-page .colpick { display: none; } /* the column choice is for the wide table; a phone shows cards */
+  /* Audit trail: the form folds behind "More filters"; the quick dates stay in view */
+  .card-head[data-filters-host] > #af { display: none !important; }
+  .card-head[data-filters-host].filters-open > #af { display: grid !important; }
+
+  /* a page's buttons sit on one line: when a page has a main button, the Excel and PDF buttons shrink to icons beside it */
+  #view .page-head .actions > .row { flex: 0 0 auto; }
+  #view .page-head .actions > .row .btn { flex: 0 0 auto; padding-inline: 12px; }
+  #view .page-head .actions:has(> .btn.primary) .row .lbl-sm { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  #view .page-head .actions:has(> .btn.primary) .row .btn { min-width: 44px; justify-content: center; }
+
+  /* three numbers (Hub stock) become compact tiles side by side */
+  .grid.kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .kpis-3 .kpi { padding: 10px; }
+  .kpis-3 .kpi .label { font-size: 12px; gap: 6px; line-height: 1.25; }
+  .kpis-3 .kpi .label .icon { display: none; }
+  .kpis-3 .kpi .value { font-size: 22px; margin-top: 6px; }
+  .kpis-3 .kpi .foot { display: none; }
+  /* Dashboard: Business across, the two shortfalls side by side */
+  .dash-min .grid.kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dash-min .grid.kpis .kpi:first-child { grid-column: 1 / -1; }
+  .dash-min .grid.kpis .kpi:not(:first-child) .foot { display: none; }
+  .dash-min .grid.kpis .kpi:not(:first-child) .value { font-size: 18px; }
+
+  /* the date range: the dropdown and the dates on one line */
+  .range-bar { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; }
+  .range-text { font-size: 12px; line-height: 1.3; }
+  .range-custom { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) { #view .range-quick button { padding-inline: 14px !important; font-size: 14px !important; } }
+
+/* Phone: long page intros (and their Read more link) are left out so the data is not pushed down; the month card is slimmer */
+@media (max-width: 760px) {
+  .page-head p.clamp, .page-head .more-link { display: none; }
+  .month-card { padding: 14px 16px; gap: 8px; margin-bottom: 12px; }
+  .month-card h2 { font-size: 20px; margin-bottom: 2px; }
+  .month-card p { font-size: 14px; margin-bottom: 10px; }
+  .month-card .btn { width: auto; min-height: 44px; padding-inline: 18px; }
+  .month-card dd { font-size: 22px; }
+  .month-card .mc-right { gap: 2px; }
 }

@@ -2,6 +2,7 @@ import { get, post, put, qs } from "../api.js";
 import { state, can, scopeHub, navigate } from "../app.js";
 import { isPhone, stepForm } from "../phone.js";
 import { managerGroupOf, teamOrder } from "./shared.js";
+import { wireFilters, filterCount } from "../foldfilters.js";
 import { readQuery, writeQuery, exportButtons, $, $$, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, fromCents, initials, roleLabel, pct, LEVELS, levelRank, levelLabel, isManagerLevel, positionDefaults } from "../ui.js";
 
 let filters = { q: "", role: "", status: "active", group: "hub" };
@@ -225,11 +226,14 @@ export default {
       ${!state.hubs.length ? html`<div class="alert warn mb-4">${icon("alert")}<div>Create at least one hub before adding employees. <a href="/hubs" data-link>Go to hubs →</a></div></div>` : ""}
       <div class="card emp-page">
         <div class="card-head">
-          <div class="row">
+          <div class="row filters-row" data-filters-host>
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID, phone" value="${filters.q}" style="width:240px"></div>
-            <select class="input sm" id="role" aria-label="Filter by position" style="width:auto"><option value="">All positions</option>${LEVELS.map(([v, l]) => html`<option value="${v}" ${filters.role === v ? "selected" : ""}>${l}</option>`)}</select>
-            <div class="seg" id="st" role="group" aria-label="Filter by status">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.status === v)}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
-            <div class="seg" id="grp" role="group" aria-label="Group by">${[...(scopeHub() ? [] : [["hub", "Hub"]]), ["manager", "Manager"], ["staff_level", "Position"], ["", "None"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
+            <button type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="emp-fp">${icon("filter")} Filters<span class="fcount" hidden></span></button>
+            <div class="filter-panel" id="emp-fp">
+              <select class="input sm" id="role" aria-label="Filter by position" style="width:auto"><option value="">All positions</option>${LEVELS.map(([v, l]) => html`<option value="${v}" ${filters.role === v ? "selected" : ""}>${l}</option>`)}</select>
+              <div class="seg" id="st" role="group" aria-label="Filter by status">${[["active", "Active"], ["inactive", "Inactive"], ["", "All"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.status === v)}" class="${filters.status === v ? "on" : ""}">${l}</button>`)}</div>
+              <div class="seg" id="grp" role="group" aria-label="Group by">${[...(scopeHub() ? [] : [["hub", "Hub"]]), ["manager", "Manager"], ["staff_level", "Position"], ["", "None"]].map(([v, l]) => html`<button type="button" data-v="${v}" aria-pressed="${String(filters.group === v)}" class="${filters.group === v ? "on" : ""}">${l}</button>`)}</div>
+            </div>
           </div>
           <details class="colpick"><summary class="btn sm">${icon("sheet")} Columns</summary>
             <div class="colpick-menu" role="group" aria-label="Choose the columns to show">${allCols.filter((c) => c.key !== "name").map((c) => html`<label><input type="checkbox" data-col="${c.key}" ${hiddenCols.includes(c.key) ? "" : "checked"}> ${c.label}</label>`)}</div></details>
@@ -239,6 +243,7 @@ export default {
 
     const draw = () => {
       writeQuery(filters, FILTER_DEFAULTS);
+      filterCount(el, ["role", "status"].filter((k) => filters[k] !== FILTER_DEFAULTS[k]).length); // what is set shows on the folded Filters button (the grouping is a view choice, not a filter)
       const q = filters.q.toLowerCase();
       const rows = staff.filter((s) => (!filters.role || s.staff_level === filters.role) && (!filters.status || s.status === filters.status) &&
         (!q || [s.name, s.employee_id, s.phone || "", s.nic || ""].some((x) => x.toLowerCase().includes(q))));
@@ -270,6 +275,7 @@ export default {
       $$("#st button", el).forEach((x) => { const on = x.dataset.v === "active"; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
       draw(); $("#q").focus();
     };
+    wireFilters(el);
     draw();
     $("#q").oninput = (e) => { filters.q = e.target.value; draw(); };
     $("#role").onchange = (e) => { filters.role = e.target.value; draw(); };

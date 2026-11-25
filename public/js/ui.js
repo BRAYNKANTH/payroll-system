@@ -434,8 +434,8 @@ export const emptyState = (title, text = "", ico = "sheet", action = "") =>
 // ---- Excel and PDF
 // A page puts exportButtons("daily", { period, hub }) in its header; the click handler below downloads /api/export/daily.xlsx (or .pdf).
 export const exportButtons = (report, params = {}) => html`<span class="row" style="gap:8px;flex-wrap:nowrap">
-  <button type="button" class="btn" data-export="${report}:xlsx" data-params="${JSON.stringify(params)}">${icon("download")} <span class="lbl-sm">Excel</span></button>
-  <button type="button" class="btn" data-export="${report}:pdf" data-params="${JSON.stringify(params)}">${icon("file")} <span class="lbl-sm">PDF</span></button></span>`;
+  <button type="button" class="btn" aria-label="Download Excel" data-export="${report}:xlsx" data-params="${JSON.stringify(params)}">${icon("download")} <span class="lbl-sm">Excel</span></button>
+  <button type="button" class="btn" aria-label="Download PDF" data-export="${report}:pdf" data-params="${JSON.stringify(params)}">${icon("file")} <span class="lbl-sm">PDF</span></button></span>`;
 export async function downloadReport(report, format, params = {}) {
   const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")).toString();
   const res = await fetch(`/api/export/${report}.${format}${query ? "?" + query : ""}`, { credentials: "same-origin" });

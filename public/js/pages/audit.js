@@ -1,6 +1,7 @@
 import { get, qs } from "../api.js";
 import { can } from "../app.js";
 import { PRESETS, rangeOf } from "../range.js";
+import { wireFilters, filterCount } from "../foldfilters.js";
 import { readQuery, writeQuery, exportButtons, $, html, raw, esc, icon, dataTable, dateTime, downloadCsv, titleCase } from "../ui.js";
 
 const MONEY = new Set(["business_amount", "settled_amount", "settle_up_minus", "personal_minus", "business_total", "rent", "hub_fee", "security_cost",
@@ -67,8 +68,9 @@ export default {
         <div class="actions"><span id="xaudit"></span><button class="btn" id="csv">${icon("download")} CSV</button></div>
       </div>
       <div class="card">
-        <div class="card-head" style="flex-wrap:wrap;gap:12px">
+        <div class="card-head" style="flex-wrap:wrap;gap:12px" data-filters-host>
           <div class="seg range-quick" id="ap" role="group" aria-label="Quick dates">${PRESETS.filter(([k]) => k !== "custom").map(([k, l]) => html`<button type="button" data-p="${k}">${l}</button>`)}</div>
+          <button type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="af">${icon("filter")} More filters<span class="fcount" hidden></span></button>
           <form class="row" id="af">
           <select class="input sm" name="table" aria-label="Record type" style="width:auto">${TABLES.filter(([v]) => (can("view_pay") || !["pay_period_summary", "settings"].includes(v)) && (can("manage_users") || !ACCESS.has(v))).map(([v, l]) => html`<option value="${v}" ${f.table === v ? "selected" : ""}>${l}</option>`)}</select>
           <select class="input sm" name="action" aria-label="Action" style="width:auto">${ACTIONS.map(([v, l]) => html`<option value="${v}" ${f.action === v ? "selected" : ""}>${l}</option>`)}</select>
@@ -81,7 +83,9 @@ export default {
         <div class="card-body flush" id="list"><div class="loading-screen" style="min-height:200px"><div class="spinner"></div></div></div>
       </div>`;
     let rows = [];
+    wireFilters(el);
     const load = async () => {
+      filterCount(el, ["table", "action", "user", "key", "from", "to"].filter((k) => f[k]).length); // what is set shows on the folded button
       rows = await get("/api/audit" + qs({ ...f, limit: 1000 }));
       $("#xaudit").innerHTML = exportButtons("audit", f).toString(); // Excel and PDF follow the filters on screen
       $("#list").innerHTML = dataTable({
