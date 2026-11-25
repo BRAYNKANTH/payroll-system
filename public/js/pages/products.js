@@ -34,6 +34,9 @@ export default {
 
     $("#list").innerHTML = rows.length ? dataTable({
       rows, empty: "No products yet", emptyHint: "Add products so they can be sent to hubs and sold.", onRow: (p) => open(p), rowLabel: (p) => `Edit ${p.name}`, rowAction: "Edit",
+      // On a phone each product is one short line: the name, what it sells for and earns, and how many the office holds. Tap it for everything else.
+      card: (p) => html`<span class="mc-main"><b>${p.name}</b><span class="mc-sub">Sells Rs ${money(p.list_price)} · profit <span class="${p.profit < 0 ? "neg" : ""}">Rs ${money(p.profit)}</span></span></span>
+        <span class="mc-end"><b class="${p.office_stock < 1 ? "neg" : ""}">${p.office_stock}</b> <span class="muted">in the office</span><br>${badge(p.status)}</span>`,
       cols: [
         { key: "name", label: "Product", render: (p) => html`<b>${p.name}</b>` },
         { key: "office_stock", label: "In the office", align: "r", render: (p) => html`<b class="${p.office_stock < 1 ? "neg" : ""}">${p.office_stock}</b>` },

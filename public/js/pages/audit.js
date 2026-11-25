@@ -90,6 +90,9 @@ export default {
       $("#xaudit").innerHTML = exportButtons("audit", f).toString(); // Excel and PDF follow the filters on screen
       $("#list").innerHTML = dataTable({
         rows, sortable: false, pageSize: 25, empty: "No changes match these filters", emptyHint: "Try a wider date range or clear a filter.",
+        // On a phone: who did what to which record and when, then what changed. The address and browser are on the wide table.
+        card: (a) => html`<span class="mc-main"><b>${a.changed_by}</b> <span class="badge plain ${BAD.has(a.action) ? "red" : GOOD.has(a.action) ? "green" : ""}">${titleCase(a.action.replace(/_/g, " "))}</span>
+          <span class="mc-sub">${TABLES.find(([v]) => v === a.table_name)?.[1] || a.table_name} · ${a.row_key} · ${dateTime(a.changed_at)}</span>${auditDiff(a)}</span>`,
         cols: [
           { key: "changed_at", label: "When", render: (a) => html`<span style="white-space:nowrap">${dateTime(a.changed_at)}</span>` },
           { key: "changed_by", label: "Who", render: (a) => html`<b>${a.changed_by}</b>` },

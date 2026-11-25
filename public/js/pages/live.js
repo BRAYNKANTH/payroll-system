@@ -64,6 +64,9 @@ export default {
       if (tab === "feed") {
         pane.innerHTML = d.feed.length ? html`<div class="card"><div class="card-body flush">${dataTable({
           rows: d.feed, sortable: false, pageSize: 25, empty: "No sales entered yet", emptyHint: "Sales appear here as soon as they are entered on the daily sheet.",
+          // On a phone each sale is a short card: who, which day, the amount and any shortfall, and the Confirm button when one is waiting.
+          card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${dateLabel(r.date)} · ${r.employee_id}${r.self_entered ? " · entered by the seller" : ""}</span>${confirmButton(r)}</span>
+            <span class="mc-end"><b>${money(r.business)}</b><br>${r.business > r.settled ? html`<span class="neg">short ${money(r.business - r.settled)}</span>` : html`<span class="muted">handed in</span>`}<br>${r.confirmed ? badge("green", r.self_entered ? "Confirmed" : "Entered") : badge("amber", "To confirm")}</span>`,
           cols: [
             { key: "date", label: "Day", render: (r) => html`<b>${dateLabel(r.date)}</b><div class="faint text-sm">${r.self_entered ? `entered ${dateTime(r.entered_at)}` : "entered by the office"}</div>` },
             { key: "name", label: "Person", render: (r) => html`<b>${r.name}</b><div class="faint text-sm">${r.employee_id} · ${r.hub} · ${levelLabel(r.staff_level)}</div>` },

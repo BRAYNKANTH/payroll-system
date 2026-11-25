@@ -2676,3 +2676,5 @@ body[data-filters="none"] #filters, body[data-filters="none"] #filterbar, body[d
 .hs-chev { width: 9px; height: 9px; flex: none; border-right: 2px solid var(--text-3); border-top: 2px solid var(--text-3); transform: rotate(45deg); margin-right: 4px; }
 .hs-hint { margin: 10px 4px 0; font-size: 14px; }
 @media (max-width: 760px) { .hs-row { padding-inline: 14px; } .hs-flags { flex-direction: column; align-items: flex-end; } }
+@media (max-width: 760px) { #view .range-quick button { flex: 0 0 auto !important; min-width: max-content !important; } }
+.m-card .mc-main .badge { align-self: flex-start; }
