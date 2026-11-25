@@ -256,7 +256,8 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/loans\/(\d+)$/, "manage_loans", ({ user, m }) => loans.remove(database, m[1], user.username, user.hub)],
 
     ["GET", /^\/api\/dashboard$/, "read", async ({ user, q }) => {
-      const d = await svc.dashboard(database, q.get("period"), user.hub || q.get("hub") || undefined);
+      const d = await svc.dashboard(database, q.get("period"), user.hub || q.get("hub") || undefined,
+        q.get("from") && q.get("to") ? { from: q.get("from"), to: q.get("to") } : null);
       return auth.can(user, "view_pay") ? d : hidePay(d);
     }],
     // The audit trail: the admin sees everything; others do not see pay approvals or sign-ins and downloads, and a hub user only their own actions.

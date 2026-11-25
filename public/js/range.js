@@ -53,8 +53,9 @@ const dayText = (s) => new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { 
 export const rangeText = (r) => (r.from === r.to ? dayText(r.from) : `${dayText(r.from)} – ${dayText(r.to)}`);
 
 // Draws the filter into `host` and calls onChange({ preset, from, to }) whenever it changes.
-export function mountRange(host, { page, fallback = "today", onChange }) {
-  let cur = currentRange(page, fallback);
+// `resolve` (optional) may adjust the dates a preset stands for, e.g. a page tied to the pay month makes "This month" mean that month.
+export function mountRange(host, { page, fallback = "today", onChange, resolve = (r) => r }) {
+  let cur = resolve(currentRange(page, fallback));
   const draw = () => {
     host.innerHTML = html`<div class="range-bar" role="group" aria-label="Date range">
       <div class="seg">${PRESETS.map(([k, l]) => html`<button type="button" data-p="${k}" class="${cur.preset === k ? "on" : ""}" aria-pressed="${cur.preset === k}">${l}</button>`)}</div>
@@ -63,7 +64,7 @@ export function mountRange(host, { page, fallback = "today", onChange }) {
         <label>To <input type="date" class="input" id="rg-to" value="${cur.to}" max="${today()}"></label></div>` : ""}
       <span class="range-text">${icon("calendar")} ${rangeText(cur)}</span></div>`.toString();
   };
-  const set = (preset, custom) => { cur = { preset, ...rangeOf(preset, custom) }; save(page, { preset, from: cur.from, to: cur.to }); draw(); onChange(cur); };
+  const set = (preset, custom) => { cur = resolve({ preset, ...rangeOf(preset, custom) }); save(page, { preset, from: cur.from, to: cur.to }); draw(); onChange(cur); };
   host.addEventListener("click", (e) => { const b = e.target.closest("[data-p]"); if (b) set(b.dataset.p, cur); });
   host.addEventListener("change", (e) => {
     if (e.target.id !== "rg-from" && e.target.id !== "rg-to") return;

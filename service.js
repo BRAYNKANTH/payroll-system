@@ -839,8 +839,14 @@ function expectedDays(period, closedWeekdays) {
   return out;
 }
 
-async function dashboard(db, period, hub) {
+// range ({ from, to }) limits the sales and cash figures to those days; pay, stock counts and missing-sheet checks stay with the pay month.
+async function dashboard(db, period, hub, range = null) {
   assertPeriod(period);
+  if (range) {
+    for (const k of ["from", "to"]) if (!DATE_RE.test(range[k] || "") || isNaN(Date.parse(range[k]))) throw httpError(400, "from and to must be YYYY-MM-DD");
+    if (range.from > range.to) throw httpError(400, "The start date is after the end date");
+    if ((Date.parse(range.to) - Date.parse(range.from)) / 864e5 > 366) throw httpError(400, "Choose a range of at most a year");
+  }
   const settings = await getSettings(db);
   const closed = String(settings.closed_weekdays || "").split(",").filter(Boolean).map(Number);
   const hubs = (await db.all("SELECT * FROM hubs ORDER BY code")).filter((h) => !hub || h.code === hub);
@@ -857,6 +863,9 @@ async function dashboard(db, period, hub) {
     .filter((r) => ids.has(r.employee_id));
   const summaries = (await getPeriod(db, period, { detail: false })).rows.filter((r) => ids.has(r.employee_id));
   const dailyBy = new Map(daily.map((r) => [r.employee_id, r]));
+  // The sales and cash numbers: the chosen days, or the whole pay month when no range is given.
+  const sales = range ? (await db.all(`SELECT employee_id, SUM(business_amount) AS business, SUM(settle_up_minus) AS settle_up FROM daily_log
+      WHERE date >= ? AND date <= ? GROUP BY employee_id`, range.from, range.to)).filter((r) => ids.has(r.employee_id)) : daily;
   const sum = (arr, k) => arr.reduce((t, r) => t + (Number(r[k]) || 0), 0);
   const guys = summaries.filter((r) => r.role === "guy");
   const managers = summaries.filter((r) => r.role === "manager");
@@ -876,8 +885,8 @@ async function dashboard(db, period, hub) {
     return {
       code: h.code, name: h.name,
       staff: staff.filter((s) => s.hub === h.code && s.status === "active").length,
-      guys_business: sum(daily.filter((r) => inHub(r)), "business"),
-      hub_business: sum(daily.filter((r) => inHub(r)), "business"),
+      guys_business: sum(sales.filter((r) => inHub(r)), "business"),
+      hub_business: sum(sales.filter((r) => inHub(r)), "business"),
       gross_pay: sum(hubGuys, "gross_earnings"),
       net_pay: sum(hubGuys, "net_pay"),
       to_bank: sum(hubGuys, "disbursed_amount"),
@@ -913,11 +922,11 @@ async function dashboard(db, period, hub) {
 
   const info = (await db.get("SELECT * FROM periods WHERE period = ?", period)) || { period, status: "open" };
   return {
-    period, hub: hub || null, status: info.status, last_run_at: info.last_run_at || null, finalized_at: info.finalized_at || null,
+    period, hub: hub || null, range: range || null, status: info.status, last_run_at: info.last_run_at || null, finalized_at: info.finalized_at || null,
     kpis: {
-      guys_business: sum(daily, "business"),
-      hub_business: sum(daily, "business"),
-      settle_up: sum(daily, "settle_up"),
+      guys_business: sum(sales, "business"),
+      hub_business: sum(sales, "business"),
+      settle_up: sum(sales, "settle_up"),
       stock_shortfall: sum(stock, "shortfall"),
       active_guys: activeGuys.length,
       active_managers: staff.filter((s) => s.role === "manager" && s.status === "active").length,

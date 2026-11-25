@@ -1,6 +1,7 @@
 import { get, post, qs } from "../api.js";
-import { state, can, scopeHub, setDirtyCheck } from "../app.js";
-import { exportButtons, $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount } from "../ui.js";
+import { state, can, scopeHub, setDirtyCheck, navigate } from "../app.js";
+import { exportButtons, $, $$, html, esc, icon, money, toast, busy, confirmDialog, modal, dateLabel, emptyState, downloadCsv, parseCsv, fromCents, parseAmount, isAmount, formatAmount, dataTable } from "../ui.js";
+import { mountRange } from "../range.js";
 import { sheetKeys, moneyInputs, periodLocked, lockedBanner, readOnlyBanner, segButtons, managerGroupOf, teamOrder } from "./shared.js";
 import { isPhone } from "../phone.js";
 import { announce, badge, initials } from "../ui.js";
@@ -54,13 +55,13 @@ export default {
       <div class="page-head">
         <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for everyone who sells: distributors, supervisors and managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions">
-          <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button></div>
-          ${editable ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}
+          <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button><button data-mode="range" class="${mode === "range" ? "on" : ""}">Date range</button></div>
+          ${editable && mode !== "range" ? html`<button class="btn" id="import">${icon("upload")} <span class="lbl-sm">Import CSV</span></button>` : ""}
           <button class="btn" id="export">${icon("download")} <span class="lbl-sm">CSV</span></button>
-          ${exportButtons("daily", { period: state.period, hub: scopeHub() })}
+          ${mode === "range" ? "" : exportButtons("daily", { period: state.period, hub: scopeHub() })}
         </div>
       </div>
-      ${locked ? lockedBanner(state.period) : ""}
+      ${locked && mode !== "range" ? lockedBanner(state.period) : ""}
       <div class="card">
         <div class="card-head" id="picker"></div>
         <div class="card-body flush" id="grid"></div>
@@ -68,9 +69,11 @@ export default {
 
     $$("[data-mode]", el).forEach((b) => (b.onclick = () => { mode = b.dataset.mode; this.render(ctx); }));
     $("#export").onclick = async () => {
-      const rows = await get("/api/daily" + qs({ period: state.period, hub: scopeHub() }));
+      // In Date range the file holds the days on screen; in the other views it holds the pay month.
+      const inRange = mode === "range" && rangeShown;
+      const rows = inRange ? rangeShown.rows : await get("/api/daily" + qs({ period: state.period, hub: scopeHub() }));
       const names = Object.fromEntries(staff.map((s) => [s.employee_id, s.name]));
-      downloadCsv(`daily-${state.period}.csv`, ["date", "employee_id", "name", "business_amount", "settled_amount", "settle_up_minus", "personal_minus", "notes"],
+      downloadCsv(inRange ? `daily-${rangeShown.from}-to-${rangeShown.to}.csv` : `daily-${state.period}.csv`, ["date", "employee_id", "name", "business_amount", "settled_amount", "settle_up_minus", "personal_minus", "notes"],
         rows.map((r) => [r.date, r.employee_id, names[r.employee_id], fromCents(r.business_amount), fromCents(r.settled_amount), fromCents(r.settle_up_minus), fromCents(r.personal_minus), r.notes || ""]));
     };
     $("#import")?.addEventListener("click", () => importCsv(guys, () => this.render(ctx)));
@@ -81,9 +84,59 @@ export default {
       return;
     }
     if (mode === "day") await dayMode(ctx, guys, days, editable);
+    else if (mode === "range") await rangeMode(staff);
     else await empMode(ctx, guys, days, editable);
   },
 };
+
+// ---------------------------------------------------------------- date range (read-only report)
+
+let rangeShown = null; // the days on screen: { from, to, rows }, for the CSV button
+let rangeBy = "person";
+
+// Sales, cash handed in, shortage and advances for any dates, added up by person or by day. Nothing is entered here: use By day or By employee for that.
+async function rangeMode(staff) {
+  const names = Object.fromEntries(staff.map((s) => [s.employee_id, s]));
+  $("#picker").innerHTML = html`<div id="dr-range"></div><div class="seg" id="dr-by" role="group" aria-label="Group by">
+    <button type="button" data-by="person" class="${rangeBy === "person" ? "on" : ""}">By person</button><button type="button" data-by="day" class="${rangeBy === "day" ? "on" : ""}">By day</button></div>`.toString();
+  $("#picker").classList.add("dr-head");
+  let seq = 0, picker = null;
+  const load = async () => {
+    const r = picker.get(), mine = ++seq;
+    $("#grid").innerHTML = `<div class="loading-screen" style="min-height:160px"><div class="spinner"></div></div>`;
+    const rows = await get("/api/daily" + qs({ from: r.from, to: r.to, hub: scopeHub() }));
+    if (mine !== seq) return;
+    rangeShown = { from: r.from, to: r.to, rows };
+    draw();
+  };
+  const draw = () => {
+    const { rows } = rangeShown;
+    const add = (m, key, base, r) => {
+      const x = m.get(key) || m.set(key, { ...base, days: 0, people: new Set(), business: 0, settled: 0, short: 0, personal: 0 }).get(key);
+      x.days += 1; x.people.add(r.employee_id); x.business += Number(r.business_amount); x.settled += Number(r.settled_amount); x.short += Number(r.settle_up_minus); x.personal += Number(r.personal_minus);
+    };
+    const by = new Map();
+    for (const r of rows) rangeBy === "person" ? add(by, r.employee_id, { employee_id: r.employee_id, name: names[r.employee_id]?.name || r.employee_id, level: levelName(names[r.employee_id] || {}) }, r) : add(by, r.date, { date: r.date }, r);
+    const list = [...by.values()].sort((a, b) => (rangeBy === "person" ? b.business - a.business : a.date < b.date ? 1 : -1));
+    const sum = (rs, k) => money(rs.reduce((t, x) => t + x[k], 0));
+    const num = (k) => ({ key: k, label: { business: "Business", settled: "Handed in", short: "Short", personal: "Advance" }[k], align: "r", render: (x) => (k === "short" && x.short > 0 ? html`<span class="neg">${money(x.short)}</span>` : money(x[k])), total: (rs) => sum(rs, k) });
+    $("#grid").innerHTML = list.length ? dataTable({
+      rows: list, footer: true, pageSize: 50, sortable: true, empty: "No sales in these dates",
+      onRow: rangeBy === "person" ? (x) => navigate(`/employees/${encodeURIComponent(x.employee_id)}`) : undefined,
+      card: (x) => html`<span class="mc-main"><b>${rangeBy === "person" ? x.name : dateLabel(x.date)}</b><span class="mc-sub">${rangeBy === "person" ? `${x.level} · ${x.days} days` : `${x.people.size} people`}</span></span><span class="mc-end">${money(x.business)}<br><span class="muted">${x.short > 0 ? `short ${money(x.short)}` : "handed in"}</span></span>`,
+      cols: [
+        rangeBy === "person"
+          ? { key: "name", label: "Person", render: (x) => html`<b>${x.name}</b><div class="faint text-sm">${x.employee_id} · ${x.level}</div>`, total: () => "Total" }
+          : { key: "date", label: "Day", render: (x) => html`<b>${dateLabel(x.date)}</b>`, total: () => "Total" },
+        rangeBy === "person" ? { key: "days", label: "Days", align: "r", total: (rs) => rs.reduce((t, x) => t + x.days, 0) } : { key: "people", label: "People", align: "r", render: (x) => x.people.size },
+        num("business"), num("settled"), num("short"), num("personal"),
+      ],
+    }).toString() : emptyState("No sales in these dates", "Try a wider range. Days appear here once they are entered on the daily sheet.", "sheet").toString();
+  };
+  picker = mountRange($("#dr-range"), { page: "daily", fallback: "week", onChange: () => load().catch((e) => toast(e.message, "warn")) });
+  $("#dr-by").onclick = (e) => { const b = e.target.closest("[data-by]"); if (!b) return; rangeBy = b.dataset.by; $$("#dr-by button").forEach((x) => x.classList.toggle("on", x === b)); if (rangeShown) draw(); };
+  await load();
+}
 
 // ---------------------------------------------------------------- grid core
 

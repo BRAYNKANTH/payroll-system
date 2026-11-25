@@ -1,6 +1,7 @@
 import { get, qs } from "../api.js";
 import { state, can, scopeHub } from "../app.js";
-import { html, icon, money, compact, badge, monthName, emptyState, raw } from "../ui.js";
+import { $, html, icon, money, compact, badge, monthName, emptyState, raw, toast } from "../ui.js";
+import { mountRange, rangeText, today } from "../range.js";
 import { loadHubData, hubInfo, plural } from "../hubinfo.js";
 
 // The home page is deliberately small: where this month stands, three figures, and one card per hub.
@@ -32,39 +33,52 @@ export default {
   periodic: true,
   async render({ el }) {
     const pay = can("view_pay"); // without it the server has already removed every pay figure
-    const [d, hubData] = await Promise.all([get("/api/dashboard" + qs({ period: state.period, hub: scopeHub() })), loadHubData(state.period, pay)]);
-    const k = d.kpis;
-    const info = hubInfo(hubData, state.period);
-    const stats = Object.fromEntries(d.by_hub.map((h) => [h.code, h]));
-    // One card per hub: people, sales and (for those who may see pay) salaries. The whole card opens the hub.
-    const hubTile = (h) => {
-      const x = info[h.code], st = stats[h.code] || {};
-      return html`<a class="card hub-tile" href="/hubs/${encodeURIComponent(h.code)}" data-link>
-        <span class="hub-top"><b class="hub-name">${h.name}</b><span class="faint">${h.code}${h.status !== "active" ? " · inactive" : ""}</span></span>
-        <span class="hub-count">${plural(x.active.length, "person", "people")}</span>
-        <span class="hub-nums"><span><small>Sales</small><b class="num">${compact(x.sales)}</b></span>
-          ${pay ? html`<span><small>Salaries</small><b class="num">${compact(st.to_bank || 0)}</b></span>` : ""}</span></a>`;
-    };
     const first = state.user.full_name.split(" ")[0];
-
     el.innerHTML = html`<div class="dash dash-min">
-      <div class="page-head">
-        <div><h1>${greeting()}, ${first}</h1>
-          <p>${monthName(d.period)} · ${badge(d.status)}</p></div>
-      </div>
+      <div class="page-head"><div><h1>${greeting()}, ${first}</h1><p id="dash-sub"></p></div></div>
+      <div id="dash-range" class="mb-4"></div>
+      <div id="dash-body"><div class="loading-screen"><div class="spinner"></div></div></div></div>`.toString();
 
-      ${pay ? monthCard(d, k) : ""}
+    // "This month" follows the month chosen at the top (the pay month), so the sales here and the salaries below are for the same month.
+    const lastDay = (p) => { const [y, m] = p.split("-").map(Number); return `${p}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
+    const effective = (r) => (r.preset === "month" ? { ...r, from: `${state.period}-01`, to: state.period === today().slice(0, 7) ? today() : lastDay(state.period) } : r);
 
-      <div class="grid kpis">
-        ${kpi("Business", money(k.hub_business))}
-        ${kpi("Cash and stock short", money(k.settle_up + k.stock_shortfall), `Cash Rs ${money(k.settle_up)} · Stock Rs ${money(k.stock_shortfall)}`)}
-      </div>
+    const hubData = await loadHubData(state.period, pay);
+    let seq = 0, picker = null;
+    const load = async () => {
+      const mine = ++seq, r = picker.get();
+      const d = await get("/api/dashboard" + qs({ period: state.period, hub: scopeHub(), from: r.from, to: r.to }));
+      if (mine !== seq) return;
+      const k = d.kpis;
+      const info = hubInfo(hubData, state.period);
+      const stats = Object.fromEntries(d.by_hub.map((h) => [h.code, h]));
+      // One card per hub: people, sales for the chosen dates and (for those who may see pay) salaries. The whole card opens the hub.
+      const hubTile = (h) => {
+        const x = info[h.code], st = stats[h.code] || {};
+        return html`<a class="card hub-tile" href="/hubs/${encodeURIComponent(h.code)}" data-link>
+          <span class="hub-top"><b class="hub-name">${h.name}</b><span class="faint">${h.code}${h.status !== "active" ? " · inactive" : ""}</span></span>
+          <span class="hub-count">${plural(x.active.length, "person", "people")}</span>
+          <span class="hub-nums"><span><small>Sales</small><b class="num">${compact(st.hub_business || 0)}</b></span>
+            ${pay ? html`<span><small>Salaries</small><b class="num">${compact(st.to_bank || 0)}</b></span>` : ""}</span></a>`;
+      };
+      $("#dash-sub").innerHTML = html`${monthName(d.period)} · ${badge(d.status)}`.toString();
+      $("#dash-body").innerHTML = html`
+        ${pay ? monthCard(d, k) : ""}
 
-      <section class="mt-5" aria-labelledby="hubs-h">
-        <div class="row between" style="margin-bottom:12px"><h2 id="hubs-h" class="section-title">${scopeHub() ? "Your hub" : "Hubs"}</h2>
-          <a class="btn sm" href="/hubs" data-link>All hubs and people</a></div>
-        ${hubData.hubs.length ? html`<div class="grid three">${hubData.hubs.map(hubTile)}</div>`
-          : html`<div class="card">${emptyState("No hubs yet", "Add your first hub to start adding people.", "store", can("manage_hubs") ? `<a class="btn primary" href="/hubs" data-link>Add a hub</a>` : "")}</div>`}
-      </section></div>`;
+        <div class="grid kpis">
+          ${kpi("Business", money(k.hub_business), rangeText(r))}
+          ${kpi("Cash short", money(k.settle_up), `Sales minus cash handed in, ${rangeText(r)}`)}
+          ${kpi("Stock short", money(k.stock_shortfall), `From the stock count for ${monthName(d.period)}`)}
+        </div>
+
+        <section class="mt-5" aria-labelledby="hubs-h">
+          <div class="row between" style="margin-bottom:12px"><h2 id="hubs-h" class="section-title">${scopeHub() ? "Your hub" : "Hubs"}</h2>
+            <a class="btn sm" href="/hubs" data-link>All hubs and people</a></div>
+          ${hubData.hubs.length ? html`<div class="grid three">${hubData.hubs.map(hubTile)}</div>`
+            : html`<div class="card">${emptyState("No hubs yet", "Add your first hub to start adding people.", "store", can("manage_hubs") ? `<a class="btn primary" href="/hubs" data-link>Add a hub</a>` : "")}</div>`}
+        </section>`.toString();
+    };
+    picker = mountRange($("#dash-range"), { page: "dashboard", fallback: "month", resolve: effective, onChange: () => load().catch((e) => toast(e.message, "warn")) });
+    await load();
   },
 };

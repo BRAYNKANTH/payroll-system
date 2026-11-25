@@ -100,6 +100,22 @@ test("a month cannot be closed while sellers' days wait for the coacher's approv
   assert.equal((await svc.getPeriod(d, p)).status, "finalized");
 });
 
+test("the dashboard's sales and cash follow a date range; without one it is the pay month", async () => {
+  const d = await setup();
+  await svc.createEntry(d, "daily", { date: "2026-10-05", employee_id: "D1", business_amount: 1000, settled_amount: 900 }, "clerk");
+  await svc.createEntry(d, "daily", { date: "2026-10-20", employee_id: "D1", business_amount: 3000, settled_amount: 3000 }, "clerk");
+  const k = (x) => [x.kpis.hub_business, x.kpis.settle_up];
+  assert.deepEqual(k(await svc.dashboard(d, "2026-10")), [400000, 10000], "no range: the whole month");
+  assert.deepEqual(k(await svc.dashboard(d, "2026-10", undefined, { from: "2026-10-01", to: "2026-10-10" })), [100000, 10000]);
+  assert.deepEqual(k(await svc.dashboard(d, "2026-10", undefined, { from: "2026-10-11", to: "2026-10-31" })), [300000, 0]);
+  assert.deepEqual(k(await svc.dashboard(d, "2026-10", undefined, { from: "2026-09-25", to: "2026-10-31" })), [400000, 10000], "a range may reach outside the month");
+  const h1 = await svc.dashboard(d, "2026-10", undefined, { from: "2026-10-01", to: "2026-10-10" });
+  assert.equal(h1.by_hub.find((h) => h.code === "H1").hub_business, 100000);
+  assert.equal((await svc.dashboard(d, "2026-10", "H2", { from: "2026-10-01", to: "2026-10-31" })).kpis.hub_business, 0, "a hub sees only its own sales");
+  await assert.rejects(() => svc.dashboard(d, "2026-10", undefined, { from: "2026-10-10", to: "2026-10-01" }), /start date is after/);
+  await assert.rejects(() => svc.dashboard(d, "2026-10", undefined, { from: "nope", to: "2026-10-01" }), /YYYY-MM-DD/);
+});
+
 test("payroll flags days nobody has confirmed, and the flag goes once they are confirmed", async () => {
   const d = await setup();
   const u = await login(d, "D1", "u-d1");
