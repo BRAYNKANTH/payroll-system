@@ -3171,3 +3171,11 @@ html.fx .org-toggle { animation: none; }
 .step-n { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .todo-row.is-next { background: var(--primary-soft); }
 .todo-row.is-next .muted { color: var(--text-2); }
+
+/* ===== Salary notes in plain words ===== */
+.flag-todo { display: inline-block; margin-top: 4px; }
+.flag-legend { padding: 10px 18px; border-bottom: 1px solid var(--border); }
+.flag-legend summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.flag-legend dl { margin: 8px 0 4px; display: grid; gap: 10px; }
+.flag-legend dt { font-weight: 650; }
+.flag-legend dd { margin: 2px 0 0; color: var(--text-2); }

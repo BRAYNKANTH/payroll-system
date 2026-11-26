@@ -1,7 +1,7 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
 import { readQuery, writeQuery, exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce, confirmDialog } from "../ui.js";
-import { openBreakdown } from "./breakdown.js";
+import { openBreakdown, FLAG_HELP, flagLabel } from "./breakdown.js";
 
 let filter = "all";
 let search = "";
@@ -58,6 +58,9 @@ export default {
             <a href="/api/payroll/${p}/payslips" target="_blank" rel="noopener">${icon("printer")} All payslips (print view)</a>
           </div></details>
         </div>
+        ${noted ? html`<details class="flag-legend"><summary>What do the notes mean?</summary>
+          <p class="muted">A note never stops anything. It points at something worth a look before you close the month. Tap a person to see what to do.</p>
+          <dl>${[...new Set(all.flatMap((r) => r.flags.map((f) => f.code)))].map((c) => html`<div><dt>${flagLabel(c)}</dt><dd>${FLAG_HELP[c]?.what || ""}</dd></div>`)}</dl></details>` : ""}
         <div class="card-body flush" id="table"></div>
       </div>` : html`<div class="card">${emptyState("Salaries not worked out yet",
         can("run_payroll") ? "When the sheets are in, press “Work out salaries”. You can update the figures as often as you like." : "The admin needs to work out the salaries for this month.", "play",
@@ -74,7 +77,7 @@ export default {
       $("#table").innerHTML = dataTable({
         rows, footer: true, pageSize: 25, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
         card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${hubName(r.hub)}</span>
-            ${r.flags.length ? html`<span class="mc-flags">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</span>` : ""}</span>
+            ${r.flags.length ? html`<span class="mc-flags">${r.flags.map((f) => html`<span class="chip">${flagLabel(f.code)}</span>`)}</span>` : ""}</span>
           <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
         summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"} · net pay Rs ${money(sum("net_pay", rs))} · salary Rs ${money(sum("disbursed_amount", rs))}`,
         onRow: (r) => openBreakdown(r, p, { finalized, onChange: () => this.render(ctx) }),
@@ -89,7 +92,7 @@ export default {
           { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>`, total: (rs) => money(sum("net_pay", rs)) },
           { key: "disbursed_amount", label: "Salary", align: "r", render: (r) => money(r.disbursed_amount), total: (rs) => money(sum("disbursed_amount", rs)) },
           { key: "closing_balance", label: "Closing", align: "r", render: (r) => html`<span class="${r.closing_balance < 0 ? "neg" : ""}">${money(r.closing_balance)}</span>`, total: (rs) => money(sum("closing_balance", rs)) },
-          { key: "status", label: "Status", render: (r) => html`${badge(r.status)}${r.flags.length ? html`<div style="margin-top:4px">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</div>` : ""}` },
+          { key: "status", label: "Status", render: (r) => html`${badge(r.status)}${r.flags.length ? html`<div style="margin-top:4px">${r.flags.map((f) => html`<span class="chip" title="${FLAG_HELP[f.code]?.what || f.message}">${flagLabel(f.code)}</span>`)}</div>` : ""}` },
         ],
       }).toString();
       return rows.length;

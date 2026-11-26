@@ -6,8 +6,24 @@ import { $, html, icon, money, badge, drawer, toast, busy, confirmDialog, dateTi
 const lines = (items) => items.filter((i) => i.amount !== 0 || /Basic|Profit/.test(i.label))
   .map((i) => html`<tr><td>${i.label}</td><td class="${i.amount < 0 ? "neg" : ""}">${money(i.amount)}</td></tr>`);
 
+// The notes on a salary line, in plain words: what the note is, why it appears, and what to do about it. None of them blocks anything;
+// they only point at something worth a look before the month is closed.
+export const FLAG_HELP = {
+  UNCONFIRMED_SALES: { label: "Days not confirmed", what: "The seller entered these days on their phone and nobody has checked them yet. They are counted in the pay.", todo: "Open Live sales and confirm them, or correct them first.", href: "/live" },
+  NEGATIVE_DEDUCTION: { label: "More cash than sales", what: "On some day the seller handed in more cash than they sold, or an amount below zero was entered. That would raise their pay.", todo: "Open the daily sheet for that day and fix Handed in. If it pays back an earlier shortage, nothing needs fixing.", href: "/daily" },
+  DEDUCTIONS_EXCEED_GROSS: { label: "Takes off more than earned", what: "Cash short, missing stock, advances and the deposit add up to more than this month's earnings. The rest carries into next month.", todo: "Check the daily sheets for a typing slip. If the figures are right, nothing needs doing.", href: "/daily" },
+  NET_PAY_CHANGE: { label: "Pay changed a lot", what: "This month's net pay is very different from last month's.", todo: "Check the sheets behind it: a missing or doubled day, or a stock shortfall.", href: "/daily" },
+  STOCK_SHORTFALL: { label: "Stock missing", what: "The stock count found missing products worth more than the limit. Their value is taken off this person's pay.", todo: "Check the stock count for the month. Correct it if it was a counting mistake.", href: "/stock" },
+  MANAGER_BALANCE_DEEPER_NEGATIVE: { label: "Manager balance worse", what: "The manager's balance is lower than last month's: they owe the company more.", todo: "Check the weekly sheets (rent, fees, drawings) for this manager.", href: "/weekly" },
+};
+export const flagLabel = (code) => FLAG_HELP[code]?.label || String(code).replace(/_/g, " ").toLowerCase();
+
 export function flagList(flags) {
-  return flags.map((f) => html`<div class="flag">${icon("alert")}<div><b>${f.code.replace(/_/g, " ")}</b><br><span>${f.message}</span></div></div>`);
+  return flags.map((f) => {
+    const h = FLAG_HELP[f.code];
+    return html`<div class="flag">${icon("alert")}<div><b>${h ? h.label : f.code.replace(/_/g, " ")}</b>
+      ${h ? html`<br><span>${h.what}</span><br><span class="muted">Here: ${f.message}</span><br><span class="flag-todo"><b>What to do:</b> ${h.todo} <a href="${h.href}" data-link data-close>Open</a></span>` : html`<br><span>${f.message}</span>`}</div></div>`;
+  });
 }
 
 export function openPayslip(period, id) {
