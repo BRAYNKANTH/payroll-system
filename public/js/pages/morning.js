@@ -117,8 +117,10 @@ export default {
       const prod = (id) => d.products.find((p) => p.id === Number(id));
       const drawResults = () => {
         const t = q.value.trim().toLowerCase();
-        const list = d.products.filter((p) => !cart.has(p.id) && (!t || p.name.toLowerCase().includes(t))).slice(0, 8);
-        res.innerHTML = list.length ? list.map((p) => html`<li><button type="button" class="give-pick" data-add="${p.id}" ${pool[p.id] ? "" : "disabled"}><span><b>${p.name}</b><span class="muted"> ${rs(p.price)} · ${pool[p.id] || 0} in the hub${have[p.id] ? ` · ${have[p.id]} carried over` : ""}</span></span><span class="btn sm">${pool[p.id] ? "Add" : "None left"}</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
+        // Products the hub has come first, then the ones it has run out of; the list scrolls, so a long catalogue stays short on screen.
+        const list = d.products.filter((p) => !cart.has(p.id) && (!t || p.name.toLowerCase().includes(t)))
+          .sort((a, b) => (pool[b.id] ? 1 : 0) - (pool[a.id] ? 1 : 0) || a.name.localeCompare(b.name)).slice(0, 80);
+        res.innerHTML = list.length ? list.map((p) => html`<li><button type="button" class="give-pick" data-add="${p.id}" ${pool[p.id] ? "" : "disabled"}><span class="gp-main"><b>${p.name}</b><span class="muted">Hub ${Number(pool[p.id] || 0).toLocaleString("en-LK")}${have[p.id] ? ` · Seller has ${have[p.id]}` : ""}</span></span><span class="gp-add">${pool[p.id] ? "+ Add" : "None"}</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
       };
       const drawCart = () => {
         cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).name}</b><span class="muted">${pool[id]} in the hub</span></label>

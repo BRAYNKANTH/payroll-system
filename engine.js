@@ -219,7 +219,7 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
 
 // Promoting managers and coachers — monthly. A fixed basic salary plus a share (rate) of the sales of everyone below them.
 // Both are paid to the bank; they hold no weekly account.
-function computeSenior({ staff, belowSales = 0, rate = 0, openingBalance = 0 }) {
+function computeSenior({ staff, belowSales = 0, rate = 0, openingBalance = 0, shareOf = "your team's sales" }) {
   const salary = Number(staff.basic_pay) || 0;
   const commission = pct(belowSales, rate);
   const gross = salary + commission;
@@ -236,7 +236,7 @@ function computeSenior({ staff, belowSales = 0, rate = 0, openingBalance = 0 }) 
       basic_salary: salary, below_sales: belowSales, commission_rate: rate,
       earnings: [
         { label: "Basic salary", amount: salary },
-        { label: `Share of your team's sales (${fmtRate(rate)} of Rs ${fmt(belowSales)})`, amount: commission },
+        { label: `Share of ${shareOf} (${fmtRate(rate)} of Rs ${fmt(belowSales)})`, amount: commission },
       ],
       deductions: [],
     },

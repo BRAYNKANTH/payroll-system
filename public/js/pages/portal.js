@@ -26,6 +26,7 @@ const readBase64 = (file) => new Promise((ok, fail) => {
 function payRules(p, me, rate) {
   const rs = (c) => `Rs ${money(c)}`;
   const lines = [];
+  if (me?.staff_level === "promoting_manager") return [`A fixed salary of <b>${rs(p.basic_pay)}</b> every month.`, `Plus <b>${pct(rate, 2)}</b> of the sales of each manager directly under you: the manager's own sales and everyone under that manager. A promoting manager under you is paid on their own managers, so nobody is paid twice on the same sales.`, `Worked out by the office when the month closes.`];
   if (me?.senior) return [`A fixed salary of <b>${rs(p.basic_pay)}</b> every month, every month.`, `Plus <b>${pct(rate, 2)}</b> of the sales of everyone below you, worked out by the office when the month closes.`];
   if (me?.is_manager) return [`Your pay is your basic salary of <b>${rs(p.basic_pay)}</b> plus the weekly commission on your own and your team's sales (20% when the week reaches your target, otherwise 15%) and your own sales commission, less the weekly rent and hub fee and any extra pay or food you give your team.`, `It is all paid at month end.`];
   if (p.pay_scheme === "tiered") {
@@ -221,10 +222,12 @@ export default {
           <div class="h-foot">Sales Rs ${n0(m.business)} of Rs ${n0(m.target)} target · ${pct(attain, 0)}</div>` : ""}
         </section>
         <div class="stats">${raw((me.senior ? [
-          stat("Team sales so far", `<small>Rs</small>${n0(d.below_sales)}`, `${d.team.filter((p) => p.business).length} of ${d.team.length} people have sales`, "chart", "blue"),
+          me.staff_level === "promoting_manager"
+            ? stat("Sales you earn on", `<small>Rs</small>${n0(d.share_sales)}`, `the groups of your ${d.team.filter((p) => p.depth === 1 && p.level_name === "Manager").length} managers`, "chart", "blue")
+            : stat("Team sales so far", `<small>Rs</small>${n0(d.below_sales)}`, `${d.team.filter((p) => p.business).length} of ${d.team.length} people have sales`, "chart", "blue"),
           stat("People below you", String(d.team.length), "managers, supervisors and distributors", "users", ""),
           stat("Your salary", `<small>Rs</small>${n0(me.pay.basic_pay)}`, "each month", "wallet", "green"),
-          stat("Your share rate", pct(d.senior_rate, 2), "of the sales below you", "trend", "amber"),
+          stat("Your share rate", pct(d.senior_rate, 2), me.staff_level === "promoting_manager" ? "of your managers' groups" : "of the sales below you", "trend", "amber"),
         ] : [
           stat("Sales so far", `<small>Rs</small>${n0(m.business)}`, `${m.days} day${m.days === 1 ? "" : "s"} worked`, "chart", "blue"),
           m.over_target > 0 || attain >= 1 ? stat("Over target by", `<small>Rs</small>${n0(m.over_target)}`, "Target passed", "trend", "green") : stat("Still to go", `<small>Rs</small>${n0(m.to_go)}`, "to reach your target", "trend", "amber"),

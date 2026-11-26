@@ -86,7 +86,12 @@ export async function employeeForm(existing, onSaved) {
     const top = f.staff_level.value === "coacher"; // nobody is above a coacher
     const sel = f.upline_id;
     const want = keep ?? sel.value;
-    const cands = staff.filter((s) => s.status === "active" && s.employee_id !== e.employee_id && levelRank(s.staff_level || (s.role === "manager" ? "manager" : "distributor")) > rank);
+    // Promoting managers are a ladder (one may report to another); a seller never reports straight to a promoting manager.
+    const lvl = f.staff_level.value, ladder = lvl === "promoting_manager", seller = !isManagerLevel(lvl);
+    const cands = staff.filter((s) => {
+      const sl = s.staff_level || (s.role === "manager" ? "manager" : "distributor");
+      return s.status === "active" && s.employee_id !== e.employee_id && (levelRank(sl) > rank || (ladder && sl === "promoting_manager")) && !(seller && sl === "promoting_manager");
+    });
     sel.innerHTML = `<option value="">${top ? "Not applicable (top of the chain)" : cands.length ? "Not set yet" : "No one senior to this position yet"}</option>` +
       cands.map((s) => `<option value="${s.employee_id}">${s.name} · ${levelLabel(s.staff_level)} · ${s.hub}</option>`).join("");
     sel.value = cands.some((s) => s.employee_id === want) ? want : "";

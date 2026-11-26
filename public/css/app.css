@@ -2909,6 +2909,53 @@ body[data-filters="month"] #hub-filter { display: none !important; }
 .hint.pos { color: var(--success); }
 .hint.neg { color: var(--danger); }
 
+/* Stock to hubs (the admin): what the office holds first, then each hub with its own Send button */
+.hs-office { padding: 14px 16px; }
+.hs-office-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.hs-office-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.hs-office-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2, transparent); }
+.hs-office-list li b { font-size: 18px; }
+.hs-office-list li.none { color: var(--text-3); }
+.hs-office-none { margin: 10px 0 0; font-size: 14px; color: var(--warning); }
+.hs-send-row { display: flex; align-items: center; }
+.hs-send-row .hs-row { flex: 1 1 auto; min-width: 0; }
+.hs-send-row .hs-send { flex: none; min-height: 44px; margin-right: 12px; }
+.hs-warn { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.hs-prod, .hs-prod li { list-style: none; margin: 0; padding: 0; }
+.hs-prod li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.hp-main, .hp-left, .gp-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hp-main .muted, .hp-left .muted, .gp-main .muted { font-size: 13px; }
+.hp-left { align-items: flex-end; text-align: right; }
+.hp-left b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.hp-left.low b { color: var(--warning); }
+.hs-prod li.none { color: var(--text-3); }
+.give-pick .gp-main b { font-size: 16px; }
+@media (max-width: 760px) {
+  .hs-office-list { grid-template-columns: 1fr 1fr; }
+  .hs-send-row .hs-send { padding-inline: 14px; }
+}
+.hs-send-row .hs-chev { display: none; }
+.hs-send-row .hs-row { border: 0 !important; box-shadow: none; }
+.hs-send-row + .hs-send-row { border-top: 1px solid var(--border); }
+.hs-send-row .hs-send { min-height: 40px; padding-inline: 14px; box-shadow: none; }
+
+/* Product pickers (send stock to a hub, give stock to a seller): one slim row per product, like a till, so a long catalogue stays short */
+.give-list:has(> li > .give-pick) { gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; }
+.give-list > li:has(> .give-pick) { display: block; padding: 0; border: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
+.give-list > li:has(> .give-pick):last-child { border-bottom: 0; }
+.give-pick { min-height: 48px; padding: 6px 12px; border: 0; border-radius: 0; background: transparent; text-align: left; }
+.give-pick .gp-main { flex: 1; }
+.give-pick .gp-main b { font-size: 15px; line-height: 1.25; }
+.give-pick .gp-main .muted { font-size: 12.5px; line-height: 1.25; white-space: normal; }
+.give-pick .gp-add { flex: none; min-width: 64px; text-align: center; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 13px; font-weight: 650; color: var(--primary); }
+.give-pick:hover:not([disabled]) { background: var(--primary-soft); }
+.give-pick[disabled] .gp-add { color: var(--text-3); border-color: transparent; }
+/* the lines already added: name, a quantity box and a remove button on one row */
+.give-list > li:has(> input) { grid-template-columns: minmax(0, 1fr) 84px 44px; gap: 8px; padding: 6px 8px 6px 12px; border-radius: 12px; }
+.give-list > li:has(> input) .input { height: 42px; font-size: 18px; }
+.give-list > li:has(> input) label b { font-size: 15px; }
+.give-list > li:has(> input) label .muted { font-size: 12.5px; }
+
 /* ===== World Entrepreneurs Company logo ===== */
 .brand-logo { width: 44px; height: 44px; border-radius: 50%; flex: none; display: block; object-fit: cover; box-shadow: 0 0 0 1px var(--border-strong), 0 3px 10px rgba(15, 23, 42, .18); background: #1b1917; }
 .brand-logo-lg { width: 76px; height: 76px; }

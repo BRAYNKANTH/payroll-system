@@ -57,7 +57,7 @@ export default {
           <div class="field"><label>A manager is "retaining" when the month's sales (their own plus their team's) are below (Rs)</label><input class="input" name="manager_retain_threshold" inputmode="decimal" value="${s.manager_retain_threshold / 100}"></div>
           <div class="field"><label>A retaining manager earns this % of those sales (plus their basic salary)</label><input class="input" name="manager_retain_rate" inputmode="decimal" value="${+(s.manager_retain_rate * 100).toFixed(4)}"></div>
           <div class="field"><label>A manager's own sales earn the seller's rate (%)</label><input class="input" name="manager_own_sales_rate" inputmode="decimal" value="${+(s.manager_own_sales_rate * 100).toFixed(4)}"></div>
-          <div class="field"><label>Promoting manager and coacher: share of the sales below them (%)</label><input class="input" name="senior_commission_rate" inputmode="decimal" value="${+(s.senior_commission_rate * 100).toFixed(4)}"><span class="hint">1% of the company's 55% share is 0.55%. To be confirmed with the owner.</span></div>
+          <div class="field"><label>Promoting manager and coacher: share of sales (%). A promoting manager earns it on the groups of the managers directly under them; a coacher on everyone below</label><input class="input" name="senior_commission_rate" inputmode="decimal" value="${+(s.senior_commission_rate * 100).toFixed(4)}"><span class="hint">1% of the company's 55% share is 0.55%. To be confirmed with the owner.</span></div>
         </div></div>
 
         <div class="card"><div class="card-head"><div><h2>Sign-in</h2></div></div><div class="card-body form-grid">

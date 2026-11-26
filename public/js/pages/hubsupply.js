@@ -22,17 +22,25 @@ export default {
     const low = (h) => h.stock.filter((x) => x.left > 0 && x.left <= LOW).length;
 
     // One line per hub.
-    const row = (h) => html`<li><button type="button" class="hs-row" data-open="${h.code}" aria-label="${h.name}: open its stock">
-      <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${n0(sum(h))} ${sum(h) === 1 ? "piece" : "pieces"} in the hub${h.status !== "active" ? " · inactive" : ""}</span></span>
-      <span class="hs-flags">${out(h) ? badge("red", `${out(h)} out`) : ""}${low(h) ? badge("amber", `${low(h)} low`) : ""}${!out(h) && !low(h) && sum(h) ? badge("green", "Enough") : ""}</span>
-      <span class="hs-chev" aria-hidden="true"></span></button></li>`;
+    const row = (h) => html`<li class="hs-send-row"><button type="button" class="hs-row" data-open="${h.code}" aria-label="${h.name}: see its stock">
+      <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${n0(sum(h))} in the hub${h.status !== "active" ? " · inactive" : ""}</span>
+        ${out(h) || low(h) ? html`<span class="hs-warn">${out(h) ? badge("red", `${out(h)} out`) : ""}${low(h) ? badge("amber", `${low(h)} low`) : ""}</span>` : ""}</span>
+      <span class="hs-chev" aria-hidden="true"></span></button>
+      <button type="button" class="btn primary hs-send" data-send="${h.code}" ${h.status !== "active" ? "disabled" : ""} aria-label="Send stock to ${h.name}">${icon("plus")} Send</button></li>`;
+
+    // What the office holds: the stock that can be sent. Shown first, so nobody has to open a hub to find out.
+    const officeList = (d.hubs[0]?.stock || []).map((x) => ({ name: x.product, left: office[x.product_id] || 0 }));
+    const officeCard = officeList.length ? html`<section class="card hs-office mb-4" aria-label="Stock in the office">
+      <div class="hs-office-head"><b>In the office</b><span class="muted">Available to send</span></div>
+      <ul class="hs-office-list" role="list">${officeList.map((p) => html`<li class="${p.left === 0 ? "none" : ""}"><span>${p.name}</span><b class="num">${n0(p.left)}</b></li>`)}</ul>
+      ${officeList.every((p) => p.left < 1) ? html`<p class="hs-office-none">The office has no stock to send. <a href="/products" data-link>Add stock on Products</a>.</p>` : ""}</section>` : "";
 
     el.innerHTML = html`<div class="hsup-page">
       <div class="page-head">
-        <div><h1>Stock to hubs</h1><p>Send products to a hub. The hub's coacher then gives the stock out to the sellers, and can only give what the hub holds.</p></div>
+        <div><h1>Stock to hubs</h1><p>Send products from the office to a hub. The hub's coacher then gives the stock out to the sellers.</p></div>
       </div>
       ${noProducts ? html`<div class="card">${emptyState("No products yet", "Add your products first, then send them to the hubs.", "box", `<a class="btn primary" href="/products" data-link>Add products</a>`)}</div>`
-        : html`<div class="card hs-list"><ul role="list">${d.hubs.map(row)}</ul></div><p class="muted hs-hint">Tap a hub to see its stock and send more.</p>`}</div>`;
+        : html`${officeCard}<h2 class="section-title drill-h">Hubs</h2><div class="card hs-list"><ul role="list">${d.hubs.map(row)}</ul></div><p class="muted hs-hint">Press Send to send stock to a hub. Tap a hub's name to see what it holds.</p>`}</div>`;
 
     // A hub opened: its stock per product and the latest stock sent. From here: Send stock, or take a mistake back.
     const openHub = (h) => {
@@ -40,13 +48,12 @@ export default {
         title: h.name,
         body: html`<div class="hs-detail">
           <div class="muted" style="margin:0 0 10px">${h.code} · ${n0(sum(h))} pieces in the hub</div>
-          <div class="table-wrap"><table class="till-stock"><caption class="sr-only">Stock held by ${h.name}</caption>
-            <thead><tr><th scope="col">Product</th><th scope="col">Sent</th><th scope="col">Given out</th><th scope="col">In the hub</th></tr></thead>
-            <tbody>${h.stock.map((x) => html`<tr class="${x.left === 0 ? "none" : ""}"><th scope="row">${x.product}</th><td>${x.received}</td><td>${x.given}</td>
-              <td class="left ${x.left > 0 && x.left <= LOW ? "low" : ""}"><b>${x.left}</b>${x.left > 0 && x.left <= LOW ? html`<span class="tag">Low</span>` : ""}</td></tr>`)}</tbody></table></div>
+          <ul class="hs-prod" role="list" aria-label="Stock held by ${h.name}">${h.stock.map((x) => html`<li class="${x.left === 0 ? "none" : ""}">
+            <span class="hp-main"><b>${x.product}</b><span class="muted">Sent ${n0(x.received)} · Given out ${n0(x.given)}</span></span>
+            <span class="hp-left ${x.left > 0 && x.left <= LOW ? "low" : ""}"><b class="num">${n0(x.left)}</b><span class="muted">in the hub${x.left > 0 && x.left <= LOW ? " · low" : x.left === 0 ? " · out" : ""}</span></span></li>`)}</ul>
           ${h.recent.length ? html`<div class="mc-label" style="margin:16px 0 6px">Latest stock sent</div>
             <ul class="till-lines" role="list" style="margin:0">${h.recent.slice(0, 8).map((r) => html`<li><div class="tl-main"><b>${r.qty} × ${r.product}</b><span class="muted">${dayLabel(r.date)} · by ${r.by}${r.note ? ` · ${r.note}` : ""}</span></div><span></span>
-              <button type="button" class="btn sm ghost icon" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">${icon("x")}</button></li>`)}</ul>` : html`<p class="muted" style="margin-top:14px">Nothing has been sent to this hub yet.</p>`}
+              <button type="button" class="btn sm" data-del="${r.id}" aria-label="Take back ${r.qty} ${r.product} sent to ${h.name}">Take back</button></li>`)}</ul>` : html`<p class="muted" style="margin-top:14px">Nothing has been sent to this hub yet.</p>`}
         </div>`.toString(),
         foot: `<button class="btn" data-close>Close</button><button class="btn primary" id="hs-send" ${h.status !== "active" ? "disabled" : ""}>${icon("plus")} Send stock</button>`,
       });
@@ -77,11 +84,13 @@ export default {
       const total = () => [...cart.values()].reduce((a, n) => a + n, 0);
       const drawResults = () => {
         const t = q.value.trim().toLowerCase();
-        const list = h.stock.filter((x) => !cart.has(x.product_id) && (!t || x.product.toLowerCase().includes(t))).slice(0, 8);
-        res.innerHTML = list.length ? list.map((x) => html`<li><button type="button" class="give-pick" data-add="${x.product_id}" ${office[x.product_id] ? "" : "disabled"}><span><b>${x.product}</b><span class="muted"> ${rs(x.price)} · ${office[x.product_id] || 0} in the office · ${x.left} in the hub</span></span><span class="btn sm">${office[x.product_id] ? "Add" : "None in the office"}</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
+        // Products the office has come first, then the ones it has run out of; the list scrolls, so a long catalogue stays short on screen.
+        const list = h.stock.filter((x) => !cart.has(x.product_id) && (!t || x.product.toLowerCase().includes(t)))
+          .sort((a, b) => (office[b.product_id] ? 1 : 0) - (office[a.product_id] ? 1 : 0) || a.product.localeCompare(b.product)).slice(0, 80);
+        res.innerHTML = list.length ? list.map((x) => html`<li><button type="button" class="give-pick" data-add="${x.product_id}" ${office[x.product_id] ? "" : "disabled"}><span class="gp-main"><b>${x.product}</b><span class="muted">Office ${n0(office[x.product_id] || 0)} · Hub ${n0(x.left)}</span></span><span class="gp-add">${office[x.product_id] ? "+ Add" : "None"}</span></button></li>`).join("") : `<li class="muted" style="padding:8px 2px">${t ? "No product matches" : "All products are added"}</li>`;
       };
       const drawCart = () => {
-        cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).product}</b><span class="muted">${office[id] || 0} in the office</span></label>
+        cartEl.innerHTML = cart.size ? [...cart].map(([id, n]) => html`<li><label for="c${id}"><b>${prod(id).product}</b><span class="muted">Office has ${n0(office[id] || 0)}</span></label>
           <input class="input" id="c${id}" data-cid="${id}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" value="${n}" aria-label="Quantity of ${prod(id).product} to send">
           <button type="button" class="mc-x" data-rm="${id}" aria-label="Remove ${prod(id).product}">${icon("x")}</button></li>`).join("") : `<li class="muted" style="padding:8px 2px">Nothing added yet</li>`;
         $("#s-count", dr.panel).textContent = cart.size ? `· ${total()} pieces` : "";
@@ -107,5 +116,6 @@ export default {
     };
 
     $$("[data-open]", el).forEach((b) => (b.onclick = () => openHub(d.hubs.find((x) => x.code === b.dataset.open))));
+    $$("[data-send]", el).forEach((b) => (b.onclick = () => sendStock(d.hubs.find((x) => x.code === b.dataset.send))));
   },
 };

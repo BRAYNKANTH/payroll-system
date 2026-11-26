@@ -265,8 +265,22 @@ async function applyChain(db, row, existing = {}, id) {
     if (m.upline_id === id) throw httpError(400, "An employee cannot report to themselves");
     const up = await db.get("SELECT staff_level FROM staff WHERE employee_id = ?", m.upline_id);
     if (!up) throw httpError(400, `Unknown upline ${m.upline_id}`);
-    if (LEVEL_RANK[up.staff_level] <= LEVEL_RANK[m.staff_level]) {
+    // Promoting managers are a ladder: one can sit under another. Every other position reports to someone strictly more senior.
+    const ladder = m.staff_level === "promoting_manager" && up.staff_level === "promoting_manager";
+    if (!ladder && LEVEL_RANK[up.staff_level] <= LEVEL_RANK[m.staff_level]) {
       throw httpError(400, `A ${LEVEL_NAME[m.staff_level].toLowerCase()} must report to someone more senior, not a ${LEVEL_NAME[up.staff_level].toLowerCase()}`);
+    }
+    // A seller reports to a manager, never straight to a promoting manager (a promoting manager earns from their managers' groups).
+    if (m.role === "guy" && up.staff_level === "promoting_manager") {
+      throw httpError(400, "A distributor or supervisor reports to a manager, not directly to a promoting manager");
+    }
+    // Nobody can end up above themselves: walk up from the chosen boss and make sure this person is not on the way.
+    if (id) {
+      let cur = m.upline_id;
+      for (let i = 0; cur && i < 20; i++) {
+        if (cur === id) throw httpError(400, "That would put this person above themselves in the chain");
+        cur = (await db.get("SELECT upline_id FROM staff WHERE employee_id = ?", cur))?.upline_id;
+      }
     }
     // The nearest manager above this person is their payroll manager, unless one was set explicitly.
     if (m.role === "guy" && row.manager_id === undefined && row.upline_id !== undefined) {
@@ -547,6 +561,10 @@ async function runPeriod(db, period, user) {
     const salesOf = (id) => (daily.get(id) || []).reduce((t, r) => t + Number(r.business_amount), 0);
     const kids = groupBy(staff, "upline_id");
     const belowSales = (id, depth = 0) => (kids.get(id) || []).reduce((t, k) => t + salesOf(k.employee_id) + (depth < 8 ? belowSales(k.employee_id, depth + 1) : 0), 0);
+    // A promoting manager earns the senior share on the groups of the managers directly under them: each manager's own sales plus everyone
+    // under that manager. A promoting manager under another is paid by the same rule on their own managers, so nobody is paid twice on a group.
+    const groupSales = (id) => salesOf(id) + belowSales(id);
+    const managersGroups = (id) => (kids.get(id) || []).filter((k) => k.staff_level === "manager").reduce((t, k) => t + groupSales(k.employee_id), 0);
     const rules = { ownRate: Number(settings.manager_own_sales_rate), retainThreshold: Number(settings.manager_retain_threshold), retainRate: Number(settings.manager_retain_rate) };
 
     const results = new Map();
@@ -574,8 +592,11 @@ async function runPeriod(db, period, user) {
       const prev = prevBy.get(m.employee_id);
       const openingBalance = prev ? prev.closing_balance : Number(m.opening_balance) || 0;
       if (m.staff_level !== "manager") {
-        // Promoting manager and coacher: basic salary plus a share of the sales of everyone below them.
-        results.set(m.employee_id, { staff: m, prev, result: engine.computeSenior({ staff: m, belowSales: belowSales(m.employee_id), rate: Number(settings.senior_commission_rate), openingBalance }) });
+        // Coacher: basic salary plus a share of the sales of everyone below. Promoting manager: basic salary plus the share on the groups of the
+        // managers directly under them.
+        const promoting = m.staff_level === "promoting_manager";
+        results.set(m.employee_id, { staff: m, prev, result: engine.computeSenior({ staff: m, belowSales: promoting ? managersGroups(m.employee_id) : belowSales(m.employee_id),
+          rate: Number(settings.senior_commission_rate), openingBalance, shareOf: promoting ? "your managers' groups" : "your team's sales" }) });
         continue;
       }
       const sellers = guys.filter((g) => g.manager_id === m.employee_id && results.has(g.employee_id));

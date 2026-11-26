@@ -43,7 +43,7 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
   const settings = await getSettings(db);
 
   // Everyone below this person in the chain, with their sales this month (sales only, never anyone's pay).
-  let team = null;
+  let team = null, shareSales = null; // shareSales: what a promoting manager's share is worked out on (the groups of the managers directly under them)
   if (s.role === "manager") {
     const people = await db.all("SELECT employee_id, name, staff_level, upline_id, target, status FROM staff WHERE hub = ? AND status = 'active'", s.hub);
     const kids = new Map();
@@ -59,6 +59,11 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
       const byId = new Map(rows.map((r) => [r.employee_id, r]));
       team = below.map((p) => ({ employee_id: p.employee_id, name: p.name, level_name: svc.LEVEL_NAME[p.staff_level] || p.staff_level, depth: p.depth, target: Number(p.target) || 0,
         days: Number(byId.get(p.employee_id)?.days) || 0, business: Number(byId.get(p.employee_id)?.business) || 0, short: Number(byId.get(p.employee_id)?.short) || 0 }));
+      if (s.staff_level === "promoting_manager") {
+        const biz = new Map(team.map((p) => [p.employee_id, p.business]));
+        const group = (id, depth = 0) => (biz.get(id) || 0) + (depth < 8 ? (kids.get(id) || []).reduce((t, k) => t + group(k.employee_id, depth + 1), 0) : 0);
+        shareSales = (kids.get(s.employee_id) || []).filter((k) => k.staff_level === "manager").reduce((t, k) => t + group(k.employee_id), 0);
+      }
     }
   }
   const belowSales = team && !hideTeamSales ? team.reduce((t, p) => t + p.business, 0) : 0;
@@ -71,7 +76,9 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
     if (r) official = { gross: r.gross_earnings, deductions: r.total_deductions, net: r.net_pay, paid: r.disbursed_amount, opening: r.opening_balance,
       closing: r.closing_balance, ...(({ earnings, deductions }) => ({ earnings, deduction_lines: deductions }))(JSON.parse(r.detail)) };
   } else if (senior) {
-    const r = engine.computeSenior({ staff: s, belowSales, rate: Number(settings.senior_commission_rate) || 0, openingBalance: 0 });
+    const promoting = s.staff_level === "promoting_manager";
+    const r = engine.computeSenior({ staff: s, belowSales: promoting ? shareSales || 0 : belowSales, rate: Number(settings.senior_commission_rate) || 0, openingBalance: 0,
+      shareOf: promoting ? "your managers' groups" : "your team's sales" });
     estimate = { gross: r.gross_earnings, deductions: 0, net: r.net_pay, opening: 0, closing: 0, earnings: r.detail.earnings, deduction_lines: [] };
   } else if (isManager) {
     estimate = null; // a manager's pay comes from the weekly account, which the office completes
@@ -104,7 +111,7 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
       settle_up: sum(daily, "settle_up_minus"), personal: sum(daily, "personal_minus"),
       daily, stock: stock.map((k) => ({ product: k.product, shortfall_qty: k.shortfall_qty, unit_price: k.unit_price, shortfall_value: k.shortfall_value })), allowances,
     },
-    team, team_sales_hidden: hideTeamSales, below_sales: hideTeamSales ? null : belowSales, senior_rate: Number(settings.senior_commission_rate) || 0,
+    team, team_sales_hidden: hideTeamSales, below_sales: hideTeamSales ? null : belowSales, share_sales: hideTeamSales ? null : shareSales, senior_rate: Number(settings.senior_commission_rate) || 0,
     official, estimate, history, security_held: Number(security.held) || 0,
     loans: await loans.mine(db, s.employee_id, period),
   };
