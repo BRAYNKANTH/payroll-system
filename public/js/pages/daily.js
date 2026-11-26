@@ -244,7 +244,7 @@ function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
     <div id="sheet-errors"></div>
     ${editable ? html`<div class="savebar">
       <span class="muted" id="dirty-info" role="status">No unsaved changes</span>
-      <div class="row"><button type="button" class="btn" id="revert" disabled>Discard</button><button type="button" class="btn primary" id="save" disabled>${icon("check")} Save sheet</button></div></div>` : ""}`;
+      <div class="row">${firstCol === "Employee" ? html`<button type="button" class="btn" id="fill-settled" title="For every row with sales but nothing handed in yet, copy the sales into Handed in">${icon("check")} Handed in = sales</button>` : ""}<button type="button" class="btn" id="revert" disabled>Discard</button><button type="button" class="btn primary" id="save" disabled>${icon("check")} Save sheet</button></div></div>` : ""}`;
   if (groups) {
     $$("details.dgrp", grid).forEach((d) => d.addEventListener("toggle", () => saveClosed($$("details.dgrp", grid).filter((x) => !x.open).map((x) => x.dataset.gid))));
     $("#grp-open", grid).onclick = () => $$("details.dgrp", grid).forEach((d) => (d.open = true));
@@ -337,6 +337,17 @@ function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
       <ul style="margin:6px 0 0;padding-left:18px">${list.map((m) => html`<li>${m}</li>`)}</ul></div></div>`.toString() : "";
   };
   $("#revert").onclick = onSaved;
+  // One tap for the usual day: everyone handed in exactly what they sold. Only rows with sales and an empty Handed in are filled; the rest are left alone.
+  const fill = $("#fill-settled", grid);
+  if (fill) fill.onclick = () => {
+    let n = 0;
+    $$("tbody tr", grid).forEach((tr) => {
+      const bz = tr.querySelector('[data-f="business_amount"]'), st = tr.querySelector('[data-f="settled_amount"]');
+      if (bz.value.trim() && isAmount(bz.value) && !st.value.trim()) { st.value = bz.value; n++; }
+    });
+    refresh();
+    toast(n ? `${n} ${n === 1 ? "row" : "rows"} filled. Change any that handed in less, then save.` : "Nothing to fill: every row with sales already has an amount handed in");
+  };
   $("#save").onclick = (e) => busy(e.currentTarget, async () => {
     const out = [];
     const problems = [];
