@@ -107,6 +107,40 @@ async function sell(db, user, body) {
   return { line: { id: Number(line.id), product: line.product, qty: line.qty, unit_price: num(line.unit_price), amount: num(line.amount) }, state: await state(db, user) };
 }
 
+// A whole bill at once: several products, each with its quantity, saved together. Either every line is saved or none is.
+// The same product listed twice is added up first, so the stock check sees the true total.
+async function sellMany(db, user, body) {
+  const s = await sales.myself(db, user);
+  const want = new Map();
+  for (const it of Array.isArray(body.items) ? body.items : []) {
+    const id = Number(it.product_id);
+    if (!Number.isInteger(id)) throw httpError(400, "Choose a product from the list");
+    want.set(id, (want.get(id) || 0) + qty(it.qty));
+  }
+  if (!want.size) throw httpError(400, "Add at least one product to the bill");
+  if (want.size > 100) throw httpError(400, "That bill is too long");
+  const date = sales.today();
+  const lines = await withUser(db, user.username, async (t) => {
+    await assertOpenDay(t, s, date);
+    const stock = await stockOf(t, s.employee_id, date);
+    const out = [];
+    for (const [id, n] of want) {
+      const p = await t.get("SELECT id, name, list_price, status FROM products WHERE id = ?", id);
+      if (!p || p.status !== "active") throw httpError(400, "Choose a product from the list");
+      const have = stock.get(key(p.id))?.left || 0;
+      if (have <= 0) throw httpError(409, `You have no ${p.name} left. Ask your hub for more stock`);
+      if (n > have) throw httpError(409, `You only have ${have} ${p.name} left`);
+      const price = num(p.list_price);
+      const row = await t.get(`INSERT INTO sale_lines (date, employee_id, product_id, qty, unit_price, amount, created_by) VALUES (?,?,?,?,?,?,?) RETURNING id, qty, unit_price, amount`,
+        date, s.employee_id, p.id, n, price, n * price, user.username);
+      out.push({ id: Number(row.id), product: p.name, qty: row.qty, unit_price: num(row.unit_price), amount: num(row.amount) });
+    }
+    await syncDay(t, user, s, date);
+    return out;
+  }, { lockKey: "pos:" + s.employee_id });
+  return { lines, amount: lines.reduce((x, l) => x + l.amount, 0), state: await state(db, user) };
+}
+
 // A seller takes back a sale they made today, while the office has not confirmed the day.
 async function undo(db, user, id) {
   const s = await sales.myself(db, user);
@@ -397,4 +431,4 @@ async function takeFromHub(db, user, id) {
   return { deleted: true };
 }
 
-module.exports = { state, sell, undo, endOfDay, morning, give, giveMany, stockOverview, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };
+module.exports = { state, sell, sellMany, undo, endOfDay, morning, give, giveMany, stockOverview, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };

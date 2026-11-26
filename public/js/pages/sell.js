@@ -1,5 +1,5 @@
 // The till: a standard point-of-sale screen. Small plain lettering for names, big numbers for money and quantities.
-// Three views only: Sell (search, pick a product, set the quantity, tap Sell), Sales (today's sales, with undo) and Hand over (the cash handed in).
+// Three views only: Sell (a bill: one row per product with - and +, then one Save bill), Sales (today's sales, with undo) and Hand over (the cash handed in).
 // The date is always today and the price is always the list price. What is left of each product shows on its row.
 import { get, post, del } from "../api.js";
 import { buzz, $, $$, html, esc, icon, toast, busy, confirmDialog, emptyState, announce } from "../ui.js";
@@ -12,19 +12,21 @@ const rs = (c) => `Rs ${n0(c)}`;
 const when = (iso) => { try { return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Colombo" }); } catch { return ""; } };
 const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const LOW = 3; // this many or fewer pieces left shows as "low"
-const QUICK = [1, 2, 3, 5, 10];
 
 // Mounts the till into `box`. `onChanged` runs after anything is saved, so the rest of the page can refresh its totals.
 export async function mountSell(box, { onChanged = () => {} } = {}) {
   let st = await get("/api/me/pos");
-  let query = "", picked = null, qty = 1;
+  let query = "";
+  const bill = new Map(); // product id -> pieces on the bill being made (nothing is saved until "Save bill")
   let subtab = "sell";
 
   const draw = () => {
     // Without a search only the products the seller still has are shown; searching finds any product.
     const visible = st.products.filter((p) => p.active && (query ? p.name.toLowerCase().includes(query.toLowerCase()) : p.left > 0));
-    const sel = picked ? st.products.find((p) => p.id === picked) : null;
-    if (picked && (!sel || sel.left < 1)) picked = null;
+    for (const [id, n] of bill) { const p = st.products.find((x) => x.id === id); if (!p || p.left < 1) bill.delete(id); else if (n > p.left) bill.set(id, p.left); }
+    const billLines = bill.size;
+    const billCount = [...bill.values()].reduce((a, b) => a + b, 0);
+    const billTotal = [...bill].reduce((a, [id, n]) => a + n * (st.products.find((x) => x.id === id)?.price || 0), 0);
     const day = st.day, due = day.not_handed_in || 0;
 
     box.innerHTML = html`
@@ -55,28 +57,23 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
         </div>
         ${st.products.length && st.products.every((p) => p.left < 1) ? html`<div class="alert warn mb-3">${icon("box")}<div><b>No stock left to sell.</b> Ask your coacher or hub for more.</div></div>` : ""}
         ${visible.length ? html`
-          <ul class="pos-list" role="list" aria-label="Products">
-            ${visible.map((p) => html`<li><button type="button" class="pos-row ${picked === p.id ? "on" : ""}" data-p="${p.id}" aria-pressed="${picked === p.id}" ${p.left < 1 ? "disabled" : ""}>
-              <span class="pos-name">${p.name}<small class="${p.left < 1 ? "none" : p.left <= LOW ? "low" : ""}">${p.left < 1 ? "none left" : `${p.left} left`}</small></span>
-              <b class="pos-price">${n0(p.price)}</b>
-            </button></li>`)}
+          <ul class="pos-bill" role="list" aria-label="Bill">
+            ${visible.map((p) => { const n = bill.get(p.id) || 0; return html`<li class="pos-brow ${n ? "on" : ""}" data-row="${p.id}">
+              <span class="pos-name">${p.name}<small class="${p.left < 1 ? "none" : p.left <= LOW ? "low" : ""}">${n0(p.price)} each · ${p.left < 1 ? "none left" : `${p.left} left`}</small></span>
+              <span class="pos-bq" role="group" aria-label="Quantity of ${esc(p.name)}">
+                <button type="button" class="pos-step" data-minus="${p.id}" aria-label="One less ${esc(p.name)}" ${n < 1 ? "disabled" : ""}>${icon("minus")}</button>
+                <input class="pos-qn" data-qn="${p.id}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" value="${n || ""}" placeholder="0" aria-label="Pieces of ${esc(p.name)}" ${p.left < 1 ? "disabled" : ""}>
+                <button type="button" class="pos-step" data-plus="${p.id}" aria-label="One more ${esc(p.name)}" ${n >= p.left ? "disabled" : ""}>${icon("plus")}</button>
+              </span>
+              <b class="pos-amt">${n ? n0(n * p.price) : ""}</b>
+            </li>`; })}
           </ul>`
           : html`<p class="muted pos-empty">${!st.products.some((p) => p.active) ? "There are no products yet. Ask the office to add them." : query ? `No product matches “${esc(query)}”.` : "Nothing left to sell. Search to see every product."}</p>`}
-        ${sel ? html`
-          <section class="pos-ticket" aria-label="Sell ${esc(sel.name)}">
-            <div class="pos-t-top"><span class="pos-t-name">${sel.name}<small>${n0(sel.price)} each · ${sel.left} left</small></span>
-              <button type="button" class="pos-x" id="ts-close" aria-label="Close">${icon("x")}</button></div>
-            <div class="pos-qty" role="group" aria-label="Quantity">
-              <button type="button" class="pos-step" id="q-minus" aria-label="One less" ${qty <= 1 ? "disabled" : ""}>${icon("minus")}</button>
-              <input id="q" type="text" inputmode="numeric" pattern="[0-9]*" value="${qty}" aria-label="Quantity" maxlength="4">
-              <button type="button" class="pos-step" id="q-plus" aria-label="One more" ${qty >= sel.left ? "disabled" : ""}>${icon("plus")}</button>
-            </div>
-            <div class="pos-quick" aria-label="Quick quantity">
-              ${QUICK.filter((n) => n <= sel.left).map((n) => html`<button type="button" class="pos-chip ${qty === n ? "on" : ""}" data-q="${n}">${n}</button>`)}
-              ${sel.left > 1 && !QUICK.includes(sel.left) ? html`<button type="button" class="pos-chip ${qty === sel.left ? "on" : ""}" data-q="${sel.left}">All ${sel.left}</button>` : ""}
-            </div>
-            <button type="button" class="pos-sell" id="sell"><span>Sell</span><b>${n0(qty * sel.price)}</b></button>
-          </section>` : ""}`) : ""}
+        <div class="pos-bar" aria-live="polite">
+          <span class="pos-bar-sum"><small>${billCount} ${billCount === 1 ? "piece" : "pieces"}${billLines ? ` · ${billLines} ${billLines === 1 ? "item" : "items"}` : ""}</small><b>Rs ${n0(billTotal)}</b></span>
+          ${billLines ? html`<button type="button" class="btn ghost" id="bill-clear">Clear</button>` : ""}
+          <button type="button" class="pos-sell" id="bill-save" ${billLines ? "" : "disabled"}><span>Save bill</span>${icon("check")}</button>
+        </div>`) : ""}
 
       ${subtab === "sales" ? html`
         <section class="pos-panel" aria-label="Today's sales">
@@ -130,38 +127,32 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
     const clearBtn = $("#ts-clear", box);
     if (clearBtn) clearBtn.onclick = () => { query = ""; draw(); $("#ts", box)?.focus(); };
 
-    $$("[data-p]", box).forEach((b) => (b.onclick = () => {
-      picked = Number(b.dataset.p); qty = 1; draw();
-      $(".pos-ticket", box)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      buzz(6);
-    }));
-
-    const sel = picked ? st.products.find((p) => p.id === picked) : null;
-    if (sel) {
-      const setQty = (n) => { qty = Math.max(1, Math.min(sel.left, Math.floor(Number(n) || 1))); draw(); };
-      const closeBtn = $("#ts-close", box);
-      if (closeBtn) closeBtn.onclick = () => { picked = null; draw(); };
-      const minusBtn = $("#q-minus", box);
-      if (minusBtn) minusBtn.onclick = () => setQty(qty - 1);
-      const plusBtn = $("#q-plus", box);
-      if (plusBtn) plusBtn.onclick = () => setQty(qty + 1);
-      $$("[data-q]", box).forEach((b) => (b.onclick = () => setQty(b.dataset.q)));
-      const q = $("#q", box);
-      if (q) {
-        q.onchange = () => setQty(q.value);
-        q.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); setQty(q.value); $("#sell", box)?.click(); } };
-        q.onfocus = () => q.select();
-      }
-      const sellBtn = $("#sell", box);
-      if (sellBtn) {
-        sellBtn.onclick = (e) => busy(e.currentTarget, async () => {
-          const res = await post("/api/me/pos/sell", { product_id: sel.id, qty });
-          const said = `Sold ${res.line.qty} × ${res.line.product} · ${rs(res.line.amount)}`;
-          picked = null; qty = 1; query = "";
-          buzz(14); toast(said); announce(said);
-          apply(res.state);
-        });
-      }
+    // Change one row; the screen is drawn again with the new quantity.
+    const setRow = (id, n) => {
+      const p = st.products.find((x) => x.id === id); if (!p) return;
+      n = Math.max(0, Math.min(p.left, Math.floor(Number(n) || 0)));
+      if (n) bill.set(id, n); else bill.delete(id);
+      draw();
+    };
+    $$("[data-plus]", box).forEach((b) => (b.onclick = () => { const id = Number(b.dataset.plus); setRow(id, (bill.get(id) || 0) + 1); buzz(6); }));
+    $$("[data-minus]", box).forEach((b) => (b.onclick = () => { const id = Number(b.dataset.minus); setRow(id, (bill.get(id) || 0) - 1); buzz(6); }));
+    $$("[data-qn]", box).forEach((inp) => {
+      inp.onfocus = () => inp.select();
+      inp.onchange = () => setRow(Number(inp.dataset.qn), inp.value.replace(/\D/g, ""));
+      inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } };
+    });
+    const clearBill = $("#bill-clear", box);
+    if (clearBill) clearBill.onclick = () => { bill.clear(); draw(); };
+    const save = $("#bill-save", box);
+    if (save) {
+      save.onclick = (e) => busy(e.currentTarget, async () => {
+        const items = [...bill].map(([product_id, q]) => ({ product_id, qty: q }));
+        const res = await post("/api/me/pos/bill", { items });
+        const said = `Saved ${res.lines.length} ${res.lines.length === 1 ? "item" : "items"} · ${rs(res.amount)}`;
+        bill.clear(); query = "";
+        buzz(14); toast(said); announce(said);
+        apply(res.state);
+      });
     }
 
     $$("[data-undo]", box).forEach((b) => (b.onclick = async () => {

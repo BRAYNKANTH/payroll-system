@@ -303,3 +303,19 @@ test("the stock overview follows a date range: period numbers change, what is he
   await assert.rejects(() => pos.stockOverview(d, { hub: "H1", from: "2026-13-01", to: t }), /YYYY-MM-DD/);
   await assert.rejects(() => pos.stockOverview(d, { hub: "H1", from: "2020-01-01", to: t }), /at most a year/);
 });
+
+test("a bill saves several products at once, all or nothing", async () => {
+  const { d, shine, vim, seller, hubHead } = await setup();
+  await give(d, hubHead, { employee_id: "D1", lines: [{ product_id: shine, qty: 5 }, { product_id: vim, qty: 3 }] }, "H1");
+  // one line is too many: nothing at all is saved
+  await assert.rejects(() => pos.sellMany(d, seller, { items: [{ product_id: shine, qty: 2 }, { product_id: vim, qty: 4 }] }), /only have 3 Vim left/);
+  assert.equal((await d.get("SELECT COUNT(*) AS n FROM sale_lines")).n, 0);
+  await assert.rejects(() => pos.sellMany(d, seller, { items: [] }), /at least one/);
+  // the same product twice is added up before the stock check
+  await assert.rejects(() => pos.sellMany(d, seller, { items: [{ product_id: shine, qty: 3 }, { product_id: shine, qty: 3 }] }), /only have 5 Shine left/);
+  const r = await pos.sellMany(d, seller, { items: [{ product_id: shine, qty: 2 }, { product_id: vim, qty: 3 }] });
+  assert.equal(r.amount, 2 * 85000 + 3 * 50000);
+  assert.equal(r.state.lines.length, 2);
+  assert.deepEqual(r.state.products.map((p) => [p.name, p.left]), [["Shine", 3], ["Vim", 0]]);
+  assert.equal((await d.get("SELECT COUNT(*) AS n FROM daily_log WHERE employee_id = 'D1'")).n, 1);
+});

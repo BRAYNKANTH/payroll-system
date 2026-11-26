@@ -184,6 +184,7 @@ function createHandler(dbReady) {
     // Selling like a till: the seller's own screen (their stock, today's sales, the end-of-day cash).
     ["GET", /^\/api\/me\/pos$/, "self", ({ user }) => pos.state(database, user)],
     ["POST", /^\/api\/me\/pos\/sell$/, "self", ({ user, body }) => pos.sell(database, user, body)],
+    ["POST", /^\/api\/me\/pos\/bill$/, "self", ({ user, body }) => pos.sellMany(database, user, body)],
     ["DELETE", /^\/api\/me\/pos\/sale\/(\d+)$/, "self", ({ user, m }) => pos.undo(database, user, m[1])],
     ["POST", /^\/api\/me\/pos\/day$/, "self", ({ user, body }) => pos.endOfDay(database, user, body)],
     // The office gives each seller their stock for the day.
