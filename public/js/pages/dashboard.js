@@ -79,7 +79,7 @@ export default {
       const stats = Object.fromEntries(d.by_hub.map((h) => [h.code, h]));
       // One card per hub: people, sales for the chosen dates and (for those who may see pay) salaries. The whole card opens the hub.
       // Each hub is its own card: a coloured band with the hub's code in a circle, the name and headcount centred, then the numbers side by side.
-      const ACCENTS = ["#0071e3", "#7c3aed", "#0f766e", "#c2410c", "#db2777", "#4f46e5"];
+      const ACCENTS = ["#1565d8", "#0b6fb8", "#3454c8", "#0e6f94", "#1d5fc9", "#4153c0"]; // all blues, so the home page keeps one light-blue look
       const hubTile = (h, i) => {
         const x = info[h.code], st = stats[h.code] || {};
         return html`<a class="card hub-tile ht" style="--hc:${ACCENTS[i % ACCENTS.length]}" href="/hubs/${encodeURIComponent(h.code)}" data-link aria-label="${h.name}: open this hub">

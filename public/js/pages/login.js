@@ -8,7 +8,7 @@ export default {
     document.body.innerHTML = `
     <div class="auth-wrap">
       <section class="auth-art" aria-label="About">
-        <div class="brand" style="padding:0"><img class="brand-logo brand-logo-lg" src="/icons/logo-128.png" width="76" height="76" alt=""><div><div class="brand-name">Payroll</div><div class="brand-sub">Hub payroll and manager accounts</div></div></div>
+        <div class="brand" style="padding:0"><img class="brand-logo brand-logo-lg" src="/icons/logo-192.png" width="104" height="104" alt=""><div><div class="brand-name">Payroll</div><div class="brand-sub">Hub payroll and manager accounts</div></div></div>
         <div>
           <h2 class="art-title">Every day's sheet ends up on a payslip.</h2>
           <p>Enter business and handed-in cash for each person. The system works out commission, shortfalls and the balance carried to next month.</p>
@@ -30,7 +30,7 @@ export default {
       </section>
       <main class="auth-form">
         <div class="auth-card">
-          <div class="auth-brand" aria-hidden="true"><img class="brand-logo" src="/icons/logo-96.png" width="44" height="44" alt=""><div><div class="brand-name">${esc(company || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
+          <div class="auth-brand" aria-hidden="true"><img class="brand-logo" src="/icons/logo-128.png" width="64" height="64" alt=""><div><div class="brand-name">${esc(company || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
           <h1 class="auth-title">${needsSetup ? "Create the admin account" : "Welcome back"}</h1>
           <p class="auth-lead">${needsSetup ? "This is the first run. The account you create here will have full access." : "Sign in to continue to your payroll workspace."}</p>
           <form id="auth-form" novalidate>
