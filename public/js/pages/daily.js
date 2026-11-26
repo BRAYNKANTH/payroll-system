@@ -35,10 +35,52 @@ let currentDate = null;
 let currentEmp = null;
 let staffAll = []; // everyone in view, including the people above the sellers, so each seller's manager can be found
 
+// The office does not get one sheet with every hub's people mixed together. It gets the hubs, each showing how many of its people
+// have a day entered for the chosen date; a hub opens to its own sheet (by day, by employee, or a date range).
+async function hubList({ el }) {
+  document.body.dataset.filters = "month"; // every hub is listed, so the hub choice is not shown
+  const days = daysIn(state.period), todayIso = new Date().toISOString().slice(0, 10);
+  if (!currentDate || !currentDate.startsWith(state.period)) currentDate = days.includes(todayIso) ? todayIso : days[0];
+  el.innerHTML = html`<div class="daily-page">
+    <div class="page-head"><div><h1>Daily sheet</h1><p>Days are entered hub by hub. Pick a hub to enter or check its days.</p></div></div>
+    <div class="dl-daybar mb-4" id="dl-day"></div>
+    <div id="dl-hubs"><div class="loading-screen"><div class="spinner"></div></div></div></div>`.toString();
+  const closed = String(state.settings.closed_weekdays || "").split(",").filter(Boolean).map(Number);
+  let seq = 0;
+  const load = async () => {
+    const mine = ++seq, date = currentDate, idx = days.indexOf(date);
+    const [staff, entries] = await Promise.all([get("/api/staff"), get("/api/daily" + qs({ from: date, to: date }))]);
+    if (mine !== seq) return;
+    const done = new Set(entries.map((e) => e.employee_id));
+    const sellers = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager") && s.status === "active" && (!s.join_date || s.join_date <= date));
+    const isClosed = closed.includes(new Date(date + "T00:00:00Z").getUTCDay());
+    $("#dl-day").innerHTML = html`<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn icon" id="dl-prev" aria-label="Previous day" ${idx <= 0 ? "disabled" : ""}>${icon("left")}</button>
+        <input type="date" class="input" id="dl-date" aria-label="Date" value="${date}" min="${days[0]}" max="${days[days.length - 1]}" style="width:160px">
+        <button type="button" class="btn icon" id="dl-next" aria-label="Next day" ${idx >= days.length - 1 ? "disabled" : ""}>${icon("right")}</button>
+        <b style="font-size:17px">${dateLabel(date)}</b>${isClosed ? badge("blue", "Closed day") : ""}</div>`.toString();
+    const go = (d) => { if (d && d.startsWith(state.period)) { currentDate = d; load().catch((e) => toast(e.message, "warn")); } else toast("Pick a date inside the selected pay period", "warn"); };
+    $("#dl-prev").onclick = () => go(days[idx - 1]);
+    $("#dl-next").onclick = () => go(days[idx + 1]);
+    $("#dl-date").onchange = (e) => go(e.target.value);
+    const hubs = state.hubs.filter((h) => h.status === "active");
+    $("#dl-hubs").innerHTML = hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => {
+      const mine = sellers.filter((s) => s.hub === h.code), n = mine.filter((s) => done.has(s.employee_id)).length, missing = mine.length - n;
+      return html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/daily" data-link aria-label="${h.name}: open its daily sheet">
+        <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${n} of ${mine.length} entered</span></span>
+        <span class="hs-flags">${!mine.length ? html`<span class="muted">No sellers</span>` : missing ? badge("amber", `${missing} to enter`) : badge("green", "Complete")}</span>
+        <span class="hs-chev" aria-hidden="true"></span></a></li>`;
+    })}</ul></div><p class="muted hs-hint">Tap a hub to enter its days, or to see them by employee or for a range of dates.</p>`.toString()
+      : emptyState("No hubs yet", "Add a hub first, then its daily sheet appears here.", "store").toString();
+  };
+  await load();
+}
+
 export default {
   title: "Daily sheet",
   periodic: true,
   async render(ctx) {
+    if (can("read") && !state.user.hub && !state.routeHub) return hubList(ctx);
     const { el } = ctx;
     const [staff, locked] = await Promise.all([
       get("/api/staff" + qs({ hub: scopeHub() })),

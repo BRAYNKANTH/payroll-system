@@ -2874,3 +2874,27 @@ body[data-filters="month"] #hub-filter { display: none !important; }
   .dc-open { display: none; }
 }
 .drill-card, .drill-card:hover, .drill-card * { text-decoration: none !important; }
+
+/* Dashboard on a phone: hubs are compact cards, the company figures are three short rows */
+@media (max-width: 760px) {
+  .dash-min .hub-tile.ht { display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-areas: "b n" "b c" "x x" "m m"; column-gap: 12px; row-gap: 2px; align-items: center; text-align: left; padding: 14px; border-radius: 16px; }
+  .hub-tile.ht::before, .hub-tile.ht::after { display: none; }
+  .hub-tile.ht .ht-badge { grid-area: b; margin: 0; width: 44px; height: 44px; font-size: 15px; box-shadow: none; background: color-mix(in srgb, var(--hc) 18%, transparent); }
+  .hub-tile.ht .ht-name { grid-area: n; margin: 0; font-size: 17px; }
+  .hub-tile.ht .ht-count { grid-area: c; }
+  .hub-tile.ht .ht-chips { grid-area: x; justify-content: flex-start; padding: 8px 0 0; }
+  .hub-tile.ht .ht-nums { grid-area: m; width: 100%; margin-top: 10px; padding-top: 10px; }
+  .hub-tile.ht .ht-stat { align-items: flex-start; }
+  .hub-tile.ht .ht-stat + .ht-stat { padding-left: 14px; }
+  .hub-tile.ht .ht-stat b { font-size: 18px; }
+  .hub-tile.ht .ht-open { display: none; }
+  .grid.three:has(> .hub-tile.ht) { gap: 10px; }
+  .dash-kpis { grid-template-columns: 1fr; gap: 8px; }
+  .dash-kpis .kpi { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 12px 14px; }
+  .dash-kpis .kpi .foot { grid-column: 1 / -1; font-size: 12px; }
+  .dash-kpis .kpi:not(:first-child) .foot { display: none; }
+  .dash-kpis .kpi .value { font-size: 20px; margin: 0; }
+}
+@media (max-width: 760px) { .grid.kpis.dash-kpis { grid-template-columns: 1fr; } }
+.dl-daybar { padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+@media (max-width: 760px) { .dl-daybar .btn.icon { min-width: 44px; min-height: 44px; } .dl-daybar input[type="date"] { min-height: 44px; flex: 1 1 150px; } }
