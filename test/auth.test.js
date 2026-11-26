@@ -201,3 +201,17 @@ test("HTTP: sign-in required, roles enforced, forged requests refused, backup", 
     assert.equal((await fetch(base + "/..%2f..%2fdb.js")).status, 403);
   } finally { srv.close(); }
 });
+
+test("the admin can rename a user's username; the old name stops working and the person is signed out", async () => {
+  const { d, admin } = await setup();
+  await auth.createUser(d, admin, { username: "oldname", full_name: "Anu", role: "coacher", hub: "COL", password: PW.clerk });
+  const s = await auth.login(d, "oldname", PW.clerk);
+  const u = await auth.updateUser(d, admin, "oldname", { username: "newname" });
+  assert.equal(u.username, "newname");
+  assert.equal(await auth.userFromToken(d, s.token), null, "signed out");
+  await assert.rejects(() => auth.login(d, "oldname", PW.clerk), /Incorrect/);
+  assert.ok((await auth.login(d, "newname", PW.clerk)).token);
+  await assert.rejects(() => auth.updateUser(d, admin, "newname", { username: "ab" }), /Username must be/);
+  await auth.createUser(d, admin, { username: "other", full_name: "O", role: "coacher", hub: "COL", password: PW.clerk });
+  await assert.rejects(() => auth.updateUser(d, admin, "newname", { username: "OTHER" }), /already used/);
+});

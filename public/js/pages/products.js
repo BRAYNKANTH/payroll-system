@@ -1,6 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { state } from "../app.js";
-import { exportButtons, $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, pct, parseAmount } from "../ui.js";
+import { exportButtons, confirmDialog, $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, pct, parseAmount } from "../ui.js";
 
 // Of every sale the workers get a share (seller + manager, 45% at first); the company keeps the rest, and the purchase price comes out of that.
 const slToday = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -47,8 +47,25 @@ export default {
         { key: "profit", label: "Profit per unit", align: "r", render: (p) => html`<b class="${p.profit < 0 ? "neg" : ""}">${money(p.profit)}</b>` },
         { key: "margin", label: "Of the price", align: "r", render: (p) => html`<span class="${p.profit < 0 ? "neg" : ""}">${pct(p.margin, 1)}</span>` },
         { key: "status", label: "Status", render: (p) => badge(p.status) },
+        // Small buttons: add stock to this product, or delete it. They sit inside the row but do not open the edit panel.
+        { key: "", label: "", sort: false, render: (p) => html`<span class="row-tools"><button type="button" class="btn sm" data-add-stock="${p.id}" aria-label="Add stock to ${p.name}">${icon("plus")} Stock</button>
+          <button type="button" class="btn sm danger-ghost" data-del-product="${p.id}" aria-label="Delete ${p.name}">${icon("trash")}</button></span>` },
       ],
     }).toString() : emptyState("No products yet", "Add each product with its selling price and the price the company pays to buy it. The profit is worked out for you.", "box").toString();
+
+    // Deleting asks first. The server refuses a product that was already sent to a hub, given to a seller or sold; make it Inactive instead.
+    const remove = async (p, after) => {
+      if (!(await confirmDialog({ title: `Delete ${p.name}?`, message: `${p.name} will be removed from the product list${p.office_stock ? ` with its ${p.office_stock} pieces in the office` : ""}. This cannot be undone. A product that was already sent to a hub or sold cannot be deleted; set it to Inactive instead.`, confirmText: "Delete", danger: true }))) return;
+      await del(`/api/products/${p.id}`);
+      toast(`${p.name} deleted`);
+      after?.();
+      await reload();
+    };
+    $("#list").addEventListener("click", (e) => {
+      const a = e.target.closest("[data-add-stock]"), x = e.target.closest("[data-del-product]");
+      if (a) { const p = rows.find((r) => String(r.id) === a.dataset.addStock); if (p) { open(p); setTimeout(() => { const q = $("#os-qty"); q?.scrollIntoView({ block: "center" }); q?.focus(); }, 60); } }
+      if (x) busy(x, () => remove(rows.find((r) => String(r.id) === x.dataset.delProduct)));
+    });
 
     function open(p) {
       const d = drawer({
@@ -83,8 +100,9 @@ export default {
             <div class="alert warn" data-v="loss" hidden>${icon("alert")}<div>The purchase price is more than the company keeps after the workers' share, so every unit sold makes a loss.</div></div>
           </section>
         </form>`.toString(),
-        foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="pf-save">${p ? "Save" : "Add product"}</button>`,
+        foot: `${p ? `<button class="btn danger" id="pf-del" style="margin-right:auto">${icon("trash")} Delete</button>` : ""}<button class="btn" data-close>Cancel</button><button class="btn primary" id="pf-save">${p ? "Save" : "Add product"}</button>`,
       });
+      if (p) $("#pf-del", d.panel).onclick = (e) => busy(e.currentTarget, () => remove(p, () => d.close()));
       const f = $("#pf", d.panel);
       f.addEventListener("submit", (e) => e.preventDefault()); // Enter in a box must not reload the page
       const out = (k) => $(`[data-v="${k}"]`, d.panel);

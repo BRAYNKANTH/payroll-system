@@ -153,3 +153,16 @@ test("the stock sheets get active product names and selling prices, never the pu
   assert.deepEqual(await products.names(d), [{ name: "Shine", list_price: 85000 }, { name: "Vim", list_price: 50000 }]);
   for (const role of ["admin", "coacher"]) assert.ok(auth.can({ role }, "enter_data"), role);
 });
+
+test("an unused product can be deleted with its office stock; a sold or sent one cannot", async () => {
+  const d = await setup();
+  const a = await products.create(d, { name: "Unused", list_price: 500, cost_price: 200 }, "admin");
+  await products.addStock(d, a.id, { qty: 10 }, "admin");
+  assert.deepEqual(await products.remove(d, a.id, "admin"), { deleted: true });
+  assert.equal((await products.list(d)).length, 0);
+  const b = await products.create(d, { name: "Sent", list_price: 500, cost_price: 200 }, "admin");
+  await products.addStock(d, b.id, { qty: 10 }, "admin");
+  await d.run("INSERT INTO hub_issues (date, hub, product_id, qty, created_by) VALUES ('2026-11-01','H1',?,2,'admin')", b.id);
+  await assert.rejects(() => products.remove(d, b.id, "admin"), /Inactive/);
+  await assert.rejects(() => products.remove(d, 99999, "admin"), /not found/);
+});

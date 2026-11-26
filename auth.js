@@ -174,6 +174,14 @@ async function updateUser(db, actor, username, body) {
   if (!u) throw httpError(404, "User not found");
   const sets = {};
   if (body.full_name !== undefined) sets.full_name = String(body.full_name).trim();
+  // A new username (the sign-in name). It must be free; the person is signed out everywhere and signs in again with the new one.
+  const newName = body.username !== undefined ? String(body.username).trim() : u.username;
+  if (newName !== u.username) {
+    validateUsername(newName);
+    if (newName.toLowerCase() !== u.username.toLowerCase() && (await findUser(db, newName))) throw httpError(409, "That username is already used");
+    if (u.username.toLowerCase() === actor.username.toLowerCase()) throw httpError(400, "You cannot rename the account you are signed in with");
+    sets.username = newName;
+  }
   if (body.role !== undefined) {
     if (!ROLES.includes(body.role)) throw httpError(400, "Invalid role");
     if ((body.role === "staff") !== (u.role === "staff")) throw httpError(400, "A staff-portal login cannot be changed into an office role (or the other way). Create a new user instead.");
@@ -193,11 +201,12 @@ async function updateUser(db, actor, username, body) {
   const cols = Object.keys(sets);
   if (!cols.length) return publicUser(u);
   await withUser(db, actor.username, async (t) => {
+    // Sessions point at the username, so they go first when it changes (the person signs in again).
+    if (sets.username || sets.status === "disabled" || sets.password_hash) await t.run("DELETE FROM sessions WHERE username = ?", u.username);
     await t.run(`UPDATE users SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_by = ?, updated_at = ${NOW} WHERE username = ?`,
       ...cols.map((c) => sets[c]), actor.username, u.username);
-    if (sets.status === "disabled" || sets.password_hash) await t.run("DELETE FROM sessions WHERE username = ?", u.username);
   });
-  return publicUser(await findUser(db, u.username));
+  return publicUser(await findUser(db, sets.username || u.username));
 }
 async function changeOwnPassword(db, actor, { current_password, new_password }) {
   const u = await findUser(db, actor.username);

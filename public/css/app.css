@@ -3132,3 +3132,5 @@ a.card:hover, .hub-tile:hover, .m-card:hover { box-shadow: var(--shadow-md); bor
 :root[data-theme="dark"] .seg, :root[data-theme="dark"] .tabs, :root[data-theme="dark"] .ws-tabs { background: rgba(255, 255, 255, .06); }
 .ht-badge { color: color-mix(in srgb, var(--hc, #1565d8) 72%, #000); }
 :root[data-theme="dark"] .ht-badge { color: color-mix(in srgb, var(--hc, #1565d8) 45%, #fff); }
+
+.row-tools { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }

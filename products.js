@@ -118,6 +118,21 @@ async function update(db, id, body, user) {
   } catch (err) { throw dupe(err); }
 }
 
+// Delete a product that was never used. Once it has been sent to a hub, given to a seller or sold it must stay in the history,
+// so it can only be made inactive. Stock the office received for it (and nothing else) goes with it.
+async function remove(db, id, user) {
+  const p = await db.get("SELECT id, name FROM products WHERE id = ?", Number(id));
+  if (!p) throw httpError(404, "Product not found");
+  await withUser(db, user, async (t) => {
+    for (const [table, what] of [["hub_issues", "sent to a hub"], ["stock_issues", "given to a seller"], ["sale_lines", "sold"]]) {
+      if (await t.get(`SELECT 1 AS x FROM ${table} WHERE product_id = ? LIMIT 1`, p.id)) throw httpError(409, `${p.name} has already been ${what}, so it cannot be deleted. Set it to Inactive instead.`);
+    }
+    await t.run("DELETE FROM product_receipts WHERE product_id = ?", p.id);
+    await t.run("DELETE FROM products WHERE id = ?", p.id);
+  }, { lockKey: "office-stock" });
+  return { deleted: true };
+}
+
 // The company's profit for a month, from what was sold (the stock counts: sold × unit price) and the catalogue's cost prices.
 // A stock line is matched to a product by name; lines with no matching product are listed with no cost, so the gap is visible.
 async function profitReport(db, period) {
@@ -139,4 +154,4 @@ async function profitReport(db, period) {
   return { period, workers_rate: share, rows, totals: { revenue: sum("revenue"), workers: sum("workers"), cost: sum("cost"), profit: sum("profit"), unmatched: rows.filter((r) => !r.matched).length } };
 }
 
-module.exports = { list, names, create, update, profitReport, economics, officeStock, addStock, stockHistory, removeStock };
+module.exports = { list, names, create, update, remove, profitReport, economics, officeStock, addStock, stockHistory, removeStock };

@@ -1,6 +1,6 @@
 import { get, post, put } from "../api.js";
 import { state } from "../app.js";
-import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago, LEVELS } from "../ui.js";
+import { $, html, icon, badge, toast, busy, drawer, dataTable, initials, ago, LEVELS, exportButtons } from "../ui.js";
 const LV = Object.fromEntries(LEVELS);
 
 const ROLES = [
@@ -23,7 +23,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Users & roles</h1><p>Who can sign in, and what they are allowed to do.</p></div>
-        <div class="actions"><button class="btn" id="bulk">${icon("users")} Create logins for employees</button><button class="btn primary" id="add">${icon("plus")} Add user</button></div>
+        <div class="actions">${exportButtons("users")}<button class="btn" id="bulk">${icon("users")} Create logins for employees</button><button class="btn primary" id="add">${icon("plus")} Add user</button></div>
       </div>
       <div class="grid kpis role-kpis mb-4">${ROLES.map(([k, , d]) => html`
         <div class="card kpi"><div class="label">${badge(k === "admin" ? "admin" : "green", { staff: "Staff", coacher: "Coacher", manager: "Manager", admin: "Admin" }[k])}</div>
@@ -35,7 +35,8 @@ export default {
       const d = drawer({
         title: u ? `Edit ${u.full_name}` : "Add user",
         body: html`<form id="uf" class="form-grid" autocomplete="off">
-          <div class="field"><label>Username</label><input class="input" name="username" value="${u?.username || ""}" ${u ? "disabled" : ""} autocomplete="off"></div>
+          <div class="field"><label for="uf-username">Username</label><input class="input" id="uf-username" name="username" value="${u?.username || ""}" ${self ? "disabled" : ""} autocomplete="off" aria-describedby="uf-username-h">
+            <span class="hint" id="uf-username-h">${self ? "You cannot rename the account you are signed in with." : u ? "The name used to sign in. Changing it signs this person out; they sign in again with the new name." : "3–32 letters, numbers, dot, dash or underscore."}</span></div>
           <div class="field"><label>Full name</label><input class="input" name="full_name" value="${u?.full_name || ""}"></div>
           ${u && (u.role === "staff" || u.role === "manager") ? html`<div class="field full"><span class="lbl">Role</span>
             <div class="alert info">${icon("info")}<div><b>${ROLES.find((x) => x[0] === u.role)[1]}</b> for ${byId[u.employee_id]?.name || u.employee_id} (${u.employee_id}). The role and the employee cannot be changed; create a new user for a different person.</div></div></div>`
@@ -88,7 +89,7 @@ export default {
         if (!u && v.employee_id) v.full_name = v.full_name || byId[v.employee_id]?.name || "";
         if (u) {
           const body = { full_name: v.full_name, hub: v.hub };
-          if (!self) { body.role = v.role; body.status = v.status; }
+          if (!self) { body.role = v.role; body.status = v.status; if (v.username && v.username.trim() !== u.username) body.username = v.username.trim(); }
           if (v.password) body.password = v.password;
           await put(`/api/users/${encodeURIComponent(u.username)}`, body);
         } else { if (!v.employee_id) delete v.employee_id; await post("/api/users", v); }

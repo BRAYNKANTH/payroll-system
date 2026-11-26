@@ -284,6 +284,7 @@ function createHandler(dbReady) {
     ["POST", /^\/api\/products\/(\d+)\/stock$/, "manage_products", ({ user, body, m }) => products.addStock(database, m[1], body, user.username)],
     ["DELETE", /^\/api\/product-stock\/(\d+)$/, "manage_products", ({ user, m }) => products.removeStock(database, m[1], user.username)],
     ["PUT", /^\/api\/products\/(\d+)$/, "manage_products", ({ user, body, m }) => products.update(database, m[1], body, user.username)],
+    ["DELETE", /^\/api\/products\/(\d+)$/, "manage_products", ({ user, m }) => products.remove(database, m[1], user.username)],
     ["GET", /^\/api\/reports\/product-profit$/, "manage_products", ({ q }) => products.profitReport(database, q.get("period"))],
     ["POST", /^\/api\/staff\/([\w.-]+)\/leave$/, ["manage_staff", "manage_team"], ({ user, body, m }) => people.leave(database, m[1], body, user.username, user.hub)],
     ["POST", /^\/api\/staff\/([\w.-]+)\/rehire$/, ["manage_staff", "manage_team"], ({ user, body, m }) => people.rehire(database, m[1], body, user.username, user.hub)],
