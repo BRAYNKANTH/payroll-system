@@ -1000,6 +1000,9 @@ async function dashboard(db, period, hub, range = null) {
       pending: summaries.filter((r) => r.status === "pending_review").length,
       rejected: summaries.filter((r) => r.status === "rejected").length,
       missing_days: completeness.reduce((t, c) => t + c.missing.length, 0),
+      // For the monthly checklist: days that have passed with no sheet (today is still being entered), and whether any stock count exists for the month.
+      missing_days_past: completeness.reduce((t, c) => t + c.missing.filter((d) => d < new Date().toISOString().slice(0, 10)).length, 0),
+      stock_counted: stock.length,
     },
     by_hub: byHub,
     trend,

@@ -3163,3 +3163,11 @@ a.card:hover, .hub-tile:hover, .m-card:hover { box-shadow: var(--shadow-md); bor
 /* The hub chart settles quickly: long staggered entrances left cards half-faded when read by screen readers and tools. */
 html.fx #view.page-in .org-card { animation-duration: .3s; animation-delay: calc(var(--d, 0) * 40ms + 40ms); }
 html.fx .org-toggle { animation: none; }
+
+/* ===== Home: the month in order ===== */
+.todo-ic.blue { background: var(--primary-soft); color: var(--primary); }
+.todo-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.todo-head .muted { text-transform: none; letter-spacing: 0; }
+.step-n { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.todo-row.is-next { background: var(--primary-soft); }
+.todo-row.is-next .muted { color: var(--text-2); }

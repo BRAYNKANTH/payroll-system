@@ -29,23 +29,38 @@ function todoCard(hub, unconfirmed, noStock, cash) {
   return html`<section class="card hs-list todo mb-4" aria-label="To do"><div class="todo-head"><b>To do</b></div><ul role="list">${rows.length ? rows : done}</ul></section>`;
 }
 
-// What is waiting for the office, across all hubs. Each line is one tap to the place where it is done.
+// The month in order, for the office: each step is done or not, worked out from the real data. The first step not done is "Next", and every
+// line is one tap to the place where it is done. (Cash handovers are the only thing that is per hub.)
 function officeTodo(d, k, noStock, cash) {
-  const row = (href, ic, tone, title, sub) => html`<li><a class="hs-row todo-row" href="${href}" data-link><span class="todo-ic ${tone}">${icon(ic)}</span>
-    <span class="hs-main"><b>${title}</b><span class="muted">${sub}</span></span><span class="hs-chev" aria-hidden="true"></span></a></li>`;
   const wait = d.by_hub.filter((h) => h.unconfirmed), waitN = wait.reduce((t, h) => t + h.unconfirmed, 0);
   const dry = noStock.filter((h) => h.without_stock), dryN = dry.reduce((t, h) => t + h.without_stock, 0);
-  const done = d.status === "finalized";
-  const pay = done ? ["/payroll", "wallet", "green", "This month is closed", "Salaries and payslips are ready to view."]
-    : !k.calculated ? ["/payroll", "wallet", "amber", "Salaries are not worked out yet", "Finish the daily sheets, then work them out."]
-    : ["/payroll", "wallet", "blue", "Salaries are worked out", `Rs ${money(k.to_bank)} for everyone. Check them, then close the month.`];
-  const rows = [
-    waitN ? row("/live", "check", "amber", `${waitN} ${waitN === 1 ? "day" : "days"} to confirm`, wait.map((h) => `${h.name}: ${h.unconfirmed}`).join(" · ")) : "",
-    cash.length && can("approve_cash") ? row("/handovers", "wallet", "amber", `${cash.length} cash ${cash.length === 1 ? "handover" : "handovers"} to verify`, cash.map((c) => `${c.hub_name}: Rs ${money(c.amount)}`).join(" · ")) : "",
-    dryN ? row(`/hubs/${encodeURIComponent(dry[0].code)}/stock/give`, "box", "red", `${dryN} ${dryN === 1 ? "seller has" : "sellers have"} no stock`, dry.map((h) => `${h.name}: ${h.without_stock}`).join(" · ")) : "",
-    can("run_payroll") || can("view_pay") ? row(...pay) : "",
-  ].filter(Boolean);
-  return rows.length ? html`<section class="card hs-list todo mb-4" aria-label="To do"><div class="todo-head"><b>To do</b></div><ul role="list">${rows}</ul></section>` : "";
+  const closed = d.status === "finalized";
+  const canPay = can("run_payroll") || can("view_pay");
+  const steps = [
+    { done: dryN === 0, href: dryN ? `/hubs/${encodeURIComponent(dry[0].code)}/stock/give` : "/hub-stock", ic: "box",
+      title: "Stock is with the sellers", ok: "Every seller has stock to sell.", todo: `${dryN} ${dryN === 1 ? "seller has" : "sellers have"} no stock. Send stock to the hub, then the coacher gives it out.` },
+    { done: !k.missing_days_past, href: "/daily", ic: "sheet",
+      title: "Every day is entered", ok: "Every working day so far has a sheet.", todo: `${k.missing_days_past} ${k.missing_days_past === 1 ? "day is" : "days are"} still missing a sheet. The coacher enters them on the daily sheet.` },
+    { done: waitN === 0, href: "/live", ic: "eye",
+      title: "Sellers' own days are confirmed", ok: "Nothing is waiting to be confirmed.", todo: `${waitN} ${waitN === 1 ? "day" : "days"} to confirm. ${wait.map((h) => `${h.name}: ${h.unconfirmed}`).join(" · ")}` },
+    ...(can("approve_cash") ? [{ done: cash.length === 0, href: "/handovers", ic: "wallet",
+      title: "Cash handovers are verified", ok: "Every handover has been checked.", todo: `${cash.length} ${cash.length === 1 ? "handover" : "handovers"} to verify. ${cash.map((c) => `${c.hub_name}: Rs ${money(c.amount)}`).join(" · ")}` }] : []),
+    { done: k.stock_counted > 0, href: "/stock", ic: "box",
+      title: "Stock is counted for the month", ok: "The stock count is in.", todo: "No stock count yet. It decides what is taken off for missing stock." },
+    ...(canPay ? [
+      { done: k.calculated, href: "/payroll", ic: "play",
+        title: "Salaries are worked out", ok: `Rs ${money(k.to_bank)} for everyone.`, todo: "Press Work out salaries once the sheets above are done." },
+      { done: closed, href: "/payroll", ic: "lock",
+        title: "The month is closed", ok: "Salaries and payslips are ready to view.", todo: "Check the salaries and payslips, then close the month. It locks the sheets." },
+    ] : []),
+  ];
+  const next = steps.findIndex((x) => !x.done), left = steps.filter((x) => !x.done).length;
+  const row = (x, i) => html`<li><a class="hs-row todo-row ${i === next ? "is-next" : ""}" href="${x.href}" data-link>
+    <span class="todo-ic ${x.done ? "green" : i === next ? "blue" : "amber"}">${icon(x.done ? "checkCircle" : x.ic)}</span>
+    <span class="hs-main"><b><span class="step-n">${i + 1}.</span> ${x.title}${i === next ? html` <span class="badge blue">Next</span>` : ""}</b><span class="muted">${x.done ? x.ok : x.todo}</span></span>
+    <span class="hs-chev" aria-hidden="true"></span></a></li>`;
+  return html`<section class="card hs-list todo mb-4" aria-label="This month in order"><div class="todo-head"><b>This month, step by step</b><span class="muted">${left ? `${steps.length - left} of ${steps.length} done` : "All steps done"}</span></div>
+    <ul role="list">${steps.map(row)}</ul></section>`;
 }
 
 export default {
