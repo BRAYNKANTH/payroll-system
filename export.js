@@ -403,7 +403,7 @@ function personReportPdf(d, { canPay, company = "" }) {
     if (mo.settle_up) row("Cash short at settle-up", rs(mo.settle_up));
     if (mo.personal) row("Advances taken", rs(mo.personal));
   }
-  if (d.team) { row("People below", String(d.team.length)); row("Their sales this month", rs(d.below_sales)); }
+  if (d.team) { row("People below", String(d.team.length)); if (!d.team_sales_hidden) row("Their sales this month", rs(d.below_sales)); }
 
   if (canPay) {
     const pay = d.official || d.estimate;

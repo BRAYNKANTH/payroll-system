@@ -107,7 +107,6 @@ function menuItems() {
     add("/reports", "Reports", "chart");
   } else if (can("read_team")) { // a manager
     add("/team", "My team", "users", { short: "Team" });
-    add("/live", "Live sales", "trend", { short: "Live" });
     add("/employees", "Employees", "users", { short: "People" });
     if (can("stock")) { add("/stock-overview", "Hub stock", "warehouse", { short: "Stock" }); add("/morning", "Give stock", "box", { short: "Give" }); }
   }

@@ -85,7 +85,7 @@ supervisors and distributors, four finalized months and the current month open. 
 |---|---|
 | Staff portal | A distributor or supervisor signs in to a single page: own sales and target progress, an estimate of pay while the month is open, final pay and payslips after it is finalized, documents, and (supervisors and group managers) their team's sales. Nothing else. |
 | Coacher | Heads one hub: sees every person, all stock and all sheets of that hub, enters data, confirms days, registers the team and gives stock out each morning. Never sees pay |
-| Manager | Sees only the people under them (directly or through others): their sales, stock and details, view only, never pay. Promoting managers get this login too. A manager tagged **stock keeper** can also see and give stock to everyone in the hub |
+| Manager | Enters their own sales (My page) and knows who is under them (directly or through others): names, positions and details, view only. **Never what those people sold**, hold or earn: no sales, no live sales, no team sales or reports, no pay. Promoting managers get this login too. A manager tagged **stock keeper** can also see and give stock to everyone in the hub, but never how much sellers sold |
 | Admin | The owner and the secretary: everything, including payroll, approvals, finalizing months, products, users and settings |
 
 ## Monthly workflow

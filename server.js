@@ -106,6 +106,8 @@ function hidePay(d) {
   };
 }
 
+// A stock keeper who is a manager sees which stock the sellers hold, never how much they have sold: that is the sellers' business, not theirs.
+const withoutSold = (x) => JSON.parse(JSON.stringify(x, (k, v) => (/^sold/.test(k) ? undefined : v)));
 // Those who may not see pay do not receive the pay defaults either.
 // A manager may open only the people under them (and themselves). Everyone else is limited by hub, as before.
 function assertInTeam(user, employeeId) {
@@ -173,6 +175,8 @@ function createHandler(dbReady) {
     // One person's report: the admin sees pay; a hub manager sees sales only, and only their own hub.
     ["GET", /^\/api\/staff\/([\w.-]+)\/report\.pdf$/, ["read", "read_team"], async ({ m, user, q }) => {
       assertInTeam(user, m[1]);
+      // the report lists a person's sales day by day, so a manager may print their own only
+      if (!auth.can(user, "read") && String(m[1]) !== String(user.employee_id)) throw svc.httpError(403, "You can print your own report only");
       const d = await portal.forEmployee(database, m[1], q.get("period") || new Date().toISOString().slice(0, 7), user.hub);
       const f = exporter.personReportPdf(d, { canPay: auth.can(user, "view_pay"), company: (await db.getSettings(database)).company_name || "" });
       return { download: f.data, type: f.type, filename: f.filename };
@@ -185,10 +189,12 @@ function createHandler(dbReady) {
     // The office gives each seller their stock for the day.
     // The office sends stock to a hub (admin); a coacher or stock keeper sees what their own hub holds.
     ["GET", /^\/api\/hub-stock$/, "stock", ({ user, q }) => pos.hubSupply(database, { hub: user.hub || q.get("hub") || undefined })],
-    ["GET", /^\/api\/stock-overview$/, "stock", ({ user, q }) => pos.stockOverview(database, { hub: user.hub || q.get("hub"), date: q.get("date"), from: q.get("from") || undefined, to: q.get("to") || undefined })],
+    ["GET", /^\/api\/stock-overview$/, "stock", ({ user, q }) => pos.stockOverview(database, { hub: user.hub || q.get("hub"), date: q.get("date"), from: q.get("from") || undefined, to: q.get("to") || undefined })
+      .then((r) => (auth.can(user, "read") ? r : withoutSold(r)))],
     ["POST", /^\/api\/hub-stock$/, "manage_products", ({ user, body }) => pos.giveToHub(database, user, body)],
     ["DELETE", /^\/api\/hub-stock\/(\d+)$/, "manage_products", ({ user, m }) => pos.takeFromHub(database, user, m[1])],
-    ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
+    ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })
+      .then((r) => (auth.can(user, "read") ? r : withoutSold(r)))],
     ["POST", /^\/api\/stock-issues\/bulk$/, "stock", ({ user, body }) => pos.giveMany(database, user, body, user.hub)],
     ["POST", /^\/api\/stock-issues$/, "stock", ({ user, body }) => pos.give(database, user, body, user.hub)],
     ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "stock", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],
@@ -265,7 +271,9 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/allowances\/(\d+)$/, "view_pay", ({ user, m }) => svc.deleteEntry(database, "allowances", m[1], user.username, user.hub)],
 
     // Live sales: everyone who can read sees the sales; only those who may see pay get the commission and pay-so-far columns.
-    ["GET", /^\/api\/live$/, ["read", "read_team"], ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined, ids: user.teamIds }, auth.can(user, "view_pay"))],
+    ["GET", /^\/api\/live$/, ["read", "read_team"], ({ user, q }) => sales.live(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined,
+      // a manager sees their own sales only, never the sales of the people under them
+      ids: user.teamIds ? (user.employee_id ? [user.employee_id] : []) : undefined }, auth.can(user, "view_pay"))],
     // A manager's own people: their sales, today's sales and the stock they hold.
     ["GET", /^\/api\/team$/, "read_team", ({ user, q }) => team.overview(database, user, q.get("period") || new Date().toISOString().slice(0, 7))],
     ["POST", /^\/api\/sales\/confirm$/, "enter_data", ({ user, body }) => sales.confirm(database, user, body, user.hub)],

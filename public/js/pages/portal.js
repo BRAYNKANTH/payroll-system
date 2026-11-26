@@ -270,9 +270,12 @@ export default {
           </div>
         </div>`,
 
-      team: () => html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">${monthName(d.period)}: sales of everyone below you. Sales only, never anyone's pay.</div></div></div>
-        <div class="card-body flush" id="team"></div></section>
-        <p class="muted" style="margin-top:12px">Total sales below you: <b class="num">Rs ${money(d.below_sales)}</b>.</p>`,
+      team: () => d.team_sales_hidden
+        ? html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">The people who report to you.</div></div></div>
+          <div class="card-body flush" id="team"></div></section>`
+        : html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">${monthName(d.period)}: sales of everyone below you. Sales only, never anyone's pay.</div></div></div>
+          <div class="card-body flush" id="team"></div></section>
+          <p class="muted" style="margin-top:12px">Total sales below you: <b class="num">Rs ${money(d.below_sales)}</b>.</p>`,
 
       payslips: () => d.history.length ? html`
         <div class="sec-held-card">${icon("shield")}<div><span>Security deposit held so far</span><b>Rs ${money(d.security_held)}</b></div></div>
@@ -411,7 +414,12 @@ export default {
           });
         }
       }
-      if (tab === "team" && d.team) {
+      if (tab === "team" && d.team && d.team_sales_hidden) {
+        // A manager knows who is under them, never what they sold.
+        $("#team").innerHTML = d.team.length ? html`<ul class="hs-list-flat" role="list" style="list-style:none;margin:0;padding:0">${d.team.map((r) => html`<li class="hs-row" style="padding-left:${16 + (r.depth - 1) * 18}px;cursor:default">
+          <span class="avatar" aria-hidden="true">${initials(r.name)}</span><span class="hs-main"><b>${r.name}</b><span class="muted">${r.employee_id} · ${r.level_name}</span></span></li>`)}</ul>`.toString()
+          : emptyState("No one reports to you yet", "People who report to you appear here.", "users").toString();
+      } else if (tab === "team" && d.team) {
         $("#team").innerHTML = d.team.length ? both(
           dataTable({
             rows: d.team, sortable: false, footer: true,

@@ -18,7 +18,9 @@ async function me(db, user) {
 
 async function summary(db, user, period) {
   svc.assertPeriod(period);
-  return build(db, await me(db, user), period);
+  const s = await me(db, user);
+  // A manager knows who is under them but never what those people sold; the office still sees the whole picture (forEmployee).
+  return build(db, s, period, { hideTeamSales: s.staff_level === "manager" });
 }
 // The same figures for any employee, for the office (a hub-limited user only reaches their own hub). Used by the person report.
 async function forEmployee(db, employeeId, period, hub) {
@@ -29,7 +31,7 @@ async function forEmployee(db, employeeId, period, hub) {
   if (hub && s.hub !== hub) throw httpError(403, "Outside your hub");
   return build(db, s, period);
 }
-async function build(db, s, period) {
+async function build(db, s, period, { hideTeamSales = false } = {}) {
   const finalized = await svc.isFinalized(db, period);
   const daily = await db.all("SELECT id, date, business_amount, settled_amount, settle_up_minus, personal_minus, notes, source, (confirmed_by IS NOT NULL OR source <> 'portal') AS confirmed FROM daily_log WHERE employee_id = ? AND date >= ? AND date < ? ORDER BY date", s.employee_id, ...monthBounds(period));
   const stock = await db.all("SELECT * FROM stock_recon WHERE employee_id = ? AND period = ? ORDER BY product", s.employee_id, period);
@@ -49,13 +51,17 @@ async function build(db, s, period) {
     const below = [];
     const walk = (id, depth) => { for (const k of kids.get(id) || []) { if (depth < 8) { below.push({ ...k, depth }); walk(k.employee_id, depth + 1); } } };
     walk(s.employee_id, 1);
-    const rows = below.length ? await db.all(`SELECT employee_id, COUNT(*) AS days, COALESCE(SUM(business_amount), 0) AS business, COALESCE(SUM(settle_up_minus), 0) AS short
-      FROM daily_log WHERE date >= ? AND date < ? GROUP BY employee_id`, ...monthBounds(period)) : [];
-    const byId = new Map(rows.map((r) => [r.employee_id, r]));
-    team = below.map((p) => ({ employee_id: p.employee_id, name: p.name, level_name: svc.LEVEL_NAME[p.staff_level] || p.staff_level, depth: p.depth, target: Number(p.target) || 0,
-      days: Number(byId.get(p.employee_id)?.days) || 0, business: Number(byId.get(p.employee_id)?.business) || 0, short: Number(byId.get(p.employee_id)?.short) || 0 }));
+    if (hideTeamSales) { // names and positions only: no sales, days, shortages or targets of the people below
+      team = below.map((p) => ({ employee_id: p.employee_id, name: p.name, level_name: svc.LEVEL_NAME[p.staff_level] || p.staff_level, depth: p.depth }));
+    } else {
+      const rows = below.length ? await db.all(`SELECT employee_id, COUNT(*) AS days, COALESCE(SUM(business_amount), 0) AS business, COALESCE(SUM(settle_up_minus), 0) AS short
+        FROM daily_log WHERE date >= ? AND date < ? GROUP BY employee_id`, ...monthBounds(period)) : [];
+      const byId = new Map(rows.map((r) => [r.employee_id, r]));
+      team = below.map((p) => ({ employee_id: p.employee_id, name: p.name, level_name: svc.LEVEL_NAME[p.staff_level] || p.staff_level, depth: p.depth, target: Number(p.target) || 0,
+        days: Number(byId.get(p.employee_id)?.days) || 0, business: Number(byId.get(p.employee_id)?.business) || 0, short: Number(byId.get(p.employee_id)?.short) || 0 }));
+    }
   }
-  const belowSales = team ? team.reduce((t, p) => t + p.business, 0) : 0;
+  const belowSales = team && !hideTeamSales ? team.reduce((t, p) => t + p.business, 0) : 0;
 
   // Final figures exist only once the month is finalized. Before that, show an estimate from the same rules,
   // clearly marked as not final.
@@ -98,7 +104,7 @@ async function build(db, s, period) {
       settle_up: sum(daily, "settle_up_minus"), personal: sum(daily, "personal_minus"),
       daily, stock: stock.map((k) => ({ product: k.product, shortfall_qty: k.shortfall_qty, unit_price: k.unit_price, shortfall_value: k.shortfall_value })), allowances,
     },
-    team, below_sales: belowSales, senior_rate: Number(settings.senior_commission_rate) || 0,
+    team, team_sales_hidden: hideTeamSales, below_sales: hideTeamSales ? null : belowSales, senior_rate: Number(settings.senior_commission_rate) || 0,
     official, estimate, history, security_held: Number(security.held) || 0,
     loans: await loans.mine(db, s.employee_id, period),
   };

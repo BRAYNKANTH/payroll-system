@@ -214,7 +214,8 @@ export default {
       ...(!can("view_pay") ? [] : [{ key: "commission_rate", label: "Commission", align: "r", render: (s) => s.role === "guy" ? pct(s.commission_rate, 2) : html`<span class="faint">—</span>` }]),
       { key: "bank_account_no", label: "Bank", render: (s) => s.bank_account_no ? html`<span class="mono faint">…${s.bank_account_no.slice(-4)}</span>` : html`<span class="faint">—</span>` },
       { key: "status", label: "Status", render: (s) => badge(s.status) },
-      { key: "report", label: "PDF report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
+      // a person's report lists their sales, so a manager (who sees who is under them, not what they sold) has no PDF column
+      ...(can("read") ? [{ key: "report", label: "PDF report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` }] : []),
     ];
 
     el.innerHTML = html`

@@ -2,7 +2,7 @@
 // and (as of now) what the hub and each seller hold. For a coacher (and a manager who is a stock keeper).
 // The actions that change stock stay on Give stock; this page is for reading.
 import { get, qs } from "../api.js";
-import { state, scopeHub } from "../app.js";
+import { state, scopeHub, can } from "../app.js";
 import { $, html, icon, badge, dataTable, emptyState, initials, levelLabel } from "../ui.js";
 import { mountRange, rangeText } from "../range.js";
 
@@ -14,6 +14,7 @@ export default {
   async render({ el }) {
     const code = scopeHub();
     const isManager = state.user.role === "manager";
+    const showSold = can("read"); // a stock-keeper manager sees what sellers hold, never how much they sold
     const base = isManager ? "" : `/hubs/${encodeURIComponent(code)}/stock`;
     const link = (path, label, ic, primary) => html`<a class="btn ${primary ? "primary" : ""}" href="${path}" data-link>${icon(ic)} ${label}</a>`;
     const level = (p) => (p.in_hub <= 0 ? ["red", "Out"] : p.in_hub <= Math.max(10, Math.round(p.received * 0.1)) ? ["amber", "Low"] : ["green", "Enough"]);
@@ -39,10 +40,10 @@ export default {
       const hasStock = d.products.some((p) => p.received > 0);
       $("#sv-sub").textContent = `${d.hub.name} · ${rangeText(r)}. The period numbers follow the dates you choose; "in the hub" and "with sellers" are what is held now.`;
       $("#sv").innerHTML = html`
-        <div class="grid kpis kpis-3 mb-4">
+        <div class="grid kpis ${showSold ? "kpis-3" : ""} mb-4">
           <div class="card kpi"><div class="label"><span class="icon blue">${icon("warehouse")}</span>Received from the office</div><div class="value">${n0(t.received_in)}</div><div class="foot">Pieces, ${rangeText(r)}</div></div>
           <div class="card kpi"><div class="label"><span class="icon">${icon("users")}</span>Given to sellers</div><div class="value">${n0(t.given_in)}</div><div class="foot">Pieces, ${rangeText(r)}</div></div>
-          <div class="card kpi"><div class="label"><span class="icon amber">${icon("trend")}</span>Sold</div><div class="value">${n0(t.sold_in)}</div><div class="foot">Pieces recorded on the tills, ${rangeText(r)}</div></div>
+          ${showSold ? html`<div class="card kpi"><div class="label"><span class="icon amber">${icon("trend")}</span>Sold</div><div class="value">${n0(t.sold_in)}</div><div class="foot">Pieces recorded on the tills, ${rangeText(r)}</div></div>` : ""}
         </div>
 
         ${hasStock ? "" : html`<div class="alert warn mb-4">${icon("box")}<div><b>The hub has no stock yet.</b> The office sends stock to the hub first. It appears here as soon as it is sent.</div></div>`}
@@ -64,7 +65,7 @@ export default {
           { key: "product", label: "Product", render: (p) => html`<b>${p.product}</b>`, total: () => "Total" },
           { key: "received_in", label: "Received", align: "r", total: (rs) => n0(rs.reduce((a, x) => a + x.received_in, 0)) },
           { key: "given_in", label: "Given to sellers", align: "r", total: (rs) => n0(rs.reduce((a, x) => a + x.given_in, 0)) },
-          { key: "sold_in", label: "Sold", align: "r", total: (rs) => n0(rs.reduce((a, x) => a + x.sold_in, 0)) },
+          ...(showSold ? [{ key: "sold_in", label: "Sold", align: "r", total: (rs) => n0(rs.reduce((a, x) => a + x.sold_in, 0)) }] : []),
           { key: "in_hub", label: "In the hub now", align: "r", render: (p) => html`<b>${n0(p.in_hub)}</b>`, total: (rs) => n0(rs.reduce((a, x) => a + x.in_hub, 0)) },
           { key: "with_sellers", label: "With sellers now", align: "r", total: (rs) => n0(rs.reduce((a, x) => a + x.with_sellers, 0)) },
           { key: "status", label: "Hub stock", sort: false, render: (p) => { const [tone, text] = level(p); return badge(tone, text); } },
@@ -75,12 +76,12 @@ export default {
         rows: d.sellers, empty: "No sellers in this hub yet", emptyHint: "Add sellers to this hub on the Employees page.",
         groupBy: (s) => s.team.id,
         groupLabel: (key, rs) => `<b>${rs[0].team.title}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "seller" : "sellers"} · ${n0(rs.reduce((a, x) => a + x.left, 0))} pieces held</span>`,
-        card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${levelLabel(s.staff_level)}</span></span><span class="mc-end">${n0(s.left)} left<br><span class="muted">sold ${n0(s.sold_in)}</span></span>`,
+        card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${levelLabel(s.staff_level)}</span></span><span class="mc-end">${n0(s.left)} left${showSold ? html`<br><span class="muted">sold ${n0(s.sold_in)}</span>` : ""}</span>`,
         cols: [
           { key: "name", label: "Seller", render: (s) => html`<div class="who"><div class="avatar">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id} · ${levelLabel(s.staff_level)}</span></div></div>` },
           { key: "carried_in", label: "Carried over", align: "r" },
           { key: "given_in", label: "Given", align: "r" },
-          { key: "sold_in", label: "Sold", align: "r" },
+          ...(showSold ? [{ key: "sold_in", label: "Sold", align: "r" }] : []),
           { key: "left", label: "Left now", align: "r", render: (s) => html`<b class="${s.left < 1 ? "neg" : ""}">${n0(s.left)}</b>` },
           { key: "items", label: "What they hold", sort: false, render: (s) => (s.items.length ? html`<div class="mc-chips">${s.items.slice(0, 3).map((i) => html`<span class="mc-chip">${i.left} × ${i.product}</span>`)}${s.items.length > 3 ? html`<span class="muted">+${s.items.length - 3} more</span>` : ""}</div>` : html`<span class="muted">Nothing</span>`) },
         ],
