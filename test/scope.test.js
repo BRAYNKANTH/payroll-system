@@ -159,7 +159,7 @@ test("HTTP: the coacher gives stock to the whole hub; a stock keeper may too; a 
     assert.equal((await give("man1", "D3")).status, 200, "a stock keeper reaches a colleague's seller too");
     assert.equal((await give("man1", "D9")).status, 403, "but only inside their hub");
     const morning = (await call("man1", "GET", "/api/stock-issues")).json;
-    assert.deepEqual(morning.sellers.map((s) => s.employee_id).sort(), ["D1", "D2", "D3", "M1", "M2"], "everyone who sells in the hub");
+    assert.deepEqual(morning.sellers.map((s) => s.employee_id).sort(), ["D1", "D2", "D3", "M1", "M2", "PM1"], "everyone who sells in the hub: the sellers, the managers and the promoting manager (he sells sometimes)");
     // a stock keeper still cannot see the rest of the hub
     assert.equal((await call("man1", "GET", "/api/daily")).status, 403);
     assert.equal((await call("man1", "GET", "/api/staff/D3/profile")).status, 403);

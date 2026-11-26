@@ -138,7 +138,7 @@ async function createUser(db, actor, body) {
   let employeeId = null;
   let role = body.role;
   const employee = async () => {
-    const s = await db.get("SELECT employee_id, hub, role, status, staff_level FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
+    const s = await db.get("SELECT employee_id, hub, role, status, staff_level, is_coacher FROM staff WHERE employee_id = ?", String(body.employee_id || ""));
     if (!s) throw httpError(400, "Choose the employee this login is for");
     if (s.status !== "active") throw httpError(400, "That employee is inactive");
     if (await db.get("SELECT 1 AS x FROM users WHERE employee_id = ?", s.employee_id)) throw httpError(409, "That employee already has a login");
@@ -150,14 +150,16 @@ async function createUser(db, actor, body) {
     employeeId = s.employee_id;
     hub = s.hub;
     if (role === "manager" && !["manager", "promoting_manager"].includes(s.staff_level)) throw httpError(400, "A manager login is for a manager or a promoting manager");
-    // The position decides the kind of login: a coacher heads the hub; a manager or promoting manager sees their own people.
-    if (role === "staff" && s.staff_level === "coacher") role = "coacher";
+    // The position and the coacher tag decide the kind of login: the coacher of a hub heads the hub; any other manager or promoting manager
+    // sees their own people.
+    const head = s.is_coacher || s.staff_level === "coacher";
+    if (head && ["staff", "manager"].includes(role)) role = "coacher";
     else if (role === "staff" && ["manager", "promoting_manager"].includes(s.staff_level)) role = "manager";
   } else if (role === "coacher") {
     if (!hub) throw httpError(400, "A coacher must be limited to one hub");
     if (body.employee_id) {
       const s = await employee();
-      if (s.staff_level !== "coacher") throw httpError(400, "A coacher login can only be linked to a coacher");
+      if (!(s.is_coacher || s.staff_level === "coacher")) throw httpError(400, "A coacher login can only be linked to the hub's coacher");
       if (s.hub !== hub) throw httpError(400, "The employee belongs to a different hub than the one chosen");
       employeeId = s.employee_id;
     }

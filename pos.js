@@ -186,7 +186,7 @@ async function morning(db, { date, hub }) {
     }),
   };
   // One line per hub: its coacher (who gives the stock out), what is given today and who has none. The admin sees this instead of every seller.
-  const coachers = await db.all("SELECT hub, employee_id, name FROM staff WHERE staff_level = 'coacher' AND status = 'active' ORDER BY employee_id");
+  const coachers = await db.all("SELECT hub, employee_id, name FROM staff WHERE is_coacher AND status = 'active' ORDER BY employee_id");
   out.hubs = allHubs.map((h) => {
     const mine = out.sellers.filter((x) => x.hub === h.code);
     const c = coachers.find((x) => x.hub === h.code);

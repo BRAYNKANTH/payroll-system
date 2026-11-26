@@ -150,6 +150,9 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','coacher','manager','staff'));
 -- A manager tagged as stock keeper can handle the stock of everyone in the hub, not only their own people.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS stock_keeper boolean NOT NULL DEFAULT false;
+-- A coacher is a manager or promoting manager carrying the coacher tag: the head of one hub (one per hub). Their pay and place in the reporting
+-- chart follow their position; the tag gives the hub-head screens. The old Coacher position is kept for old records and becomes the tag.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_coacher boolean NOT NULL DEFAULT false;
 
 -- Balance brought forward from the old spreadsheets. Only used until the person has a first calculated month.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS opening_balance bigint NOT NULL DEFAULT 0;
@@ -174,6 +177,10 @@ UPDATE staff SET staff_level = 'supervisor', role = 'guy' WHERE staff_level = 'g
 -- Promoting manager and coacher sit above the manager and draw a fixed monthly salary (staff.basic_pay) plus a share of the sales below.
 ALTER TABLE staff DROP CONSTRAINT IF EXISTS staff_staff_level_check;
 ALTER TABLE staff ADD CONSTRAINT staff_staff_level_check CHECK (staff_level IN ('distributor','supervisor','manager','promoting_manager','coacher'));
+-- The old Coacher position becomes the coacher tag (after the position column exists), and a hub has one active coacher.
+UPDATE staff SET is_coacher = true WHERE staff_level = 'coacher' AND status = 'active' AND NOT is_coacher
+  AND employee_id = (SELECT MIN(c.employee_id) FROM staff c WHERE c.hub = staff.hub AND c.staff_level = 'coacher' AND c.status = 'active');
+CREATE UNIQUE INDEX IF NOT EXISTS staff_one_coacher_per_hub ON staff (hub) WHERE is_coacher AND status = 'active';
 
 CREATE TABLE IF NOT EXISTS daily_log (
   id              bigserial PRIMARY KEY,

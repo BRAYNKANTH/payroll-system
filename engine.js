@@ -154,7 +154,8 @@ function managerCommissionRate(businessCents, settings, targetCents) {
 //               share, so it is charged to his account. The company pays everything else a seller earns.
 // The weeks are worked out from the daily sheets by the service (no manual weekly sheet).
 // team: one row per seller with the extras charged to this manager: [{ employee_id, name, over_target, food }].
-function computeManager({ staff, weekly, team = [], openingBalance, companyReturnRate, teamSales = 0, ownSales = 0, rules = {} }) {
+// seniorShare: for a promoting manager, the share of the managers' groups under him ({ base, rate }), on top of everything above.
+function computeManager({ staff, weekly, team = [], openingBalance, companyReturnRate, teamSales = 0, ownSales = 0, rules = {}, seniorShare = null }) {
   const { ownRate = 0, retainThreshold = 0, retainRate = 0 } = rules;
   const weeks = weekly.map((w) => {
     const profitShare = pct(w.business_total, w.profit_percent);
@@ -173,7 +174,9 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
   const ownCommission = pct(ownSales, ownRate);
   const salary = Number(staff.basic_pay) || 0;
   const companyReturn = pct(totalBusiness, companyReturnRate);
-  const gross = commission + ownCommission + salary;
+  const shareBase = seniorShare ? Number(seniorShare.base) || 0 : 0;
+  const share = seniorShare ? pct(shareBase, seniorShare.rate) : 0;
+  const gross = commission + ownCommission + salary + share;
   const deductions = [
     { key: "rent", label: "Rent", amount: sum(weeks, "rent") },
     { key: "hub_fee", label: "Hub fee", amount: sum(weeks, "hub_fee") },
@@ -211,7 +214,9 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
           ? { label: `Retaining commission (${fmtRate(retainRate)} of Rs ${fmt(monthSales)}: sales below Rs ${fmt(retainThreshold)})`, amount: commission }
           : { label: "Weekly commission (each week's business × that week's profit share)", amount: commission },
         ...(ownSales ? [{ label: `Own sales commission (${fmtRate(ownRate)} of Rs ${fmt(ownSales)})`, amount: ownCommission }] : []),
+        ...(seniorShare ? [{ label: `Share of your managers' groups (${fmtRate(seniorShare.rate)} of Rs ${fmt(shareBase)})`, amount: share }] : []),
         ...(salary ? [{ label: "Basic salary", amount: salary }] : [])],
+      ...(seniorShare ? { share_base: shareBase, below_sales: shareBase } : {}),
       deductions,
     },
   };

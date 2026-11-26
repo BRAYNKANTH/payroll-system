@@ -43,7 +43,11 @@ async function leave(db, id, body, user, scopeHub) {
       await t.run("UPDATE staff SET upline_id = ?, updated_by = ?, updated_at = " + NOW + " WHERE upline_id = ? AND status = 'active'", replacement.employee_id, user, id);
       await t.run("UPDATE staff SET manager_id = ?, updated_by = ?, updated_at = " + NOW + " WHERE manager_id = ? AND status = 'active'", replacement.employee_id, user, id);
     }
-    await t.run("UPDATE staff SET status = 'inactive', leave_date = ?, leave_reason = ?, updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ?", leaveDate, reason, user, id);
+    await t.run("UPDATE staff SET status = 'inactive', leave_date = ?, leave_reason = ?, is_coacher = false, updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ?", leaveDate, reason, user, id);
+    // A coacher who leaves hands the hub over: the coacher tag goes to the person who takes over (if the hub already has no other coacher).
+    if (replacement && s.is_coacher && !(await t.get("SELECT 1 AS x FROM staff WHERE is_coacher AND status = 'active' AND hub = ?", s.hub))) {
+      await t.run("UPDATE staff SET is_coacher = true, updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ?", user, replacement.employee_id);
+    }
     // Their sign-in is switched off at once and any open session ends. The user record and the history stay; the admin can turn it on again (Users & roles).
     await t.run("DELETE FROM sessions WHERE username IN (SELECT username FROM users WHERE employee_id = ?)", id);
     deactivated = (await t.run("UPDATE users SET status = 'disabled', updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ? AND status = 'active'", user, id)).rowCount;

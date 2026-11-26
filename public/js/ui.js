@@ -67,8 +67,8 @@ export const isManagerLevel = (l) => MANAGER_LEVELS.includes(l);
 const TIERED = { pay_scheme: "tiered", commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, security_deduction_rule: "pct_business:1" };
 export const POSITION_FALLBACK = {
   distributor: { ...TIERED, target: 100000, basic_pay: 25000, food_min_days: 0 },
-  supervisor: { ...TIERED, target: 120000, basic_pay: 30000, food_min_days: 24 },
-  manager: { basic_pay: 27000, target: 100000 }, promoting_manager: { basic_pay: 29000 }, coacher: { basic_pay: 30000 },
+  supervisor: { ...TIERED, target: 120000, basic_pay: 30000, food_min_days: 21 },
+  manager: { basic_pay: 27000, target: 100000 }, promoting_manager: { basic_pay: 30000, target: 100000 }, coacher: { basic_pay: 30000 },
 };
 export function positionDefaults(settings) {
   let saved = {};

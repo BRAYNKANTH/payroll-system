@@ -32,7 +32,7 @@ function teamsView(pane, d, drawFeed) {
   if (!teams.length) { pane.innerHTML = html`<div class="card">${emptyState("No teams yet", "Add a manager and the people under them. Their sales appear here.", "users")}</div>`.toString(); return; }
 
   if (team) {
-    const count = team.members.length, head = team.members.find((m) => m.staff_level === "manager");
+    const count = team.members.length, head = team.members.find((m) => m.staff_level === "manager" || m.staff_level === "promoting_manager");
     const pctOf = d.monthToDate && team.target > 0 ? team.business / team.target : null;
     pane.innerHTML = html`<nav class="drill-crumbs" aria-label="Where you are"><a href="${path}" data-link>All teams</a><span aria-hidden="true">›</span><b>${team.title}</b></nav>
       <div class="grid kpis hub-kpis mb-4">
@@ -58,7 +58,7 @@ function teamsView(pane, d, drawFeed) {
       ${tile("To confirm", html`<span class="${d.unconfirmed ? "neg" : ""}">${d.unconfirmed}</span>`, d.unconfirmed ? "Days waiting for you" : "Everything is confirmed")}
     </div>
     <div class="drill-grid">${teams.map((t) => {
-      const pctOf = d.monthToDate && t.target > 0 ? t.business / t.target : null, head = t.members.find((m) => m.staff_level === "manager");
+      const pctOf = d.monthToDate && t.target > 0 ? t.business / t.target : null, head = t.members.find((m) => m.staff_level === "manager" || m.staff_level === "promoting_manager");
       return html`<a class="card drill-card" href="${path}?team=${encodeURIComponent(t.id)}" data-link aria-label="${t.title}: open this team">
         <span class="dc-top"><span class="avatar" aria-hidden="true">${initials(t.title)}</span><span class="dc-main"><b>${t.title}</b><span class="muted">${head ? "Manager" : t.sub} · ${peopleText(t.members.length)}</span></span><span class="dc-sales"><b class="num">${money(t.business)}</b></span></span>
         ${pctOf == null ? "" : html`<span class="dc-foot">${bar(pctOf)}</span>`}${t.unconfirmed ? html`<span class="dc-foot">${badge("amber", `${t.unconfirmed} to confirm`)}</span>` : ""}

@@ -39,13 +39,14 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
   const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k] || 0), 0);
   const business = sum(daily, "business_amount");
   const senior = s.staff_level === "promoting_manager" || s.staff_level === "coacher"; // paid a salary plus a share of the sales below them
-  const isManager = s.staff_level === "manager";
+  const isManager = s.staff_level === "manager" || s.staff_level === "promoting_manager"; // a promoting manager is also a manager of his own team
   const settings = await getSettings(db);
 
   // Everyone below this person in the chain, with their sales this month (sales only, never anyone's pay).
   let team = null, shareSales = null; // shareSales: what a promoting manager's share is worked out on (the groups of the managers directly under them)
   if (s.role === "manager") {
-    const people = await db.all("SELECT employee_id, name, staff_level, upline_id, target, status FROM staff WHERE hub = ? AND status = 'active'", s.hub);
+    // Everyone below, in any hub: the reporting chart crosses hubs (a branch's coacher can report to someone from another branch).
+    const people = await db.all("SELECT employee_id, name, staff_level, upline_id, target, status FROM staff WHERE status = 'active'");
     const kids = new Map();
     for (const p of people) { if (!kids.has(p.upline_id)) kids.set(p.upline_id, []); kids.get(p.upline_id).push(p); }
     const below = [];
@@ -75,7 +76,7 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
     const r = await db.get("SELECT * FROM pay_period_summary WHERE employee_id = ? AND period = ?", s.employee_id, period);
     if (r) official = { gross: r.gross_earnings, deductions: r.total_deductions, net: r.net_pay, paid: r.disbursed_amount, opening: r.opening_balance,
       closing: r.closing_balance, ...(({ earnings, deductions }) => ({ earnings, deduction_lines: deductions }))(JSON.parse(r.detail)) };
-  } else if (senior) {
+  } else if (senior && s.staff_level !== "promoting_manager") { // the old Coacher position; a promoting manager is paid like a manager (below)
     const promoting = s.staff_level === "promoting_manager";
     const r = engine.computeSenior({ staff: s, belowSales: promoting ? shareSales || 0 : belowSales, rate: Number(settings.senior_commission_rate) || 0, openingBalance: 0,
       shareOf: promoting ? "your managers' groups" : "your team's sales" });

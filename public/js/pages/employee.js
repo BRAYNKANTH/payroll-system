@@ -92,7 +92,7 @@ export default {
           <div class="avatar lg" style="${s.role === "manager" ? "background:var(--accent)" : ""}">${initials(s.name)}</div>
           <div style="flex:1;min-width:200px">
             <h1>${s.name}</h1>
-            <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
+            <div class="row" style="margin-top:6px;gap:8px">${badge(s.role, levelLabel(s.staff_level))}${s.is_coacher && s.staff_level !== "coacher" ? html` ${badge("green", "Coacher")}` : ""} ${badge(s.status)} <span class="muted">${s.employee_id} · ${s.hub_name}</span></div>
           </div>
           <div class="row ph-stats" style="gap:28px" ${can("view_pay") ? "" : "hidden"}>
             <div><div class="faint text-sm">Latest net pay</div><div class="num stat-lg ${last?.net_pay < 0 ? "neg" : ""}">${last ? `Rs ${money(last.net_pay)}` : "—"}</div><div class="faint text-sm">${last ? monthName(last.period) : ""}</div></div>

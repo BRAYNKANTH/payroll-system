@@ -43,6 +43,7 @@ const ENTITIES = {
       leave_reason: { type: "text" },
       staff_level: { type: "enum", values: ["distributor", "supervisor", "manager", "promoting_manager", "coacher"] },
       stock_keeper: { type: "bool" }, // a manager who may handle the stock of the whole hub
+      is_coacher: { type: "bool" }, // the tag: this manager or promoting manager heads their hub (one per hub)
       opening_balance: { type: "money" }, // balance brought forward when payroll starts; negative = money owed
       upline_id: { type: "text" },
       manager_id: { type: "text" },
@@ -230,7 +231,7 @@ async function validateRefs(db, kind, row) {
   if (kind === "staff" && row.manager_id && (await staffRole(row.manager_id)) !== "manager") {
     throw httpError(400, `manager_id ${row.manager_id} is not a manager`);
   }
-  if (kind === "weekly" && row.manager_id && (await staffLevel(row.manager_id)) !== "manager") {
+  if (kind === "weekly" && row.manager_id && !holdsWeekly(await staffLevel(row.manager_id))) {
     throw httpError(400, `${row.manager_id} is not a manager`);
   }
   if (kind === "daily" && row.employee_id && !sellsDaily(await staffLevel(row.employee_id))) {
@@ -261,18 +262,35 @@ async function applyChain(db, row, existing = {}, id) {
   if (row.staff_level) row.role = m.role = roleOf(row.staff_level);
   else if (row.role && row.role !== existing.role) row.staff_level = m.staff_level = row.role === "manager" ? "manager" : "distributor";
   else if (!m.staff_level) row.staff_level = m.staff_level = m.role === "manager" ? "manager" : "distributor";
+  // Changing someone's position must keep the people who report to them valid: everyone under them still has to be below them in the chain.
+  if (id && existing.staff_level && row.staff_level && row.staff_level !== existing.staff_level) {
+    for (const r of await db.all("SELECT name, staff_level FROM staff WHERE upline_id = ? AND status = 'active'", id)) {
+      const ok = LEVEL_RANK[r.staff_level] < LEVEL_RANK[m.staff_level] || (r.staff_level === "promoting_manager" && m.staff_level === "promoting_manager");
+      if (!ok) throw httpError(400, `${r.name} (${LEVEL_NAME[r.staff_level].toLowerCase()}) reports to ${existing.name || "this person"}, who would then no longer be above them. Move ${r.name} first`);
+    }
+  }
+  // The old Coacher position carries the tag automatically (as the migration does for existing records).
+  // A second one added while the hub's coacher is still there (a handover) stays untagged; the tag moves when the first leaves.
+  if (m.staff_level === "coacher" && !m.is_coacher && !(await db.get("SELECT 1 AS x FROM staff WHERE is_coacher AND status = 'active' AND hub = ? AND employee_id <> ?", m.hub, String(id || "")))) row.is_coacher = m.is_coacher = true;
+  // The coacher tag: only on a manager or promoting manager, and one active coacher per hub.
+  if (m.is_coacher) {
+    if (!MANAGER_LEVELS.has(m.staff_level)) throw httpError(400, "Only a manager or a promoting manager can be the coacher of a hub");
+    if ((m.status || "active") === "active") {
+      const other = await db.get("SELECT employee_id, name FROM staff WHERE is_coacher AND status = 'active' AND hub = ? AND employee_id <> ?", m.hub, String(id || ""));
+      if (other) throw httpError(400, `This hub already has a coacher (${other.name}). Take the coacher tag off ${other.name} first`);
+    }
+  }
   if (m.upline_id) {
     if (m.upline_id === id) throw httpError(400, "An employee cannot report to themselves");
-    const up = await db.get("SELECT staff_level FROM staff WHERE employee_id = ?", m.upline_id);
+    const up = await db.get("SELECT staff_level, name FROM staff WHERE employee_id = ?", m.upline_id);
     if (!up) throw httpError(400, `Unknown upline ${m.upline_id}`);
     // Promoting managers are a ladder: one can sit under another. Every other position reports to someone strictly more senior.
+    // Sellers may report straight to a promoting manager (his own team); the promoting manager's share is worked out on his managers' groups.
     const ladder = m.staff_level === "promoting_manager" && up.staff_level === "promoting_manager";
     if (!ladder && LEVEL_RANK[up.staff_level] <= LEVEL_RANK[m.staff_level]) {
-      throw httpError(400, `A ${LEVEL_NAME[m.staff_level].toLowerCase()} must report to someone more senior, not a ${LEVEL_NAME[up.staff_level].toLowerCase()}`);
-    }
-    // A seller reports to a manager, never straight to a promoting manager (a promoting manager earns from their managers' groups).
-    if (m.role === "guy" && up.staff_level === "promoting_manager") {
-      throw httpError(400, "A distributor or supervisor reports to a manager, not directly to a promoting manager");
+      // A manager gets a manager under them by being promoted first: the promoting manager position is given when a manager comes under him.
+      const hint = m.staff_level === "manager" && up.staff_level === "manager" ? `. If ${up.name} now has a manager under them, make ${up.name} a promoting manager first, then add this manager under them` : "";
+      throw httpError(400, `A ${LEVEL_NAME[m.staff_level].toLowerCase()} must report to someone more senior, not a ${LEVEL_NAME[up.staff_level].toLowerCase()}${hint}`);
     }
     // Nobody can end up above themselves: walk up from the chosen boss and make sure this person is not on the way.
     if (id) {
@@ -288,7 +306,7 @@ async function applyChain(db, row, existing = {}, id) {
       for (let i = 0; cur && i < 10; i++) {
         const s = await db.get("SELECT role, staff_level, upline_id FROM staff WHERE employee_id = ?", cur);
         // Only a manager holds a weekly account; the sellers below belong to the nearest manager above them.
-        if (s?.staff_level === "manager") { row.manager_id = cur; break; }
+        if (s?.staff_level === "manager" || s?.staff_level === "promoting_manager") { row.manager_id = cur; break; } // a promoting manager is also a manager of his own sellers
         cur = s?.upline_id;
       }
     }
@@ -318,7 +336,8 @@ function weeklyDefaults(raw, settings, targetCents) {
   return { ...raw, profit_percent: engine.managerCommissionRate(Math.round(business * 100), settings, targetCents) };
 }
 // Daily sheets are kept for everyone who sells: distributors, supervisors and managers.
-const sellsDaily = (level) => ["distributor", "supervisor", "manager"].includes(level);
+const sellsDaily = (level) => ["distributor", "supervisor", "manager", "promoting_manager"].includes(level);
+const holdsWeekly = (level) => level === "manager" || level === "promoting_manager"; // the weekly account: a manager, and a promoting manager (also a manager)
 
 async function createEntry(db, kind, body, user, scopeHub) {
   const e = ENTITIES[kind];
@@ -331,10 +350,24 @@ async function createEntry(db, kind, body, user, scopeHub) {
   row.created_by = user;
   if (kind === "staff") row.bank_account_verified = row.bank_account_no ?? null; // initial on-file account
   const cols = Object.keys(row);
+  let made;
   try {
-    return await withUser(db, user, async (t) =>
+    made = await withUser(db, user, async (t) =>
       t.get(`${insertSql(e.table, cols)} RETURNING *`, ...cols.map((c) => row[c])));
   } catch (err) { throw sqlError(err); }
+  if (kind === "staff") await syncLogin(db, made, user);
+  return made;
+}
+
+// A manager's or coacher's login follows the person: the coacher tag makes it a hub-head login, taking the tag off makes it a manager login
+// again, and moving the person to another hub moves the login with them.
+async function syncLogin(db, s, user) {
+  if (!s) return;
+  const u = await db.get("SELECT username, role, hub FROM users WHERE employee_id = ?", s.employee_id);
+  if (!u || !["coacher", "manager"].includes(u.role)) return;
+  const want = s.is_coacher || s.staff_level === "coacher" ? "coacher" : MANAGER_LEVELS.has(s.staff_level) ? "manager" : u.role;
+  if (want === u.role && u.hub === s.hub) return;
+  await withUser(db, user, (t) => t.run(`UPDATE users SET role = ?, hub = ?, updated_by = ?, updated_at = ${NOW} WHERE username = ?`, want, s.hub, user, u.username));
 }
 
 async function updateEntry(db, kind, key, body, user, scopeHub) {
@@ -349,11 +382,14 @@ async function updateEntry(db, kind, key, body, user, scopeHub) {
   await assertScope(db, kind, { ...existing, ...row }, scopeHub);
   const cols = Object.keys(row).filter((c) => row[c] !== existing[c]);
   if (!cols.length) return existing;
+  let saved;
   try {
-    return await withUser(db, user, async (t) =>
+    saved = await withUser(db, user, async (t) =>
       t.get(`UPDATE ${e.table} SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_by = ?, updated_at = ${NOW} WHERE ${e.key}::text = ? RETURNING *`,
         ...cols.map((c) => row[c]), user, String(key)));
   } catch (err) { throw sqlError(err); }
+  if (kind === "staff") await syncLogin(db, saved, user);
+  return saved;
 }
 
 async function deleteEntry(db, kind, key, user, scopeHub) {
@@ -389,7 +425,7 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
 
   // Validate everything up front, with staff looked up once.
   const staff = new Map((await db.all("SELECT employee_id, role, hub, staff_level, target FROM staff")).map((s) => [s.employee_id, s]));
-  const okStaff = (s) => !!s && (kind === "weekly" ? s.staff_level === "manager" : kind === "daily" ? sellsDaily(s.staff_level) : s.role === "guy");
+  const okStaff = (s) => !!s && (kind === "weekly" ? holdsWeekly(s.staff_level) : kind === "daily" ? sellsDaily(s.staff_level) : s.role === "guy");
   const wrongStaff = kind === "weekly" ? "a manager" : kind === "daily" ? "someone who sells" : "a distributor or supervisor";
   const settings = kind === "weekly" ? await getSettings(db) : null;
   const rowHub = (r) => (e.byHub ? r.hub : staff.get(r[empCol(kind)])?.hub);
@@ -518,7 +554,7 @@ async function weeklyView(db, period, hub) {
   const dailyAll = mondays.length ? await db.all("SELECT * FROM daily_log WHERE date >= ? AND date < ?", mondays[0], end) : [];
   const saved = await db.all("SELECT * FROM weekly_log WHERE week_start >= ? AND week_start < ?", ...monthBounds(period));
   const dBy = groupBy(dailyAll, "employee_id"), sBy = groupBy(saved, "manager_id");
-  return staff.filter((m) => m.staff_level === "manager" && m.status === "active" && (!hub || m.hub === hub)).map((m) => {
+  return staff.filter((m) => holdsWeekly(m.staff_level) && m.status === "active" && (!hub || m.hub === hub)).map((m) => {
     const rows = [m, ...staff.filter((s) => s.manager_id === m.employee_id)].flatMap((x) => dBy.get(x.employee_id) || []);
     const weeks = managerWeeks(period, settings, m, rows, sBy.get(m.employee_id) || []);
     return { manager_id: m.employee_id, name: m.name, hub: m.hub, target: Number(m.target) || Number(settings.manager_commission_threshold),
@@ -591,14 +627,14 @@ async function runPeriod(db, period, user) {
     for (const m of managers) {
       const prev = prevBy.get(m.employee_id);
       const openingBalance = prev ? prev.closing_balance : Number(m.opening_balance) || 0;
-      if (m.staff_level !== "manager") {
-        // Coacher: basic salary plus a share of the sales of everyone below. Promoting manager: basic salary plus the share on the groups of the
-        // managers directly under them.
-        const promoting = m.staff_level === "promoting_manager";
-        results.set(m.employee_id, { staff: m, prev, result: engine.computeSenior({ staff: m, belowSales: promoting ? managersGroups(m.employee_id) : belowSales(m.employee_id),
-          rate: Number(settings.senior_commission_rate), openingBalance, shareOf: promoting ? "your managers' groups" : "your team's sales" }) });
+      if (m.staff_level === "coacher") {
+        // The old Coacher position: basic salary plus a share of the sales of everyone below.
+        results.set(m.employee_id, { staff: m, prev, result: engine.computeSenior({ staff: m, belowSales: belowSales(m.employee_id), rate: Number(settings.senior_commission_rate), openingBalance }) });
         continue;
       }
+      // A manager, and a promoting manager: a promoting manager is also a manager of his own team (and sells sometimes), so he is paid exactly like
+      // a manager on that team; on top of that he earns the senior share on the groups of the managers directly under him.
+      const promoting = m.staff_level === "promoting_manager";
       const sellers = guys.filter((g) => g.manager_id === m.employee_id && results.has(g.employee_id));
       const team = sellers.map((g) => ({ employee_id: g.employee_id, name: g.name, ...results.get(g.employee_id).result.detail.manager_extra }))
         .filter((t) => t.over_target || t.food);
@@ -608,6 +644,7 @@ async function runPeriod(db, period, user) {
           staff: m, weekly: managerWeeks(period, settings, m, [m, ...sellers].flatMap((x) => weekDaily.get(x.employee_id) || []), weekly.get(m.employee_id) || []), team, openingBalance,
           companyReturnRate: 0, // a manager returns no share to the company; only the coacher hands cash to the owner
           teamSales: sellers.reduce((t, g) => t + salesOf(g.employee_id), 0), ownSales: salesOf(m.employee_id), rules,
+          seniorShare: promoting ? { base: managersGroups(m.employee_id), rate: Number(settings.senior_commission_rate) } : null,
         }),
       });
     }

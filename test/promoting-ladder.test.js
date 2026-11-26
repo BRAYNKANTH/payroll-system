@@ -36,14 +36,39 @@ test("a promoting manager can sit under another, but nobody can end up above the
   await assert.rejects(() => svc.updateEntry(d, "staff", "PB", { upline_id: "M1" }, "owner"), /more senior/);
 });
 
-test("no distributor or supervisor reports straight to a promoting manager; a manager can", async () => {
+test("a promoting manager is also a manager of his own sellers: he earns the manager commission on them and on his own sales, plus the share", async () => {
   const d = await setup();
   const mk = (id, level, upline) => svc.createEntry(d, "staff", { employee_id: id, name: id, hub: "H1", staff_level: level, upline_id: upline, bank_account_no: "11112222", basic_pay: 25000, ...(level === "manager" ? {} : seller) }, "owner");
-  await assert.rejects(() => mk("X1", "distributor", "PA"), /not directly to a promoting manager/);
-  await assert.rejects(() => mk("X2", "supervisor", "PB"), /not directly to a promoting manager/);
-  await assert.rejects(() => svc.updateEntry(d, "staff", "D1", { upline_id: "PB" }, "owner"), /not directly to a promoting manager/);
+  await mk("X1", "distributor", "PA");   // his own seller
+  await mk("X2", "supervisor", "PB");
   await mk("X3", "distributor", "M1");
   await mk("X4", "manager", "PB");
+  assert.equal((await d.get("SELECT manager_id FROM staff WHERE employee_id = 'X1'")).manager_id, "PA", "a seller straight under a promoting manager belongs to him");
+  assert.equal((await d.get("SELECT manager_id FROM staff WHERE employee_id = 'X3'")).manager_id, "M1", "a seller under a manager belongs to that manager");
+  // week of Monday 7 Sept: his seller sells Rs 500,000 and he sells Rs 100,000 himself
+  await svc.createEntry(d, "daily", { date: "2026-09-08", employee_id: "X1", business_amount: 500000, settled_amount: 500000 }, "owner");
+  await svc.createEntry(d, "daily", { date: "2026-09-09", employee_id: "PA", business_amount: 100000, settled_amount: 100000 }, "owner");
+  await svc.runPeriod(d, "2026-09", "owner");
+  // weekly commission 20% of Rs 600,000 (the week reached his Rs 100,000 target) + own sales 25% of Rs 100,000 + basic Rs 29,000 + share 0.55% of M2's group Rs 200,000
+  assert.equal(await gross(d, "PA"), 12000000 + 2500000 + 2900000 + 110000);
+  const detail = JSON.parse((await d.get("SELECT detail FROM pay_period_summary WHERE employee_id = 'PA' AND period = '2026-09'")).detail);
+  assert.deepEqual(detail.earnings.map((e) => e.amount), [12000000, 2500000, 110000, 2900000]);
+  assert.ok(detail.deductions.find((x) => x.key === "rent").amount > 0, "he pays the weekly rent and hub fee like a manager");
+  assert.match(detail.earnings[2].label, /your managers' groups/);
+  assert.equal(await gross(d, "PB"), 2900000 + 550000, "PB is unchanged: his group is M1's alone");
+});
+
+test("a manager is promoted first, then a manager goes under him; a position change cannot strand the people under it", async () => {
+  const d = await setup();
+  const mk = (id, level, upline) => svc.createEntry(d, "staff", { employee_id: id, name: id, hub: "H1", staff_level: level, upline_id: upline, bank_account_no: "11112222", basic_pay: 27000, ...(level === "manager" ? { target: 100000 } : seller) }, "owner");
+  // M2 has a seller, D2. D2 brings a new team and becomes a manager: M2 must be a promoting manager first.
+  await assert.rejects(() => svc.updateEntry(d, "staff", "D2", { staff_level: "manager", upline_id: "M2" }, "owner"), /make Name M2 a promoting manager first/);
+  await svc.updateEntry(d, "staff", "M2", { staff_level: "promoting_manager" }, "owner"); // D2 stays directly under him
+  await svc.updateEntry(d, "staff", "D2", { staff_level: "manager", target: 100000 }, "owner");
+  assert.equal((await d.get("SELECT upline_id, staff_level FROM staff WHERE employee_id = 'D2'")).staff_level, "manager");
+  await mk("N1", "distributor", "D2");
+  // PB has a manager (M1) under him: he cannot be turned back into a manager while that manager reports to him
+  await assert.rejects(() => svc.updateEntry(d, "staff", "PB", { staff_level: "manager" }, "owner"), /no longer be above them/);
 });
 
 test("each promoting manager earns 0.55% on the groups of the managers directly under them, and no group is paid twice", async () => {

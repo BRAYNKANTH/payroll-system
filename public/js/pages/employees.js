@@ -35,13 +35,16 @@ export async function employeeForm(existing, onSaved) {
       <div class="field"><label>Join date</label><input class="input" type="date" name="join_date" value="${e.join_date || ""}"></div>
       <div class="form-section">Role and place</div>
       <div class="field"><label for="ef-level">Position</label><select class="input" id="ef-level" name="staff_level">
-        ${LEVELS.filter(([v]) => !(scopeHub() && isManagerLevel(v))).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select>
+        ${LEVELS.filter(([v]) => !(scopeHub() && isManagerLevel(v)) && (v !== "coacher" || e.staff_level === "coacher")).map(([v, l]) => html`<option value="${v}" ${v === (e.staff_level || (e.role === "manager" ? "manager" : "distributor")) ? "selected" : ""}>${l}</option>`)}</select>
         <span class="hint" id="ef-level-hint" hidden></span></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Reports to</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Who sits directly above this person in the chain</span></div>
       <div class="field" id="ef-keeper-wrap" hidden><span class="lbl">Stock keeper</span>
         <label style="display:flex;gap:10px;align-items:center;font-weight:400"><input type="checkbox" name="stock_keeper" ${e.stock_keeper ? "checked" : ""}> Can handle the stock of the whole hub</label>
         <span class="hint">A stock keeper can see and give stock to everyone in the hub, not only the people under them. Their other access does not change.</span></div>
+      <div class="field" id="ef-coach-wrap" hidden><span class="lbl">Hub coacher</span>
+        <label style="display:flex;gap:10px;align-items:center;font-weight:400"><input type="checkbox" name="is_coacher" ${e.is_coacher ? "checked" : ""}> This person is the coacher of their hub</label>
+        <span class="hint" id="ef-coach-hint">The coacher heads the hub: its people, stock, daily sheets and the cash handover. One coacher per hub. Their pay and their place in the chart do not change.</span></div>
       <div class="field"><label>Hub</label><select class="input" name="hub" ${scopeHub() ? "disabled" : ""}>${state.hubs.map((h) => html`<option value="${h.code}" ${h.code === e.hub ? "selected" : ""}>${h.name}</option>`)}</select></div>
       <div class="field"><label>Status</label><select class="input" name="status"><option value="active" ${e.status === "active" ? "selected" : ""}>Active</option><option value="inactive" ${e.status === "inactive" ? "selected" : ""}>Inactive</option></select></div>
 
@@ -86,11 +89,11 @@ export async function employeeForm(existing, onSaved) {
     const top = f.staff_level.value === "coacher"; // nobody is above a coacher
     const sel = f.upline_id;
     const want = keep ?? sel.value;
-    // Promoting managers are a ladder (one may report to another); a seller never reports straight to a promoting manager.
-    const lvl = f.staff_level.value, ladder = lvl === "promoting_manager", seller = !isManagerLevel(lvl);
+    // Promoting managers are a ladder (one may report to another); sellers may report straight to a promoting manager.
+    const lvl = f.staff_level.value, ladder = lvl === "promoting_manager";
     const cands = staff.filter((s) => {
       const sl = s.staff_level || (s.role === "manager" ? "manager" : "distributor");
-      return s.status === "active" && s.employee_id !== e.employee_id && (levelRank(sl) > rank || (ladder && sl === "promoting_manager")) && !(seller && sl === "promoting_manager");
+      return s.status === "active" && s.employee_id !== e.employee_id && (levelRank(sl) > rank || (ladder && sl === "promoting_manager"));
     });
     sel.innerHTML = `<option value="">${top ? "Not applicable (top of the chain)" : cands.length ? "Not set yet" : "No one senior to this position yet"}</option>` +
       cands.map((s) => `<option value="${s.employee_id}">${s.name} · ${levelLabel(s.staff_level)} · ${s.hub}</option>`).join("");
@@ -102,13 +105,18 @@ export async function employeeForm(existing, onSaved) {
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
     const lvl = f.staff_level.value;
     $("#ef-keeper-wrap", f).hidden = lvl !== "manager"; // only a manager can be a stock keeper
+    // The coacher tag goes on a manager or a promoting manager. One per hub: say who has it now.
+    $("#ef-coach-wrap", f).hidden = !["manager", "promoting_manager"].includes(lvl);
+    const holder = f.is_coacher?.checked ? staff.find((x) => x.is_coacher && x.status === "active" && x.hub === f.hub.value && x.employee_id !== e.employee_id) : null;
+    $("#ef-coach-hint", f).textContent = holder ? `${holder.name} is already the coacher of this hub. Take the tag off ${holder.name} first, then save this one.` : "The coacher heads the hub: its people, stock, daily sheets and the cash handover. One coacher per hub. Their pay and their place in the chart do not change.";
+    $("#ef-coach-hint", f).classList.toggle("neg", !!holder);
     // A branch has one coacher: when adding another, say who is there now and how to hand over.
     const hint = $("#ef-level-hint", f);
     const coach = lvl === "coacher" && !existing ? staff.find((x) => x.staff_level === "coacher" && x.status === "active" && x.hub === f.hub.value) : null;
     hint.hidden = !coach;
     hint.textContent = coach ? `This hub already has a coacher (${coach.name}). If ${coach.name} is leaving, add the new coacher, then open ${coach.name}'s profile, choose Mark as left and pick the new coacher to take over.` : "";
-    $$("[data-target]", f).forEach((x) => (x.hidden = lvl !== "manager" && !guy));
-    $("#target-lbl", f).textContent = lvl === "manager" ? "Weekly target (Rs): sales of the manager and the team in a week" : "Monthly target (Rs)";
+    $$("[data-target]", f).forEach((x) => (x.hidden = !holdsWeekly(lvl) && !guy));
+    $("#target-lbl", f).textContent = holdsWeekly(lvl) ? "Weekly target (Rs): sales of the manager and the team in a week" : "Monthly target (Rs)";
     $("#basic-hint", f).hidden = guy;
     const tiered = f.pay_scheme.value === "tiered";
     $$("[data-tiered]", f).forEach((x) => (x.hidden = !guy || !tiered));
@@ -132,7 +140,7 @@ export async function employeeForm(existing, onSaved) {
     const set = (n, v) => { f[n].value = v || ""; };
     f.pay_scheme.value = d.pay_scheme || "over_target";
     // A manager's weekly target defaults to the figure in Settings ("Manager pay").
-    set("target", d.target || (f.staff_level.value === "manager" ? Number(state.settings.manager_commission_threshold) / 100 : 0)); set("basic_pay", d.basic_pay);
+    set("target", d.target || (holdsWeekly(f.staff_level.value) ? Number(state.settings.manager_commission_threshold) / 100 : 0)); set("basic_pay", d.basic_pay);
     set("commission_pct", d.commission_rate ? +(d.commission_rate * 100).toFixed(4) : "");
     set("base_commission_pct", d.base_commission_rate ? +(d.base_commission_rate * 100).toFixed(4) : "");
     set("food_per_day", d.food_per_day); set("food_min_days", d.food_min_days);
@@ -179,12 +187,13 @@ export async function employeeForm(existing, onSaved) {
     const tiered = guy && v.pay_scheme === "tiered";
     const body = {
       name: v.name, staff_level: v.staff_level, upline_id: v.upline_id || "", hub: f.hub.value, phone: v.phone, nic: v.nic, join_date: v.join_date, status: v.status,
-      ...(guy ? {} : { manager_id: "" }), basic_pay: v.basic_pay || 0, target: guy || v.staff_level === "manager" ? v.target || 0 : 0,
+      ...(guy ? {} : { manager_id: "" }), basic_pay: v.basic_pay || 0, target: guy || holdsWeekly(v.staff_level) ? v.target || 0 : 0,
       commission_rate: guy && v.commission_pct ? Number(v.commission_pct) / 100 : 0, security_deduction_rule: secRule,
       pay_scheme: tiered ? "tiered" : "over_target",
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
       food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
       opening_balance: v.opening_balance || 0, stock_keeper: v.staff_level === "manager" && !!f.stock_keeper?.checked,
+      is_coacher: v.staff_level === "coacher" || (["manager", "promoting_manager"].includes(v.staff_level) && !!f.is_coacher?.checked),
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };
     const login = !existing && v.make_login ? { username: (v.login_username || "").trim(), password: v.login_password || "" } : null;
@@ -199,6 +208,9 @@ export async function employeeForm(existing, onSaved) {
   });
 }
 
+// A manager and a promoting manager (also a manager of his own team) hold the weekly account and a weekly target.
+const holdsWeekly = (l) => l === "manager" || l === "promoting_manager";
+
 export default {
   title: "Employees",
   async render(ctx) {
@@ -211,7 +223,7 @@ export default {
 
     const allCols = [
       { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:color-mix(in srgb, var(--accent) 78%, #000)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
-      { key: "staff_level", label: "Position", render: (s) => html`${badge(s.role, levelLabel(s.staff_level))}${s.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}` },
+      { key: "staff_level", label: "Position", render: (s) => html`${badge(s.role, levelLabel(s.staff_level))}${s.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}${s.is_coacher && s.staff_level !== "coacher" ? html` ${badge("green", "Coacher")}` : ""}` },
       { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
       { key: "upline_id", label: "Reports to", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
       ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic pay", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),
@@ -222,6 +234,31 @@ export default {
       // a person's report lists their sales, so a manager (who sees who is under them, not what they sold) has no PDF column
       ...(can("read") ? [{ key: "report", label: "PDF report", sort: false, render: (s) => html`<a class="btn sm" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` }] : []),
     ];
+
+    // A manager sees only the names of the people in his team here; everything else about a person is on the profile that opens when he selects them.
+    if (!can("read")) {
+      const mine = staff.filter((s) => s.status === "active" && s.employee_id !== state.user.employee_id).sort((a, b) => a.name.localeCompare(b.name));
+      el.innerHTML = html`
+        <div class="page-head emp-page"><div><h1>Employees</h1><p>${mine.length} ${mine.length === 1 ? "person" : "people"} in your team</p></div></div>
+        <div class="card emp-page">
+          <div class="card-head"><div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search your team" placeholder="Search name" value="${filters.q}" style="width:240px"></div></div>
+          <div class="card-body flush" id="list"></div>
+        </div>`;
+      const drawSimple = () => {
+        const q = filters.q.toLowerCase();
+        const rows = mine.filter((s) => !q || s.name.toLowerCase().includes(q));
+        $("#list").innerHTML = mine.length ? dataTable({
+          rows, empty: "No one matches", emptyHint: "Try a different name.", cls: "people",
+          card: (s) => html`<span class="mc-main"><b>${s.name}</b></span>`,
+          summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"}`, rowAction: "", rowLabel: (s) => `Open ${s.name}`,
+          onRow: (s) => navigate(`/employees/${encodeURIComponent(s.employee_id)}`),
+          cols: [{ key: "name", label: "Name", render: (s) => html`<div class="who"><div class="avatar">${initials(s.name)}</div><div><b>${s.name}</b></div></div>` }],
+        }).toString() : emptyState("No one in your team yet", "People who report to you will be listed here.", "users").toString();
+      };
+      drawSimple();
+      $("#q").oninput = (e) => { filters.q = e.target.value; drawSimple(); };
+      return;
+    }
 
     el.innerHTML = html`
       <div class="page-head emp-page">

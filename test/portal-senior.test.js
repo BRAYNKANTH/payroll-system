@@ -63,7 +63,7 @@ test("a coacher cannot enter sales, and a seller has no team", async () => {
   const { d, login, period } = await setup();
   const coach = await login("coach", "C1");
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
-  await assert.rejects(() => sales.addSale(d, coach, { date: today, business_amount: 1, settled_amount: 1 }), /Only distributors, supervisors and managers/);
+  await assert.rejects(() => sales.addSale(d, coach, { date: today, business_amount: 1, settled_amount: 1 }), /Only distributors, supervisors, managers/);
   const guy = await login("guy", "D1");
   const s = await portal.summary(d, guy, period);
   assert.equal(s.team, null);
@@ -74,7 +74,7 @@ test("a coacher login can be linked to the coacher's own record, which gives My 
   const { d, period } = await setup();
   const admin = await auth.userFromToken(d, (await auth.login(d, "owner", PW)).token);
   await assert.rejects(() => auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "NOBODY", password: PW }), /Choose the employee/);
-  await assert.rejects(() => auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "M1", password: PW }), /only be linked to a coacher/);
+  await assert.rejects(() => auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "M1", password: PW }), /only be linked to the hub's coacher/);
   const u = await auth.createUser(d, admin, { username: "c-office", full_name: "C", role: "coacher", hub: "H1", employee_id: "C1", password: PW });
   assert.equal(u.employee_id, "C1");
   await assert.rejects(() => auth.createUser(d, admin, { username: "c-two", full_name: "C", role: "coacher", hub: "H1", employee_id: "C1", password: PW }), /already has a login/);

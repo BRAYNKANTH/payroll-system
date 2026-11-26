@@ -34,7 +34,7 @@ Everyone hands in 92% of their business (the settle-up). D03 takes a Rs 15,000 a
 | # | Sign in as | Do this | You should see |
 |---|---|---|---|
 | 1 | (first page) | Create the admin, for example `owner`. | You land on the dashboard. |
-| 2 | admin | **Settings**: set the company name. In **Pay defaults by position** enter: Distributor tiered, target 100000, basic 25000, 30% over, 25% under, food 150, after 0 days, security % business 1. Supervisor: target 120000, basic 30000, food after 24 days. Group manager: target 150000, basic 35000, food after 24 days. Set Company return to 0. | "Settings saved". |
+| 2 | admin | **Settings**: set the company name. In **Pay defaults by position** enter: Distributor tiered, target 100000, basic 25000, 30% over, 25% under, food 150, after 0 days, security % business 1. Supervisor: target 120000, basic 30000, food after 21 days. Group manager: target 150000, basic 35000, food after 21 days. Set Company return to 0. | "Settings saved". |
 | 3 | admin | **Hubs**: add `J1` Jaffna 01 and `J2` Jaffna 02. | Two hubs. |
 | 4 | admin | **Users & roles**: add `acct` (Accountant), `mgr1` (Hub manager, hub J1), `clerk1` (Clerk, hub J1), `viewer1` (Viewer). Try a hub manager without a hub. | The manager without a hub is refused. |
 | 5 | admin | **Employees**: add `M01` Arun Selvam, position Manager, hub J1. Leave the starting balance empty. | The manager appears. |
@@ -55,7 +55,7 @@ Everyone hands in 92% of their business (the settle-up). D03 takes a Rs 15,000 a
 | Person | Net pay | Notes |
 |---|---|---|
 | GM01 | 39,410.00 | Over target. Basic 35,000 + 30% of 66,000. Food 27 days. |
-| S01 | 40,740.00 | Over target, 3,000 allowance, food paid (27 days is at least 24). |
+| S01 | 40,740.00 | Over target, 3,000 allowance, food paid (27 days is at least 21). |
 | S02 | 22,194.00 | Under target. 25% of 113,400, food paid. |
 | D01 | 25,132.00 | Over target. Basic 25,000 + 30% of 24,200. |
 | D02 | 14,460.00 | Under target. Stock shortfall 2,550 taken off. |

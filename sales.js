@@ -43,7 +43,7 @@ function assertHandIn(settled, business) {
 async function myself(db, user) {
   if (!user?.employee_id) throw httpError(403, "This login is not linked to an employee");
   const s = await db.get("SELECT employee_id, name, role, staff_level, status, hub FROM staff WHERE employee_id = ?", user.employee_id);
-  if (!s || (s.role !== "guy" && s.staff_level !== "manager")) throw httpError(403, "Only distributors, supervisors and managers can enter sales here");
+  if (!s || (s.role !== "guy" && !["manager", "promoting_manager"].includes(s.staff_level))) throw httpError(403, "Only distributors, supervisors, managers and promoting managers can enter sales here");
   if (s.status !== "active") throw httpError(403, "Your account is no longer active");
   return s;
 }
@@ -165,7 +165,7 @@ async function live(db, { period, hub, ids }, canPay) {
   // Everyone who sells in this hub (or in the manager's own team), even with no sales yet, so every team shows as a card.
   const mine = ids ? new Set(ids) : null;
   const roster = [...staff.values()]
-    .filter((s) => s.status === "active" && (s.role === "guy" || s.staff_level === "manager") && (!hub || s.hub === hub) && (!mine || mine.has(s.employee_id)))
+    .filter((s) => s.status === "active" && (s.role === "guy" || ["manager", "promoting_manager"].includes(s.staff_level)) && (!hub || s.hub === hub) && (!mine || mine.has(s.employee_id)))
     .map((s) => ({ employee_id: s.employee_id, name: s.name, hub: s.hub, staff_level: s.staff_level, team: teamOf(s, staff) }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return { period, can_pay: !!canPay, unconfirmed: people.reduce((t, p) => t + p.unconfirmed, 0), feed, people, roster };

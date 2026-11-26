@@ -6,11 +6,12 @@ import { html, icon, monthName, parseAmount, formatAmount, fromCents, money, ann
 // Everyone sits in a group: the manager they report to (directly or through others), or, when no manager is above them, whoever they report to.
 // Returns { id, title, sub, order, name, hub }. byId maps employee_id -> person (the whole hub, with the people above the sellers).
 export function managerGroupOf(person, byId) {
-  if (person.staff_level === "coacher" || person.staff_level === "promoting_manager") return { id: "lead:" + person.hub, title: "Leadership", sub: `Coacher and promoting manager · ${person.hub}`, order: -1, name: "", hub: person.hub };
-  const isManager = (x) => x && x.staff_level === "manager";
+  if (person.staff_level === "coacher") return { id: "lead:" + person.hub, title: "Leadership", sub: `Coacher · ${person.hub}`, order: -1, name: "", hub: person.hub };
+  // A promoting manager is also a manager of his own sellers, so he heads a team like a manager.
+  const isManager = (x) => x && (x.staff_level === "manager" || x.staff_level === "promoting_manager");
   let boss = isManager(person) ? person : null, cur = person, hops = 0;
   while (!boss && cur?.upline_id && hops++ < 8) { cur = byId[cur.upline_id]; if (isManager(cur)) boss = cur; }
-  if (boss) return { id: boss.employee_id, title: boss.name, sub: `Manager · ${boss.employee_id}`, order: 0, name: boss.name, hub: boss.hub };
+  if (boss) return { id: boss.employee_id, title: boss.name, sub: `${boss.staff_level === "promoting_manager" ? "Promoting manager" : "Manager"} · ${boss.employee_id}`, order: 0, name: boss.name, hub: boss.hub };
   const up = byId[person.upline_id];
   if (up) return { id: "up:" + up.employee_id, title: `Reports to ${up.name}`, sub: up.employee_id, order: 1, name: up.name, hub: up.hub };
   return { id: "none", title: "No manager", sub: "", order: 2, name: "", hub: person.hub };

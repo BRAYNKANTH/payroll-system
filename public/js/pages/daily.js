@@ -52,7 +52,7 @@ async function hubList({ el }) {
     const [staff, entries] = await Promise.all([get("/api/staff"), get("/api/daily" + qs({ from: date, to: date }))]);
     if (mine !== seq) return;
     const done = new Set(entries.map((e) => e.employee_id));
-    const sellers = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager") && s.status === "active" && (!s.join_date || s.join_date <= date));
+    const sellers = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager" || s.staff_level === "promoting_manager") && s.status === "active" && (!s.join_date || s.join_date <= date));
     const isClosed = closed.includes(new Date(date + "T00:00:00Z").getUTCDay());
     $("#dl-day").innerHTML = html`<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
         <button type="button" class="btn icon" id="dl-prev" aria-label="Previous day" ${idx <= 0 ? "disabled" : ""}>${icon("left")}</button>
@@ -87,7 +87,7 @@ export default {
       periodLocked(state.period),
     ]);
     staffAll = staff;
-    const guys = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager") && s.status === "active"); // everyone who sells, managers included
+    const guys = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager" || s.staff_level === "promoting_manager") && s.status === "active"); // everyone who sells, managers included
     // The days are entered by the hub's own coacher. The office (no hub of its own) looks at them and checks them, but does not enter them.
     const office = !state.user.hub;
     const editable = can("enter_data") && !locked && !office;

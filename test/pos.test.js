@@ -144,7 +144,7 @@ test("a hub head gives stock only inside their own hub; stock given by mistake c
 test("only people who sell can use the till", async () => {
   const { d } = await setup();
   await svc.createEntry(d, "staff", { employee_id: "C1", name: "Coacher", hub: "H1", staff_level: "coacher", basic_pay: 30000 }, "admin");
-  await assert.rejects(() => pos.state(d, { username: "coach", employee_id: "C1" }), /Only distributors, supervisors and managers/);
+  await assert.rejects(() => pos.state(d, { username: "coach", employee_id: "C1" }), /Only distributors, supervisors, managers/);
   await assert.rejects(() => pos.state(d, { username: "office", employee_id: null }), /not linked/);
 });
 

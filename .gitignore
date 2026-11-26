@@ -6,3 +6,7 @@ node_modules/
 !.env.example
 .vercel
 audit-report/
+
+# starter sign-ins written by tools/golive.js (they hold passwords)
+golive/logins.csv
+~$*

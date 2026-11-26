@@ -47,7 +47,7 @@ export default {
             ${self ? html`<span class="hint">You can't change your own role.</span>` : ""}</div>
           <div class="field full" id="emp-wrap" hidden><label for="emp-sel" id="emp-lbl">Employee</label>
             <select class="input" id="emp-sel" name="employee_id"><option value="">Choose the person this login is for</option>
-              ${free.map((s) => html`<option value="${s.employee_id}" data-level="${s.staff_level}">${s.name} · ${LV[s.staff_level] || s.staff_level} · ${s.employee_id} · ${s.hub}`)}</select>
+              ${free.map((s) => html`<option value="${s.employee_id}" data-level="${s.staff_level}" data-coach="${s.is_coacher || s.staff_level === "coacher" ? 1 : 0}">${s.name} · ${LV[s.staff_level] || s.staff_level}${s.is_coacher && s.staff_level !== "coacher" ? " · Coacher" : ""} · ${s.employee_id} · ${s.hub}`)}</select>
             <span class="hint" id="emp-hint">Every active employee without a login is listed. The login takes that person's hub and shows their own page. Choosing a coacher gives the coacher login; choosing a manager or promoting manager gives the manager login.</span></div>`}
           <div class="field" id="hub-wrap" ${u && (u.role === "staff" || u.role === "manager") ? "hidden" : ""}><label>Hub access</label><select class="input" name="hub"><option value="">All hubs</option>
             ${state.hubs.map((h) => html`<option value="${h.code}" ${u?.hub === h.code ? "selected" : ""}>${h.name} only</option>`)}</select>
@@ -66,8 +66,8 @@ export default {
           const o = ew.querySelector("option");
           if (o) o.textContent = r === "coacher" ? "Not linked (no My page)" : "Choose the person this login is for";
           $("#emp-lbl", d.panel).textContent = r === "coacher" ? "Coacher's own record (optional)" : "Employee";
-          // a coacher login can only be linked to a coacher
-          ew.querySelectorAll("option[data-level]").forEach((x) => { x.hidden = r === "coacher" && x.dataset.level !== "coacher"; x.disabled = x.hidden; });
+          // a coacher login can only be linked to a hub's coacher (the manager or promoting manager carrying the coacher tag)
+          ew.querySelectorAll("option[data-level]").forEach((x) => { x.hidden = r === "coacher" && x.dataset.coach !== "1"; x.disabled = x.hidden; });
           const sel = $("#emp-sel", d.panel);
           if (sel.selectedOptions[0]?.disabled) sel.value = "";
         }

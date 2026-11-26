@@ -32,7 +32,7 @@ export function hubInfo({ hubs, staff, live, queue }, period) {
       all, active, attention,
       sales: sold.reduce((t, p) => t + p.business, 0),
       levels: LEVELS.slice().reverse().map(([v]) => [v, active.filter((s) => s.staff_level === v).length]).filter(([, n]) => n),
-      head: active.find((s) => s.staff_level === "coacher"),
+      head: active.find((s) => s.is_coacher || s.staff_level === "coacher"),
       joined: all.filter((s) => (s.join_date || "").startsWith(period)).length,
       left: all.filter((s) => (s.leave_date || "").startsWith(period)).length,
     }];
