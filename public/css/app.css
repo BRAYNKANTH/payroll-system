@@ -2320,10 +2320,7 @@ a.crumb-group { min-width: 44px; justify-content: center; }
 .ws-sub a, .ws-tabs a, .ws-sub button, .ws-tabs button { min-height: 44px; display: inline-flex; align-items: center; }
 
 /* ===== Dark mode: first paint follows the device until the script applies the saved choice ===== */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) { color-scheme: dark; }
-  :root:not([data-theme]) body { background: #090e18; color: #f1f5f9; }
-}
+/* (removed: the page no longer follows the device's dark setting; light is the default) */
 
 /* ===== Reduced transparency: solid panels instead of blurred glass ===== */
 @media (prefers-reduced-transparency: reduce) {
