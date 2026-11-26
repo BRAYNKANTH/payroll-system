@@ -1,8 +1,9 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
 import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, parseAmount, announce } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers, productList, pickProduct, unknownProducts, findBox } from "./shared.js";
+import { sheetKeys, periodLocked, lockedBanner, readOnlyBanner, badNumber, stockNum, markBadNumbers, productList, pickProduct, unknownProducts, findBox } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
+import { badge } from "../ui.js";
 
 const INTS = ["opening_stock", "received", "issued", "counted_stock"];
 // Same words as the column headings, so a screen reader says what is on screen.
@@ -14,6 +15,25 @@ export default {
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
+    // The office does not get one table with every hub's products mixed together: it gets the hubs, each with its count at a glance.
+    // A hub opens to its own sheet.
+    if (can("read") && !state.user.hub && !state.routeHub) {
+      document.body.dataset.filters = "month"; // every hub is listed, so the hub choice is not shown
+      const all = await get("/api/hubstock" + qs({ period: state.period }));
+      const hubs = state.hubs.filter((h) => h.status === "active").map((h) => {
+        const mine = all.filter((l) => l.hub === h.code);
+        const off = mine.filter((l) => Number(l.opening_stock) + Number(l.received) - Number(l.issued) !== Number(l.counted_stock)).length;
+        return { ...h, products: mine.length, off, value: mine.reduce((t, l) => t + Number(l.counted_stock) * Number(l.unit_price), 0) };
+      });
+      el.innerHTML = html`<div class="hubsheet-page">
+        <div class="page-head"><div><h1>Hub count sheet</h1><p>What each hub holds this month, checked against what was sent and given out. Pick a hub to see its products.</p></div></div>
+        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/stock/sheet" data-link aria-label="${h.name}: open its count sheet">
+          <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${h.products ? `${h.products} ${h.products === 1 ? "product" : "products"} · Rs ${money(h.value)}` : "No count yet"}</span></span>
+          <span class="hs-flags">${!h.products ? badge("amber", "Not counted") : h.off ? badge("red", `${h.off} ${h.off === 1 ? "product" : "products"} differ`) : badge("green", "Matches")}</span>
+          <span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div><p class="muted hs-hint">"Differ" means the count is not what was sent minus what was given out. Tap a hub to see which products.</p>`
+          : html`<div class="card">${emptyState("No hubs yet", "Add a hub first.", "store")}</div>`}</div>`;
+      return;
+    }
     const [lines, locked, catalogue] = await Promise.all([
       get("/api/hubstock" + qs({ period: state.period, hub: scopeHub() })),
       periodLocked(state.period),
@@ -21,7 +41,7 @@ export default {
     ]);
     const hubs = state.hubs.filter((h) => !scopeHub() || h.code === scopeHub());
     const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
-    const editable = can("enter_data") && !locked;
+    const editable = can("enter_data") && !locked && !!state.user.hub; // the hub's coacher counts; the office looks
 
     el.innerHTML = html`<div class="hubsheet-page">
       <div class="page-head">
@@ -30,7 +50,7 @@ export default {
           <button type="button" class="btn" id="carry">${icon("copy")} Open from last month's count</button>
           <button type="button" class="btn" id="add" ${hubs.length ? "" : "disabled"}>${icon("plus")} Add product</button>` : ""}</div>
       </div>
-      ${locked ? lockedBanner(state.period) : ""}
+      ${locked ? lockedBanner(state.period) : !state.user.hub ? readOnlyBanner("View only. The hub's coacher takes the count; here you check it.") : ""}
       ${productList(catalogue)}
       <div class="card">${lines.length && !isPhone() ? html`<div class="card-head">${findBox("Search hub stock", "Search hub or product")}<span class="muted" id="find-count"></span></div>` : ""}
         <div class="card-body flush" id="grid"></div>

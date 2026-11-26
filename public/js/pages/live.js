@@ -124,7 +124,13 @@ export default {
       // "Of target" and "earned so far" only make sense for a month counted from its first day up to now, so those show only for such a range.
       const monthToDate = singleMonth(r) && r.from.endsWith("-01") && (r.to >= today() || r.to === lastDay(r.to));
       let people;
-      if (monthToDate) people = parts[0].people;
+      if (monthToDate) {
+        // The server adds up the whole month. Sales, days and days-to-confirm follow the dates chosen, so every figure on the page matches the hub list.
+        people = parts[0].people.map((p) => {
+          const mine = feed.filter((f) => f.employee_id === p.employee_id), business = mine.reduce((t, f) => t + f.business, 0);
+          return { ...p, business, days: mine.length, unconfirmed: mine.filter((f) => !f.confirmed).length, target_pct: p.target > 0 ? business / p.target : null };
+        }).sort((a, b) => b.business - a.business);
+      }
       else {
         const by = new Map();
         for (const f of feed) {

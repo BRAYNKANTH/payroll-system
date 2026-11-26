@@ -322,6 +322,24 @@ CREATE TABLE IF NOT EXISTS hub_issues (
 );
 CREATE INDEX IF NOT EXISTS hub_issues_hub ON hub_issues (hub, date);
 
+-- The cash a hub's coacher hands to the office for a day: at least 90% of the day's sales. The admin checks it and approves it (or sends it back).
+CREATE TABLE IF NOT EXISTS cash_handovers (
+  id           bigserial PRIMARY KEY,
+  hub          text NOT NULL REFERENCES hubs(code),
+  date         text NOT NULL ${DATE_CHECK("date")},
+  sales        bigint NOT NULL CHECK (sales >= 0),   -- the hub's sales for the day when the handover was made
+  amount       bigint NOT NULL CHECK (amount > 0),
+  note         text,
+  status       text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  submitted_by text NOT NULL,
+  submitted_at text NOT NULL DEFAULT ${NOW},
+  verified_by  text,
+  verified_at  text,
+  verify_note  text,
+  UNIQUE (hub, date)
+);
+CREATE INDEX IF NOT EXISTS cash_handovers_status ON cash_handovers (status, date);
+
 -- Stock the company receives (bought or made). The office holds everything received minus everything it sent to hubs.
 CREATE TABLE IF NOT EXISTS product_receipts (
   id         bigserial PRIMARY KEY,
@@ -498,6 +516,7 @@ const AUDITED = {
   products:    { key: "id", period: null },
   stock_issues: { key: "id", period: "date" },
   hub_issues:  { key: "id", period: "date" },
+  cash_handovers: { key: "id", period: null },
   product_receipts: { key: "id", period: "date" },
   sale_lines:  { key: "id", period: "date" },
 };

@@ -11,7 +11,7 @@ const PERMISSIONS = {
   staff: ["self"], // the staff portal: own figures only, nothing in the office pages
   manager: ["read_team", "self"], // their own people only; "self" is My page
   coacher: ["read", "read_team", "enter_data", "manage_team", "stock", "self"],
-  admin: ["read", "read_team", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings", "stock"],
+  admin: ["read", "read_team", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings", "stock", "approve_cash"],
 };
 const permissionsOf = (u) => [...(PERMISSIONS[u.role] || []), ...(u.role === "manager" && u.stock_keeper ? ["stock"] : [])];
 const can = (user, perm) => !!user && (user.permissions || PERMISSIONS[user.role] || []).includes(perm);

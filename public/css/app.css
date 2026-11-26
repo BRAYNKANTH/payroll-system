@@ -2898,3 +2898,15 @@ body[data-filters="month"] #hub-filter { display: none !important; }
 @media (max-width: 760px) { .grid.kpis.dash-kpis { grid-template-columns: 1fr; } }
 .dl-daybar { padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 @media (max-width: 760px) { .dl-daybar .btn.icon { min-width: 44px; min-height: 44px; } .dl-daybar input[type="date"] { min-height: 44px; flex: 1 1 150px; } }
+
+/* Cash handover */
+.ho-item { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ho-top { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.ho-mid { display: flex; gap: 6px; flex-wrap: wrap; }
+.ho-note { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.ho-actions { display: flex; gap: 8px; width: 100%; }
+.ho-actions .btn { flex: 1 1 0; min-height: 44px; justify-content: center; }
+.ho-form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ho-form .btn.primary { min-height: 48px; justify-content: center; }
+.hint.pos { color: var(--success); }
+.hint.neg { color: var(--danger); }

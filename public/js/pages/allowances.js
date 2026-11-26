@@ -24,8 +24,18 @@ export default {
       ${locked ? lockedBanner(state.period) : ""}
       <div class="card"><div class="card-body flush" id="list"></div></div></div>`;
 
+    // With every hub shown, the allowances are grouped by hub, each hub with its own heading and total.
+    const hubOf = (r) => byId[r.employee_id]?.hub || "";
+    const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c || "No hub";
+    const byHub = !scopeHub();
+    const shown = byHub ? [...rows].sort((a, b) => hubOf(a).localeCompare(hubOf(b))) : rows;
+    const nameOf = (r) => byId[r.employee_id]?.name || r.employee_id;
     $("#list").innerHTML = rows.length ? dataTable({
-      rows, footer: true,
+      rows: shown, footer: true,
+      ...(byHub ? { groupBy: hubOf, groupLabel: (code, rs) => `<b>${hubName(code)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "allowance" : "allowances"} · Rs ${money(rs.reduce((t, r) => t + r.amount, 0))}</span>` } : {}),
+      // On a phone each allowance is a short card: who, what for, the amount, and the edit and delete buttons.
+      card: (r) => html`<span class="mc-main"><b>${nameOf(r)}</b><span class="mc-sub">${r.description} · ${r.employee_id}</span></span>
+        <span class="mc-end"><b>${money(r.amount)}</b>${editable ? html`<span class="row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm ghost" data-edit="${r.id}" aria-label="Edit allowance for ${nameOf(r)}">${icon("edit")}</button><button class="btn sm icon danger-ghost" data-del="${r.id}" aria-label="Delete allowance for ${nameOf(r)}">${icon("trash")}</button></span>` : ""}</span>`,
       cols: [
         { key: "employee_id", label: "Employee", render: (r) => html`<div class="who"><div><b>${byId[r.employee_id]?.name || r.employee_id}</b><span>${r.employee_id} · ${byId[r.employee_id]?.hub || ""}</span></div></div>`, total: () => "Total" },
         { key: "description", label: "Description" },

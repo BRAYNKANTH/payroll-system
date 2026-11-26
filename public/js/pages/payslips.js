@@ -26,7 +26,12 @@ export default {
     const draw = () => {
       const f = q.toLowerCase();
       const shown = rows.filter((r) => !f || r.name.toLowerCase().includes(f) || r.employee_id.toLowerCase().includes(f));
+      // With every hub shown, the payslips are grouped by hub, each hub with its own heading.
+      const byHub = !scopeHub();
+      if (byHub) shown.sort((a, b) => a.hub.localeCompare(b.hub));
+      const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
       $("#list").innerHTML = rows.length ? dataTable({
+        ...(byHub ? { groupBy: (r) => r.hub, groupLabel: (code, rs) => `<b>${hubName(code)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "payslip" : "payslips"} · net pay Rs ${money(rs.reduce((t, r) => t + r.net_pay, 0))}</span>` } : {}),
         rows: shown, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
         onRow: (r) => openPayslip(p, r.employee_id),
         rowAction: "View", rowLabel: (r) => `View payslip for ${r.name}`,

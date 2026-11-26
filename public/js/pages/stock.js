@@ -1,9 +1,9 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, setDirtyCheck } from "../app.js";
 import { $, $$, html, icon, money, toast, busy, confirmDialog, emptyState, fromCents, raw, parseAmount } from "../ui.js";
-import { sheetKeys, periodLocked, lockedBanner, badNumber, stockNum, markBadNumbers, productList, pickProduct, unknownProducts, findBox } from "./shared.js";
+import { sheetKeys, periodLocked, lockedBanner, readOnlyBanner, badNumber, stockNum, markBadNumbers, productList, pickProduct, unknownProducts, findBox } from "./shared.js";
 import { isPhone, stackTable } from "../phone.js";
-import { announce } from "../ui.js";
+import { announce, badge } from "../ui.js";
 
 const INTS = ["opening_stock", "issued", "sold", "counted_stock"];
 const NUMS = [...INTS, "unit_price"];
@@ -18,6 +18,28 @@ export default {
   periodic: true,
   async render(ctx) {
     const { el } = ctx;
+    // The office does not get one count with every hub's sellers mixed together: it gets the hubs, each with how far its count has got.
+    // A hub opens to its own count.
+    if (can("read") && !state.user.hub && !state.routeHub) {
+      document.body.dataset.filters = "month"; // every hub is listed, so the hub choice is not shown
+      const [all, counted] = await Promise.all([get("/api/staff"), get("/api/stock" + qs({ period: state.period }))]);
+      const sellers = all.filter((s) => s.role === "guy" && s.status === "active");
+      const done = new Set(counted.map((l) => l.employee_id));
+      const short = new Map();
+      for (const l of counted) short.set(l.employee_id, (short.get(l.employee_id) || 0) + Number(l.shortfall_value || 0));
+      const hubs = state.hubs.filter((h) => h.status === "active").map((h) => {
+        const mine = sellers.filter((s) => s.hub === h.code);
+        return { ...h, total: mine.length, n: mine.filter((s) => done.has(s.employee_id)).length, short: mine.reduce((t, s) => t + (short.get(s.employee_id) || 0), 0) };
+      });
+      el.innerHTML = html`<div class="stockc-page">
+        <div class="page-head"><div><h1>Stock count</h1><p>The month's stock count is taken hub by hub. Pick a hub to count its sellers or check the result.</p></div></div>
+        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/stock/count" data-link aria-label="${h.name}: open its stock count">
+          <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${h.n} of ${h.total} sellers counted</span></span>
+          <span class="hs-flags">${h.short > 0 ? badge("red", `Rs ${money(h.short)} short`) : h.n ? badge("green", "No shortfall") : badge("amber", "Not counted")}</span>
+          <span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div><p class="muted hs-hint">Tap a hub to take or check its stock count.</p>`
+          : html`<div class="card">${emptyState("No hubs yet", "Add a hub first.", "store")}</div>`}</div>`;
+      return;
+    }
     const [staff, lines, locked, catalogue] = await Promise.all([
       get("/api/staff" + qs({ hub: scopeHub() })),
       get("/api/stock" + qs({ period: state.period, hub: scopeHub() })),
@@ -26,7 +48,7 @@ export default {
     ]);
     const guys = staff.filter((s) => s.role === "guy");
     const names = Object.fromEntries(guys.map((g) => [g.employee_id, g.name]));
-    const editable = can("enter_data") && !locked;
+    const editable = can("enter_data") && !locked && !!state.user.hub; // the hub's coacher counts; the office looks
     const threshold = Number(state.settings.stock_shortfall_threshold || 0);
 
     el.innerHTML = html`<div class="stockc-page">
@@ -36,7 +58,7 @@ export default {
           <button type="button" class="btn" id="carry" aria-label="Carry over from last month">${icon("copy")} Carry over<span class="lbl-long"> from last month</span></button>
           <button type="button" class="btn" id="add">${icon("plus")} Add line</button>` : ""}</div>
       </div>
-      ${locked ? lockedBanner(state.period) : ""}
+      ${locked ? lockedBanner(state.period) : !state.user.hub ? readOnlyBanner("View only. The hub's coacher takes the count; here you check it.") : ""}
       ${productList(catalogue)}
       <div class="card">${lines.length && !isPhone() ? html`<div class="card-head">${findBox("Search stock lines", "Search person or product")}<span class="muted" id="find-count"></span></div>` : ""}
         <div class="card-body flush" id="grid"></div>

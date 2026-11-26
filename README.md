@@ -52,14 +52,15 @@ supervisors and distributors, four finalized months and the current month open. 
 | Area | |
 |---|---|
 | Dashboard | KPIs, 6-month trend, business by hub, exceptions, top performers, missing daily sheets |
-| Daily sheet | Spreadsheet grid, by day (all guys) or by employee (whole month); CSV import/export |
+| Daily sheet | Entered by each hub's coacher (the admin only views it): by day, by employee, or for a date range; CSV import/export |
+| Cash handover | Each day the hub's coacher hands the day's cash to the office: at least 90% of the hub's sales for the day. They type the amount and submit; the admin checks it against the cash received and approves it, or sends it back with a reason. An approved handover is final |
 | Weekly sheet | One row per manager per week, live weekly balance, month overview |
 | Stock count | Per guy per product, live shortfall, carry over last month's count as opening stock |
 | Branch stock | Per branch per product: opening, received, given out, counted; difference and stock value; open a month from last month's count |
-| Allowances | Extra earnings per month |
+| Allowances | Not in the menu. A person's own take-outs are the "advance" and "personal minus" on the daily sheet, inside the hub. Existing allowance records still count in pay |
 | Salaries | View only: every person's pay for the month, worked out from the sheets, with a full breakdown per person |
 | Approvals | Queue of flagged entries only; approve / reject with notes |
-| Advances & loans | Give an advance (back in one month) or a loan (monthly instalments). The payroll run takes each instalment from pay; balances come from finalized months |
+| Advances & loans | Not in the menu. Existing advances and loans still come off pay in the payroll run; balances come from finalized months |
 | Payslips | Per person or all, printable |
 | Employees | Directory, add/edit, profile with pay history chart, team, change log |
 | Hubs | Branches with live figures, and each branch's coach |

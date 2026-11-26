@@ -68,7 +68,12 @@ export default {
       const rows = all.filter((r) =>
         (filter === "all" || (filter === "review" ? !!r.flags?.length : r.role === filter)) &&
         (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q)));
+      // With every hub shown, the people are grouped by hub and each hub has its own heading and totals, so no hub's pay is mixed into another's.
+      const byHub = !scopeHub();
+      if (byHub) rows.sort((a, b) => a.hub.localeCompare(b.hub));
+      const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
       $("#table").innerHTML = dataTable({
+        ...(byHub ? { groupBy: (r) => r.hub, groupLabel: (code, rs) => `<b>${hubName(code)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "person" : "people"} · net pay Rs ${money(sum("net_pay", rs))} · salary Rs ${money(sum("disbursed_amount", rs))}</span>` } : {}),
         rows, footer: true, pageSize: 25, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
         card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span>
             ${r.flags.length ? html`<span class="mc-flags">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</span>` : ""}</span>

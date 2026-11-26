@@ -88,7 +88,9 @@ export default {
     ]);
     staffAll = staff;
     const guys = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager") && s.status === "active"); // everyone who sells, managers included
-    const editable = can("enter_data") && !locked;
+    // The days are entered by the hub's own coacher. The office (no hub of its own) looks at them and checks them, but does not enter them.
+    const office = !state.user.hub;
+    const editable = can("enter_data") && !locked && !office;
     const days = daysIn(state.period);
     const today = new Date().toISOString().slice(0, 10);
     if (!currentDate || !currentDate.startsWith(state.period)) currentDate = days.includes(today) ? today : days[0];
@@ -107,7 +109,7 @@ export default {
           </div>
         </div>
       </div>
-      ${locked && mode !== "range" ? lockedBanner(state.period) : ""}
+      ${locked && mode !== "range" ? lockedBanner(state.period) : office && mode !== "range" ? readOnlyBanner("View only. The hub's coacher enters the days; here you check them.") : ""}
       <div class="card">
         <div class="card-head" id="picker"></div>
         <div class="card-body flush" id="grid"></div>
@@ -409,6 +411,19 @@ async function dayMode(ctx, guys, days, editable) {
     const k = managerGroupOf(g, byId);
     if (!teams.has(k.id)) teams.set(k.id, { ...k, people: [] });
     teams.get(k.id).people.push(g);
+  }
+  // Looking only, on a phone: a short card per person (what they sold and handed in, or "Not entered"), team by team. Tap one to open them.
+  if (isPhone() && !editable) {
+    $("#grid").innerHTML = html`<div class="ro-days">${[...teams.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).map((t) => html`<section aria-label="${t.title}">
+      <h3 class="ro-h"><b>${t.title}</b> <span class="muted">${t.sub}</span></h3>
+      <div class="card hs-list"><ul role="list">${t.people.sort(teamOrder).map((g) => {
+        const e = byEmp[g.employee_id], short = e ? Number(e.settle_up_minus) : 0;
+        return html`<li><a class="hs-row" href="/employees/${encodeURIComponent(g.employee_id)}" data-link aria-label="${g.name}: open record">
+          <span class="hs-main"><b>${g.name}</b><span class="muted">${g.employee_id} · ${levelName(g)}</span></span>
+          <span class="hs-flags">${e ? html`<b class="num">${money(e.business_amount)}</b>${short > 0 ? badge("red", `short ${money(short)}`) : ""}` : badge("amber", "Not entered")}</span>
+          <span class="hs-chev" aria-hidden="true"></span></a></li>`;
+      })}</ul></div></section>`)}</div>`.toString();
+    return;
   }
   const rows = [], groups = [];
   for (const t of [...teams.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))) {

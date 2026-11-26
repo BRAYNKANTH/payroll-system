@@ -48,7 +48,7 @@ export default {
         <div><h1>Advances & loans</h1><p>Money given to staff and taken back from their pay. An advance comes back in one month; a loan comes back in monthly instalments.</p></div>
         <div class="actions">${exportButtons("loans", { hub: scopeHub() })}${editable ? html`<button class="btn primary" id="add">${icon("plus")} Give advance or loan</button>` : ""}</div>
       </div>
-      <div class="grid kpis mb-4">
+      <div class="grid kpis hub-kpis mb-4">
         <div class="card kpi"><div class="label">Still to be paid back</div><div class="value">${whole(live.reduce((t, l) => t + l.outstanding, 0))}</div><div class="foot">${live.length} active</div></div>
         <div class="card kpi"><div class="label">Comes off pay in ${monthName(state.period)}</div><div class="value">${whole(live.reduce((t, l) => t + l.due, 0))}</div><div class="foot">Before any month's pay is too low to cover it</div></div>
         <div class="card kpi"><div class="label">People who owe money</div><div class="value">${owing}</div><div class="foot">${all.length} advance${all.length === 1 ? "" : "s"} and loans recorded</div></div>
@@ -60,8 +60,13 @@ export default {
 
     $("#flt").onclick = (e) => { const b = e.target.closest("[data-v]"); if (b) { filter = b.dataset.v; this.render(ctx); } };
 
+    // With every hub shown, the loans are grouped by hub, each hub with its own heading and what is still owed there.
+    const byHub = !scopeHub();
+    const shown = byHub ? [...rows].sort((a, b) => a.hub.localeCompare(b.hub)) : rows;
+    const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
     $("#list").innerHTML = rows.length ? dataTable({
-      rows, onRow: (l) => detail(l), rowLabel: (l) => `Open ${kindLabel(l.kind).toLowerCase()} for ${l.name}`, rowAction: "Open",
+      ...(byHub ? { groupBy: (l) => l.hub, groupLabel: (code, rs) => `<b>${hubName(code)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "advance or loan" : "advances and loans"} · still owed ${whole(rs.reduce((t, l) => t + l.outstanding, 0))}</span>` } : {}),
+      rows: shown, onRow: (l) => detail(l), rowLabel: (l) => `Open ${kindLabel(l.kind).toLowerCase()} for ${l.name}`, rowAction: "Open",
       card: (l) => html`<span class="mc-main"><b>${l.name}</b><span class="mc-sub">${l.employee_id} · ${kindLabel(l.kind)} of Rs ${money(l.amount)} · ${given(l.issued_on)}</span>
           <span class="mc-kv"><span class="k">Still owes</span><span class="v">${whole(l.outstanding)}</span></span>
           ${l.state === "active" ? html`<span class="mc-kv"><span class="k">${shortMonth(state.period)} deduction</span><span class="v">${whole(l.due)}</span></span>` : ""}</span>
