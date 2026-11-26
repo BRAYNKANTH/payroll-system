@@ -46,14 +46,14 @@ test("a coacher and a promoting manager can have a portal login, and see their t
   assert.ok(!JSON.stringify(s.team).match(/basic_pay|net_pay|gross/), "team rows carry sales only, never pay");
 });
 
-test("a manager has a portal login, sells too, and sees the team", async () => {
+test("a manager has a portal login, sells too, and is shown no list of people", async () => {
   const { d, login, period } = await setup();
   const m = await login("mgr", "M1");
   const s = await portal.summary(d, m, period);
   assert.equal(s.me.is_manager, true);
   assert.equal(s.me.sells, true);
   assert.equal(s.estimate, null, "a manager's pay comes from the weekly account");
-  assert.deepEqual(s.team.map((p) => p.employee_id).sort(), ["D1", "D2"]);
+  assert.ok(!s.team, "a manager is shown no list of people, only the team total on Team sales");
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
   await sales.addSale(d, m, { date: today, business_amount: 5000, settled_amount: 5000 });
   assert.ok((await portal.summary(d, m, today.slice(0, 7))).month.daily.some((r) => r.date === today));

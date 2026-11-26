@@ -1771,6 +1771,89 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 }
 @media (prefers-reduced-motion: reduce) { .till-prod, .till-sell, .ts-step { transition: none; } .till-prod:active, .till-sell:active, .ts-step:active { transform: none; } }
 
+/* ---------- The till, v2: a standard point-of-sale screen. Small plain lettering, big numbers ---------- */
+.till { max-width: 560px; }
+.pos-cap { font-size: 11.5px; font-weight: 500; letter-spacing: .02em; color: var(--text-3); }
+.pos-big { display: inline-flex; align-items: baseline; gap: 4px; font-size: 30px; line-height: 1.1; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+.pos-big small { font-size: 13px; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+.pos-big.neg { color: var(--danger); }
+.pos-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: stretch; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.pos-sum { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pos-due { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 2px; padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); cursor: pointer; font: inherit; color: inherit; }
+.pos-due .pos-big { font-size: 22px; }
+.pos-due.owe { border-color: var(--warning); background: var(--warning-soft); }
+.pos-lock { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--warning); }
+.pos-lock svg { width: 14px; height: 14px; }
+
+.pos-tabs { display: flex; gap: 2px; padding: 3px; background: var(--surface-3); border-radius: var(--radius-sm); }
+.pos-tabs button { flex: 1 1 0; height: 34px; border: 0; background: none; border-radius: calc(var(--radius-sm) - 2px); font: 600 13px var(--font); color: var(--text-2); cursor: pointer; }
+.pos-tabs button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-xs); }
+.pos-tabs i { font-style: normal; font-weight: 700; font-size: 12px; color: var(--primary); }
+
+.pos-search { position: relative; }
+.pos-search > span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); display: grid; color: var(--text-3); pointer-events: none; }
+.pos-search > span svg { width: 15px; height: 15px; }
+.pos-search .input { height: 36px; padding-left: 32px; padding-right: 30px; font-size: 13.5px; border-radius: var(--radius-sm); }
+.pos-search .ts-clear { right: 8px; }
+
+/* The product list: one thin row per product, the price as the big number on the right */
+.pos-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.pos-list li + li { border-top: 1px solid var(--border); }
+.pos-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 48px; padding: 6px 14px; border: 0; background: none; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+.pos-row:hover { background: var(--surface-2); }
+.pos-row.on { background: var(--primary-soft); }
+.pos-row:disabled { opacity: .45; cursor: not-allowed; }
+.pos-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13.5px; font-weight: 550; line-height: 1.25; }
+.pos-name small { font-size: 11.5px; font-weight: 500; color: var(--text-3); }
+.pos-name small.low { color: var(--warning); font-weight: 650; }
+.pos-name small.none { color: var(--text-3); }
+.pos-price { font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; }
+.pos-empty { margin: 10px 2px; font-size: 13px; }
+
+/* The ticket: what is being sold now, with the quantity and the total as big numbers */
+.pos-ticket { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 40; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: 0 10px 28px -6px rgba(15, 23, 42, .28); }
+.pos-t-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.pos-t-name { display: flex; flex-direction: column; font-size: 13.5px; font-weight: 650; }
+.pos-t-name small { font-size: 11.5px; font-weight: 500; color: var(--text-3); }
+.pos-x { display: grid; place-items: center; width: 28px; height: 28px; border: 0; background: var(--surface-3); border-radius: 50%; color: var(--text-2); cursor: pointer; }
+.pos-x svg { width: 14px; height: 14px; }
+.pos-qty { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; }
+.pos-step { display: grid; place-items: center; height: 52px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); cursor: pointer; }
+.pos-step svg { width: 20px; height: 20px; }
+.pos-step:disabled { opacity: .35; cursor: not-allowed; }
+.pos-qty input { height: 52px; width: 100%; min-width: 0; text-align: center; font: 750 32px var(--font); font-variant-numeric: tabular-nums; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); padding: 0; }
+.pos-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.pos-chip { min-width: 40px; height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface-2); color: var(--text); font: 650 14px var(--font); cursor: pointer; }
+.pos-chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.pos-sell { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 54px; padding: 0 18px; border: 0; border-radius: var(--radius-sm); background: #17753b; color: #fff; font: 650 14px var(--font); cursor: pointer; }
+.pos-sell b { font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.pos-sell svg { width: 20px; height: 20px; }
+.pos-sell:disabled, .pos-sell.loading { opacity: .55; pointer-events: none; }
+
+/* Sales and hand over */
+.pos-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.pos-panel-head { display: flex; justify-content: space-between; align-items: baseline; padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 650; }
+.pos-panel-head b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.pos-lines { list-style: none; margin: 0; padding: 0; }
+.pos-lines li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.pos-lines li:last-child { border-bottom: 0; }
+.pos-l-main { display: flex; flex-direction: column; min-width: 0; font-size: 13.5px; }
+.pos-l-main small { font-size: 11.5px; color: var(--text-3); }
+.pos-l-amt { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.pos-undo { height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 999px; background: none; color: var(--danger); font: 600 12px var(--font); cursor: pointer; }
+.pos-eod { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; }
+.pos-eod > :not(.pos-panel-head) { margin-left: 14px; margin-right: 14px; }
+.pos-eod-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 4px; }
+.pos-eod-sum > div { display: flex; flex-direction: column; gap: 2px; }
+.pos-eod-sum .pos-big { font-size: 24px; }
+.pos-money { height: 58px; padding: 0 14px; text-align: right; font: 750 32px var(--font); font-variant-numeric: tabular-nums; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.pos-money:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+.pos-note { font-size: 12.5px; margin-top: 0; }
+.pos-eod .pos-sell { width: auto; }
+.pos-eod .pos-money { width: auto; box-sizing: border-box; }
+.shell:not(.has-bnav) .pos-ticket { bottom: 12px; }
+@media (max-width: 860px) { .pos-ticket { bottom: calc(60px + env(safe-area-inset-bottom)); } }
+
 /* Document list Apple Inset styling */
 .doc-list { display: flex; flex-direction: column; }
 .doc-item { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }

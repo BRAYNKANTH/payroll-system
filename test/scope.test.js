@@ -131,19 +131,17 @@ test("HTTP: a manager reaches nothing that shows the whole hub", async () => {
   } finally { close(); }
 });
 
-test("HTTP: My team shows a manager who is under them, never what they sold, hold or earn", async () => {
+test("HTTP: Team sales gives a manager only the total of their team, never a person, stock or pay", async () => {
   const { d, shine } = await setup();
   const { call, close } = await http(d);
   try {
     await call("coach", "POST", "/api/stock-issues", { employee_id: "D1", lines: [{ product_id: shine, qty: 6 }] });
     const t = (await call("man1", "GET", "/api/team")).json;
-    assert.deepEqual(t.members.map((m) => m.employee_id).sort(), ["D1", "D2"], "their own people, not themselves");
-    assert.equal(t.totals.people, 2);
-    assert.deepEqual(Object.keys(t.members.find((m) => m.employee_id === "D1")).sort(), ["depth", "employee_id", "hub", "name", "reports_to", "staff_level"], "who they are, nothing about their business");
-    assert.ok(!JSON.stringify(t).match(/basic|net_pay|gross|commission|business|stock|sales|5000000/i), "no pay, no sales, no stock anywhere");
-    assert.equal((await call("man2", "GET", "/api/team")).json.members.map((m) => m.employee_id).join(), "D3");
+    assert.deepEqual(Object.keys(t).sort(), ["business", "date", "days", "period"], "totals only");
+    assert.deepEqual(Object.keys(t.business).sort(), ["month", "today"]);
+    assert.ok(!JSON.stringify(t).match(/D1|D2|members|basic|net_pay|gross|commission|stock|5000000/i), "no people, no pay, no stock anywhere");
     assert.equal((await call("seller", "GET", "/api/team")).status, 403, "a seller has no team page");
-    assert.equal((await call("coach", "GET", "/api/team")).json.members.length, 0, "a coacher uses the hub pages, not My team");
+    assert.equal((await call("coach", "GET", "/api/team")).json.business.month, 0, "a coacher uses the hub pages, not Team sales");
   } finally { close(); }
 });
 

@@ -112,7 +112,8 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
       settle_up: sum(daily, "settle_up_minus"), personal: sum(daily, "personal_minus"),
       daily, stock: stock.map((k) => ({ product: k.product, shortfall_qty: k.shortfall_qty, unit_price: k.unit_price, shortfall_value: k.shortfall_value })), allowances,
     },
-    team, team_sales_hidden: hideTeamSales, below_sales: hideTeamSales ? null : belowSales, share_sales: hideTeamSales ? null : shareSales, senior_rate: Number(settings.senior_commission_rate) || 0,
+    // a manager is shown no list of people at all (team is null for them)
+    team: hideTeamSales ? null : team, team_sales_hidden: hideTeamSales, below_sales: hideTeamSales ? null : belowSales, share_sales: hideTeamSales ? null : shareSales, senior_rate: Number(settings.senior_commission_rate) || 0,
     official, estimate, history, security_held: Number(security.held) || 0,
     loans: await loans.mine(db, s.employee_id, period),
   };

@@ -1,6 +1,6 @@
 // Staff portal: one page for any employee (distributor, supervisor, manager, promoting manager or coacher), showing only their own figures and their team's sales.
 import { get, post, del } from "../api.js";
-import { state } from "../app.js";
+import { state, can } from "../app.js";
 import { buzz, $, $$, html, raw, esc, icon, money, badge, toast, busy, dataTable, emptyState, monthName, dateLabel, pct, dateTime, initials } from "../ui.js";
 import { mountSell } from "./sell.js";
 import { swipeTabs } from "../phone.js";
@@ -183,13 +183,23 @@ function setupPull() {
 
 export { plain, plainParts, keep };
 export default {
-  title: "My page",
+  title: "Sell",
   async render(ctx) {
     const { el } = ctx;
     el.classList.add("has-bottom-tabs");
     if (!ctx.refresh) el.innerHTML = skeleton(); // grey shapes in the layout of the page, instead of a spinner on a blank screen
     const d = await get("/api/me/portal?period=" + state.period);
     const me = d.me, m = d.month;
+    // Sellers, supervisors, managers and promoting managers get the till and nothing else: Sell, Sales and Hand over.
+    // (The office keeps pay, payslips and records; a manager's team business is on Team sales.)
+    if (!can("read")) {
+      el.classList.remove("has-bottom-tabs");
+      document.body.dataset.filters = "none";
+      el.removeAttribute("data-tab");
+      el.innerHTML = html`<div class="page-head portal-head"><div><h1>Hello, ${me.name.split(" ")[0]}</h1><p>${badge("blue", me.level_name)} ${me.hub_name}</p></div></div><div id="till" class="till"></div>`;
+      await mountSell($("#till"), {}).catch((e) => toast(e.message, "err"));
+      return;
+    }
     if (!tabInit) { tabInit = true; tab = me.sells ? "sell" : "month"; }
     // The section is in the address (?tab=payslips), so Back moves between sections and a section can be bookmarked or shared.
     if (!ctx.refresh) { const q = new URLSearchParams(location.search).get("tab") || history.state?.tab; if (q) tab = q; else if (location.pathname === "/me") history.replaceState({ tab }, "", location.href); }

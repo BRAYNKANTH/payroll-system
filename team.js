@@ -1,21 +1,23 @@
-// "My team": what a manager may see of the people who report to them (directly or through others): who they are, their position and who
-// each reports to. Nothing about their business: a manager enters their own sales and knows who is under them, never what those people sold,
-// what they hold, or anything about their pay.
+// "Team sales": what a manager or promoting manager may see about the people who report to them (directly or through others): how much business
+// the team did, in total, today and this month. No names, no positions, no one's own figures, no pay. The manager's own selling is on the Sell page,
+// and nobody above them (their own manager) is ever shown.
 const svc = require("./service");
+const sales = require("./sales");
+
+const monthBounds = (period) => [period + "-01", svc.shiftPeriod(period, 1) + "-01"];
 
 async function overview(db, user, period) {
   svc.assertPeriod(period);
   const ids = (user.teamIds || []).filter((id) => id !== user.employee_id);
-  const people = ids.length ? await db.all(`SELECT employee_id, name, staff_level, hub, upline_id FROM staff WHERE employee_id = ANY(?::text[]) AND status = 'active' ORDER BY name`, ids) : [];
-  const byId = new Map(people.map((p) => [p.employee_id, p]));
-  const kids = new Map();
-  for (const p of people) { const up = byId.has(p.upline_id) ? p.upline_id : user.employee_id; (kids.get(up) || kids.set(up, []).get(up)).push(p); }
-  // In reporting order: each person, then the people under them, indented one step more.
-  const members = [];
-  const walk = (id, depth) => { for (const k of kids.get(id) || []) { if (depth < 8) { members.push({ employee_id: k.employee_id, name: k.name, staff_level: k.staff_level, hub: k.hub,
-    reports_to: k.upline_id && k.upline_id !== user.employee_id ? byId.get(k.upline_id)?.name || null : null, depth }); walk(k.employee_id, depth + 1); } } };
-  walk(user.employee_id, 1);
-  return { period, me: { employee_id: user.employee_id, name: user.full_name }, members, totals: { people: members.length } };
+  const today = sales.today();
+  const sum = async (from, to) => ids.length
+    ? Number((await db.get("SELECT COALESCE(SUM(business_amount), 0) AS t FROM daily_log WHERE employee_id = ANY(?::text[]) AND date >= ? AND date < ?", ids, from, to)).t) || 0 : 0;
+  const nextDay = new Date(Date.parse(today + "T00:00:00Z") + 86400000).toISOString().slice(0, 10);
+  const [from, to] = monthBounds(period);
+  // Each day of the month, newest first, so the manager can see how the team is doing day by day (totals only).
+  const days = ids.length ? (await db.all("SELECT date, COALESCE(SUM(business_amount), 0) AS business FROM daily_log WHERE employee_id = ANY(?::text[]) AND date >= ? AND date < ? GROUP BY date HAVING SUM(business_amount) > 0 ORDER BY date DESC", ids, from, to))
+    .map((r) => ({ date: r.date, business: Number(r.business) })) : [];
+  return { period, date: today, business: { today: await sum(today, nextDay), month: await sum(from, to) }, days };
 }
 
 module.exports = { overview };

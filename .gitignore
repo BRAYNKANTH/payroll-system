@@ -8,5 +8,5 @@ node_modules/
 audit-report/
 
 # starter sign-ins written by tools/golive.js (they hold passwords)
-golive/logins.csv
+golive/logins*.csv
 ~$*

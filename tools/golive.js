@@ -217,7 +217,7 @@ async function main() {
   const r = await apply(d, plan, { eraseDemo: flag("--erase-demo"), keepUsers, logins });
   if (r.wiped.length) console.log(`Cleared: ${r.wiped.join(", ")}.\nBefore: ${JSON.stringify(r.before)}`);
   if (logins.length) {
-    const file = path.join(FOLDER, "logins.csv");
+    const file = opt("logins-file") ? path.resolve(opt("logins-file")) : path.join(FOLDER, "logins.csv");
     fs.writeFileSync(file, "\ufeff" + toCsv(logins, ["username", "password", "full_name", "position", "hub", "reports_to", "employee_id", "role"]));
     console.log(`The list of sign-ins was written to ${file}. It holds passwords: keep it private and never send it by chat or e-mail.`);
   }

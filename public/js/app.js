@@ -27,7 +27,7 @@ export const scopeHub = () => state.user?.hub || state.routeHub || state.hub || 
 const NAV = [
   { group: "Overview" },
   { path: "/", label: "Dashboard", icon: "dashboard", page: "dashboard", perm: "read" },
-  { path: "/team", label: "My team", icon: "users", page: "team", perm: "read_team", roles: ["manager"] },
+  { path: "/team", label: "Team sales", icon: "chart", page: "team", perm: "read_team", roles: ["manager"] },
   { group: "Data entry" },
   { path: "/weekly", label: "Weekly sheet", icon: "calendar", page: "weekly", perm: "read" },
   { path: "/products", label: "Products", icon: "box", page: "products", perm: "manage_products" },
@@ -43,7 +43,7 @@ const NAV = [
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
   { path: "/payslips", label: "Payslips", icon: "file", page: "payslips", perm: "view_pay" },
   { group: "People" },
-  { path: "/employees", label: "Employees", icon: "users", page: "employees", perm: ["read", "read_team"] },
+  { path: "/employees", label: "Employees", icon: "users", page: "employees", perm: "read" },
   { path: "/hubs", label: "Hubs", icon: "store", page: "hubs", perm: "read" },
   { group: "Insights" },
   { path: "/reports", label: "Reports", icon: "chart", page: "reports", perm: "read" },
@@ -62,6 +62,8 @@ const EXTRA_ROUTES = [
 ];
 // A staff-portal login (a distributor or supervisor) gets one page about themselves and nothing else.
 export const isStaff = () => state.user?.role === "staff";
+// A seller, supervisor, manager or promoting manager never needs to look people up, so their top bar has no search.
+const noSearch = () => isStaff() || (!can("read") && can("read_team"));
 // ---------------------------------------------------------------- hub-first navigation
 // The company menu is short and depends on who signed in. Opening a hub opens that hub's workspace: five sections, each with its own pages,
 // all showing that hub only. Pages that already existed are reused: the hub is fixed by the address (see scopeHub).
@@ -87,7 +89,7 @@ function menuItems() {
   const u = state.user, out = [];
   if (!u) return out; // before anyone has signed in
   const add = (path, label, ic, extra = {}) => out.push({ path, label, icon: ic, ...extra });
-  if (isStaff()) { add("/me", "My page", "users"); return out; }
+  if (isStaff()) { add("/me", "Sell", "bag"); return out; } // a seller or supervisor: the till (Sell, Sales, Hand over) and nothing else
   if (can("read") && !u.hub) { // the admin: every page is in the menu, in groups
     const ok = (perm) => !perm || (Array.isArray(perm) ? perm.some((x) => can(x)) : can(perm));
     let heading = null;
@@ -106,11 +108,11 @@ function menuItems() {
     if (can("stock")) add("/stock-overview", "Stock", "warehouse");
     add("/reports", "Reports", "chart");
   } else if (can("read_team")) { // a manager
-    add("/team", "My team", "users", { short: "Team" });
-    add("/employees", "Employees", "users", { short: "People" });
+    add("/me", "Sell", "bag");
+    add("/team", "Team sales", "chart", { short: "Team" });
     if (can("stock")) { add("/stock-overview", "Hub stock", "warehouse", { short: "Stock" }); add("/morning", "Give stock", "box", { short: "Give" }); }
   }
-  if (u.employee_id) add("/me", "My page", "user");
+  if (u.employee_id && (can("read") || !can("read_team"))) add("/me", "My page", "user");
   return out;
 }
 // Which side-menu item lights up for a page.
@@ -159,7 +161,7 @@ export async function navigate(path, replace = false) {
 }
 
 function resolve(pathname) {
-  if (pathname === "/" && !can("read") && can("read_team")) return { page: "team", nav: "/team", params: [], perm: "read_team" }; // a manager lands on their team
+  if (pathname === "/" && !can("read") && can("read_team")) return { page: "portal", nav: "/me", params: [], perm: "self" }; // a manager lands on the till
   const w = WS_RE.exec(pathname);
   if (w) { // a hub workspace: /hubs/J1, /hubs/J1/people, /hubs/J1/sales/daily ...
     const [, hub, tab = "overview", sub = ""] = w;
@@ -226,7 +228,7 @@ function shell() {
       <header class="topbar">
         <button type="button" class="btn ghost icon menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
         <div class="crumbs" id="crumbs"></div>
-        ${isStaff() ? "" : `<div class="gsearch" id="gsearch" role="search" aria-label="Search"></div>`}
+        ${noSearch() ? "" : `<div class="gsearch" id="gsearch" role="search" aria-label="Search"></div>`}
         <div class="spacer"></div>
         <div class="filters" id="filters">
           ${isStaff() ? "" : u.hub ? `<span class="badge indigo plain">${icon("store")} ${esc(u.hub)}</span>` : `
@@ -281,7 +283,7 @@ function shell() {
     state.hub = e.target.value; render();
   });
   $("#theme-btn").onclick = toggleTheme;
-  if (!isStaff()) mountSearch($("#gsearch"), { navigate, state, scopeHub });
+  if (!noSearch()) mountSearch($("#gsearch"), { navigate, state, scopeHub });
   setupUserMenu();
   applyTheme();
 }

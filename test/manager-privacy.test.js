@@ -27,7 +27,7 @@ async function setup() {
   return d;
 }
 
-test("a manager sees who is under them, and nothing they sold", async () => {
+test("a manager sees only the total business of their team: no names, no people, nothing about anyone above", async () => {
   const d = await setup();
   const srv = createServer(d).listen(0, "127.0.0.1");
   await new Promise((r) => srv.once("listening", r));
@@ -40,11 +40,12 @@ test("a manager sees who is under them, and nothing they sold", async () => {
   try {
     const mgr = await signIn("mgr");
 
-    // My team: the people below, in reporting order, with no figures
+    // Team sales: only how much the team did, in total. No names, no positions, nobody above them, not even their own sales.
     const team = await json(`/api/team?period=${month}`, mgr);
-    assert.deepEqual(team.members.map((m) => [m.employee_id, m.depth]), [["D1", 1], ["S1", 1]], "only the people under this manager, not the coacher or another hub person");
-    assert.deepEqual(team.members.map((m) => m.reports_to), [null, null], "both report to the manager directly");
-    assert.ok(!/business|sales|stock|unconfirmed|11111|22222|33333|44444/i.test(JSON.stringify(team)), "no business figures in My team");
+    assert.equal(team.members, undefined, "no list of people");
+    assert.deepEqual(team.business, { today: 5555500, month: 5555500 }, "S1 + D1 only: not the manager's own sales, not the coacher's team (D9)");
+    assert.deepEqual(team.days, [{ date: day, business: 5555500 }]);
+    assert.ok(!/Name |"S1"|"D1"|"C1"|"D9"|11111|22222|33333|44444/.test(JSON.stringify(team)), "no names, ids or single person's figures");
 
     // Live sales: only their own entries, and only themselves in the roster
     const live = await json(`/api/live?period=${month}`, mgr);
@@ -53,11 +54,11 @@ test("a manager sees who is under them, and nothing they sold", async () => {
     assert.deepEqual(live.roster.map((r) => r.employee_id), ["M1"]);
     assert.ok(!/22222|33333|44444|"S1"|"D1"/.test(JSON.stringify(live)), "nobody else's sales");
 
-    // Their own page: the team tab has names and positions only
+    // Their own page: no list of people at all
     const me = await json(`/api/me/portal?period=${month}`, mgr);
     assert.equal(me.team_sales_hidden, true);
-    assert.deepEqual(me.team.map((t) => Object.keys(t).sort().join()), ["depth,employee_id,level_name,name", "depth,employee_id,level_name,name"]);
-    assert.equal(me.below_sales, null);
+    assert.ok(!me.team, "no list of people");
+    assert.ok(!me.below_sales, "no team figure on their page");
     assert.equal(me.month.business, 1111100, "their own sales are still theirs");
 
     // A team member's report lists their sales day by day: a manager may print only their own
