@@ -20,25 +20,25 @@ export default {
         <div class="actions">${rows.length ? html`<a class="btn primary" href="/api/payroll/${p}/payslips" target="_blank" rel="noopener">${icon("printer")} Print all</a>` : ""}</div>
       </div>
       <div class="card">
-        ${rows.length ? html`<div class="card-head"><div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search employee" value="${q}" style="width:260px"></div>${badge(data.status)}</div>` : ""}
+        ${rows.length ? html`<div class="card-head"><div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID or hub" value="${q}" style="width:260px"></div><span class="muted" id="pslip-sum" role="status"></span>${badge(data.status)}</div>` : ""}
         <div class="card-body flush" id="list"></div></div>`;
 
     const draw = () => {
       const f = q.toLowerCase();
-      const shown = rows.filter((r) => !f || r.name.toLowerCase().includes(f) || r.employee_id.toLowerCase().includes(f));
-      // With every hub shown, the payslips are grouped by hub, each hub with its own heading.
-      const byHub = !scopeHub();
-      if (byHub) shown.sort((a, b) => a.hub.localeCompare(b.hub));
       const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
+      // One list of everyone, by name. Click a heading to sort; the hub is a column (and the hub choice at the top narrows the list).
+      const shown = rows.filter((r) => !f || r.name.toLowerCase().includes(f) || r.employee_id.toLowerCase().includes(f) || hubName(r.hub).toLowerCase().includes(f)).sort((a, b) => a.name.localeCompare(b.name));
+      const net = shown.reduce((t, r) => t + r.net_pay, 0);
+      const sumEl = $("#pslip-sum"); if (sumEl) sumEl.textContent = `${shown.length} ${shown.length === 1 ? "payslip" : "payslips"} · net pay Rs ${money(net)}`;
       $("#list").innerHTML = rows.length ? dataTable({
-        ...(byHub ? { groupBy: (r) => r.hub, groupLabel: (code, rs) => `<b>${hubName(code)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "payslip" : "payslips"} · net pay Rs ${money(rs.reduce((t, r) => t + r.net_pay, 0))}</span>` } : {}),
-        rows: shown, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
+        rows: shown, pageSize: 50, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
         onRow: (r) => openPayslip(p, r.employee_id),
         rowAction: "View", rowLabel: (r) => `View payslip for ${r.name}`,
-        card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span></span>
+        card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${hubName(r.hub)}</span></span>
           <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
         cols: [
-          { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>` },
+          { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id}</span></div></div>` },
+          { key: "hub", label: "Hub", render: (r) => hubName(r.hub) },
           { key: "role", label: "Position", render: (r) => levelLabel(r.staff_level) },
           { key: "gross_earnings", label: "Gross", align: "r", render: (r) => money(r.gross_earnings) },
           { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions) },

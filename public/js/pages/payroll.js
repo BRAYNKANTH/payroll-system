@@ -50,7 +50,7 @@ export default {
         <div class="card-head">
           <div class="row">
             <div class="seg" id="pay-filters" role="group" aria-label="Show">${[["all", "All"], ["review", `With notes (${noted})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button type="button" data-f="${f}" class="${filter === f ? "on" : ""}" aria-pressed="${filter === f ? "true" : "false"}">${l}</button>`)}</div>
-            <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name or ID" value="${search}" style="width:220px"></div>
+            <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID or hub" value="${search}" style="width:220px"></div>
           </div>
           <details class="more-menu"><summary class="btn sm">More views and downloads</summary><div class="more-list">
             <a href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Register (print view)</a>
@@ -63,26 +63,25 @@ export default {
         can("run_payroll") ? "When the sheets are in, press “Work out salaries”. You can update the figures as often as you like." : "The admin needs to work out the salaries for this month.", "play",
         can("run_payroll") && !finalized ? `<button class="btn primary" id="run2">Work out salaries</button>` : "")}</div>`}`;
 
+    const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
     const drawTable = () => {
       const q = search.toLowerCase();
       const rows = all.filter((r) =>
         (filter === "all" || (filter === "review" ? !!r.flags?.length : r.role === filter)) &&
-        (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q)));
-      // With every hub shown, the people are grouped by hub and each hub has its own heading and totals, so no hub's pay is mixed into another's.
-      const byHub = !scopeHub();
-      if (byHub) rows.sort((a, b) => a.hub.localeCompare(b.hub));
-      const hubName = (c) => state.hubs.find((h) => h.code === c)?.name || c;
+        (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q) || hubName(r.hub).toLowerCase().includes(q)));
+      // One list of everyone, by name. Click a heading to sort; the hub is a column, and the totals row adds up whatever is shown.
+      rows.sort((a, b) => a.name.localeCompare(b.name));
       $("#table").innerHTML = dataTable({
-        ...(byHub ? { groupBy: (r) => r.hub, groupLabel: (code, rs) => `<b>${hubName(code)}</b> <span class="muted">· ${rs.length} ${rs.length === 1 ? "person" : "people"} · net pay Rs ${money(sum("net_pay", rs))} · salary Rs ${money(sum("disbursed_amount", rs))}</span>` } : {}),
         rows, footer: true, pageSize: 25, empty: "No matching employees", emptyHint: "Try a different search, or clear the filters.",
-        card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${r.hub}</span>
+        card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${r.employee_id} · ${levelLabel(r.staff_level)} · ${hubName(r.hub)}</span>
             ${r.flags.length ? html`<span class="mc-flags">${r.flags.map((f) => html`<span class="chip">${f.code.replace(/_/g, " ").toLowerCase()}</span>`)}</span>` : ""}</span>
           <span class="mc-end"><b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b><br>${badge(r.status)}</span>`,
         summary: (rs) => `${rs.length} ${rs.length === 1 ? "person" : "people"} · net pay Rs ${money(sum("net_pay", rs))} · salary Rs ${money(sum("disbursed_amount", rs))}`,
         onRow: (r) => openBreakdown(r, p, { finalized, onChange: () => this.render(ctx) }),
         rowLabel: (r) => `Open pay details for ${r.name}`,
         cols: [
-          { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id} · ${r.hub}</span></div></div>`, total: (rs) => `${rs.length} employees` },
+          { key: "name", label: "Employee", render: (r) => html`<div class="who"><div><b>${r.name}</b><span>${r.employee_id}</span></div></div>`, total: (rs) => `${rs.length} employees` },
+          { key: "hub", label: "Hub", render: (r) => hubName(r.hub) },
           { key: "role", label: "Position", render: (r) => badge(r.role, levelLabel(r.staff_level)) },
           { key: "opening_balance", label: "Opening", align: "r", render: (r) => html`<span class="${r.opening_balance < 0 ? "neg" : ""}">${money(r.opening_balance)}</span>`, total: (rs) => money(sum("opening_balance", rs)) },
           { key: "gross_earnings", label: "Gross", align: "r", render: (r) => money(r.gross_earnings), total: (rs) => money(sum("gross_earnings", rs)) },

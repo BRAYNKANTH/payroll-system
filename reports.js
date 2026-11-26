@@ -31,6 +31,7 @@ async function payslipHtml(db, period, employeeId, hub, plain = false) {
   const rows = data.rows.filter((r) => (!employeeId || r.employee_id === employeeId) && (!hub || r.hub === hub));
   if (!rows.length) throw httpError(404, "No payslip — run the period first");
   const company = (await getSettings(db)).company_name;
+  const hubNames = Object.fromEntries((await db.all("SELECT code, name FROM hubs")).map((h) => [h.code, h.name]));
   const draft = data.status !== "finalized";
   const slips = rows.map((r) => {
     const d = r.detail;
@@ -43,15 +44,16 @@ async function payslipHtml(db, period, employeeId, hub, plain = false) {
         <td class="n">${(w.profit_percent * 100).toFixed(2)}%</td><td class="n">${fmt(w.profit_share)}</td>
         <td class="n">${fmt(w.rent + w.hub_fee + w.security_cost + w.personal_draw)}</td><td class="n">${fmt(w.weekly_balance)}</td></tr>`).join("")}
       </table>` : "";
-    const stock = r.role === "guy" && d.stock_lines.length ? `
+    const missing = r.role === "guy" ? d.stock_lines.filter((s) => Number(s.shortfall_qty) > 0) : [];
+    const stock = missing.length ? `
       <h2>Stock reconciliation</h2>
       <table><tr><th>Product</th><th class="n">Shortfall qty</th><th class="n">Unit price</th><th class="n">Value</th></tr>
-      ${d.stock_lines.map((s) => `<tr><td>${esc(s.product)}</td><td class="n">${s.shortfall_qty}</td><td class="n">${fmt(s.unit_price)}</td><td class="n">${fmt(s.shortfall_value)}</td></tr>`).join("")}
+      ${missing.map((s) => `<tr><td>${esc(s.product)}</td><td class="n">${s.shortfall_qty}</td><td class="n">${fmt(s.unit_price)}</td><td class="n">${fmt(s.shortfall_value)}</td></tr>`).join("")}
       </table>` : "";
     return `<section class="slip">
       <h1><span class="lg"></span>${esc(company)} — Payslip ${esc(period)}${draft ? ' <span class="flag">(DRAFT — period not finalized)</span>' : ""}</h1>
       <div class="grid">
-        <div><b>${esc(r.name)}</b> (${esc(r.employee_id)})</div><div>Hub: ${esc(r.hub)}</div>
+        <div><b>${esc(r.name)}</b> (${esc(r.employee_id)})</div><div>Hub: ${esc(hubNames[r.hub] || r.hub)}</div>
         <div>Position: ${LEVEL_NAME[r.staff_level] || (r.role === "guy" ? "Distributor" : "Manager")}</div>
         <div>Business this period: Rs ${fmt(d.total_business)}</div>
         ${r.role === "guy" ? `<div>Target: Rs ${fmt(d.target)} · Over target: Rs ${fmt(d.over_target_amount)}</div>`
