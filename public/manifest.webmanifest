@@ -1,6 +1,6 @@
 {
-  "name": "Payroll and hub accounts",
-  "short_name": "WE Payroll",
+  "name": "WEC",
+  "short_name": "WEC",
   "description": "Daily sheets, payroll and payslips for hubs, managers and sales staff.",
   "start_url": "/",
   "scope": "/",
