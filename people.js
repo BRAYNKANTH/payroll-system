@@ -63,7 +63,7 @@ async function rehire(db, id, body, user, scopeHub) {
   // Their old upline may have left meanwhile: the person must report to someone who is still here.
   if (s.upline_id) {
     const up = await db.get("SELECT status FROM staff WHERE employee_id = ?", s.upline_id);
-    if (!up || up.status !== "active") throw httpError(400, "The person they used to report to has left. Edit their record to choose a new person to report to, then re-hire");
+    if (!up || up.status !== "active") throw httpError(400, "The person whose team they were in has left. Edit their record to choose a new Team of, then re-hire");
   }
   await withUser(db, user, (t) => t.run("UPDATE staff SET status = 'active', join_date = ?, leave_date = NULL, leave_reason = NULL, updated_by = ?, updated_at = " + NOW + " WHERE employee_id = ?", joinDate, user, id));
   // The sign-in stays switched off until the admin turns it on again (Users & roles): a person coming back does not get access by themselves.

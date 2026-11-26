@@ -68,7 +68,7 @@ test("a manager is promoted first, then a manager goes under him; a position cha
   assert.equal((await d.get("SELECT upline_id, staff_level FROM staff WHERE employee_id = 'D2'")).staff_level, "manager");
   await mk("N1", "distributor", "D2");
   // PB has a manager (M1) under him: he cannot be turned back into a manager while that manager reports to him
-  await assert.rejects(() => svc.updateEntry(d, "staff", "PB", { staff_level: "manager" }, "owner"), /no longer be above them/);
+  await assert.rejects(() => svc.updateEntry(d, "staff", "PB", { staff_level: "manager" }, "owner"), /no longer be below them/);
 });
 
 test("each promoting manager earns 0.55% on the groups of the managers directly under them, and no group is paid twice", async () => {

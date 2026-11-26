@@ -266,7 +266,7 @@ async function applyChain(db, row, existing = {}, id) {
   if (id && existing.staff_level && row.staff_level && row.staff_level !== existing.staff_level) {
     for (const r of await db.all("SELECT name, staff_level FROM staff WHERE upline_id = ? AND status = 'active'", id)) {
       const ok = LEVEL_RANK[r.staff_level] < LEVEL_RANK[m.staff_level] || (r.staff_level === "promoting_manager" && m.staff_level === "promoting_manager");
-      if (!ok) throw httpError(400, `${r.name} (${LEVEL_NAME[r.staff_level].toLowerCase()}) reports to ${existing.name || "this person"}, who would then no longer be above them. Move ${r.name} first`);
+      if (!ok) throw httpError(400, `${r.name} (${LEVEL_NAME[r.staff_level].toLowerCase()}) is in ${existing.name || "this person"}'s team, and would then no longer be below them. Move ${r.name} first`);
     }
   }
   // The old Coacher position carries the tag automatically (as the migration does for existing records).
@@ -281,7 +281,7 @@ async function applyChain(db, row, existing = {}, id) {
     }
   }
   if (m.upline_id) {
-    if (m.upline_id === id) throw httpError(400, "An employee cannot report to themselves");
+    if (m.upline_id === id) throw httpError(400, "A person cannot be in their own team");
     const up = await db.get("SELECT staff_level, name FROM staff WHERE employee_id = ?", m.upline_id);
     if (!up) throw httpError(400, `Unknown upline ${m.upline_id}`);
     // Promoting managers are a ladder: one can sit under another. Every other position reports to someone strictly more senior.
@@ -290,7 +290,7 @@ async function applyChain(db, row, existing = {}, id) {
     if (!ladder && LEVEL_RANK[up.staff_level] <= LEVEL_RANK[m.staff_level]) {
       // A manager gets a manager under them by being promoted first: the promoting manager position is given when a manager comes under him.
       const hint = m.staff_level === "manager" && up.staff_level === "manager" ? `. If ${up.name} now has a manager under them, make ${up.name} a promoting manager first, then add this manager under them` : "";
-      throw httpError(400, `A ${LEVEL_NAME[m.staff_level].toLowerCase()} must report to someone more senior, not a ${LEVEL_NAME[up.staff_level].toLowerCase()}${hint}`);
+      throw httpError(400, `A ${LEVEL_NAME[m.staff_level].toLowerCase()} must be in the team of someone more senior, not a ${LEVEL_NAME[up.staff_level].toLowerCase()}${hint}`);
     }
     // Nobody can end up above themselves: walk up from the chosen boss and make sure this person is not on the way.
     if (id) {

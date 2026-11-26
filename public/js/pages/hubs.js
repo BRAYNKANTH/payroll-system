@@ -1,6 +1,6 @@
 import { get, post, put, qs } from "../api.js";
 import { state, can } from "../app.js";
-import { $, html, icon, badge, toast, busy, drawer, emptyState, compact, money, LEVELS, levelLabel } from "../ui.js";
+import { $, html, icon, badge, toast, busy, drawer, emptyState, compact, money, LEVELS, levelLabel, exportButtons } from "../ui.js";
 import { loadHubData, hubInfo, plural } from "../hubinfo.js";
 
 export default {
@@ -26,7 +26,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head hubs-page">
         <div><h1>Hubs</h1><p>The places where distributors, supervisors and managers work. Figures are for ${monthLabel}.</p></div>
-        <div class="actions">${can("manage_hubs") ? html`<button class="btn primary" id="add">${icon("plus")} Add hub</button>` : ""}</div>
+        <div class="actions">${exportButtons("hubs")}${can("manage_hubs") ? html`<button class="btn primary" id="add">${icon("plus")} Add hub</button>` : ""}</div>
       </div>
       ${hubs.length ? html`<div class="grid kpis hub-kpis mb-4">
         <div class="card kpi"><div class="label">Hubs</div><div class="value">${hubs.filter((h) => h.status === "active").length}</div><div class="foot">${hubs.length === 1 ? "1 hub in total" : `${hubs.length} hubs in total`}</div></div>

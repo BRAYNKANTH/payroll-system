@@ -54,15 +54,15 @@ export default {
           ${can(["manage_staff", "manage_team"]) ? html`<a class="btn primary" href="/hubs/${encodeURIComponent(code)}/people" data-link>${icon("users")} People in this hub</a>` : ""}
         </div>
       </div>
-      <div class="card mb-4 hubpage"><div class="card-head"><div><h2>Reporting chain</h2><div class="sub">Top of the chain first, each person under the one they report to. Tap anyone to open their record.</div></div>
+      <div class="card mb-4 hubpage"><div class="card-head"><div><h2>Teams</h2><div class="sub">Who counts in whose team for commission, top first. This is about pay, not office management. Tap anyone to open their record.</div></div>
         ${tops.length ? html`<div class="org-tools" role="group" aria-label="Chart controls">
           <button type="button" class="btn org-zoom" id="org-out" aria-label="Zoom out">−</button><button type="button" class="btn org-zoom" id="org-in" aria-label="Zoom in">+</button>
           <button type="button" class="btn org-zoom" id="org-fit">Fit</button>
           <button type="button" class="btn" id="org-all">Open all</button><button type="button" class="btn" id="org-none">Fold all</button></div>` : ""}</div>
         <div class="card-body">${tops.length ? html`
           <div class="org-legend">${legend.map((l) => html`<span class="org-key lv-${l}"><i class="org-dot"></i>${levelLabel(l)}</span>`)}</div>
-          <div class="org-scroll" id="org-scroll" tabindex="0" role="region" aria-label="Reporting chain chart, scroll sideways to see everyone"><div class="org" id="org"><ul class="org-root">${tops.map((s) => node(s))}</ul></div></div>`
-          : emptyState("No members yet", "Add employees to this hub and set who each reports to.", "users")}</div></div>
+          <div class="org-scroll" id="org-scroll" tabindex="0" role="region" aria-label="Teams chart, scroll sideways to see everyone"><div class="org" id="org"><ul class="org-root">${tops.map((s) => node(s))}</ul></div></div>`
+          : emptyState("No members yet", "Add employees to this hub and set whose team each is in.", "users")}</div></div>
       <div class="card hubpage"><div class="card-head"><div><h2>Members</h2><div class="sub">${members.length} in total, grouped by position</div></div></div><div class="card-body flush" id="mem"></div></div>`.toString();
 
     // Chart controls: fold or open a branch, fold/open everything, zoom.
@@ -101,12 +101,12 @@ export default {
       groupBy: (s) => s.staff_level,
       groupLabel: (key, rs) => `<b>${levelLabel(key, rs.length)}</b> <span class="muted">· ${rs.length}</span>`,
       onRow: (s) => navigate(`/employees/${s.employee_id}`),
-      card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${levelLabel(s.staff_level)}${up(s) && byId[up(s)] ? ` · reports to ${byId[up(s)].name}` : ""}</span></span>
+      card: (s) => html`<span class="mc-main"><b>${s.name}</b><span class="mc-sub">${s.employee_id} · ${levelLabel(s.staff_level)}${up(s) && byId[up(s)] ? ` · team of ${byId[up(s)].name}` : ""}</span></span>
         <span class="mc-end">${compact(sales[s.employee_id]?.business || 0)}<br>${badge(s.status)}</span>`,
       cols: [
         { key: "name", label: "Member", render: (s) => html`<div class="who"><div class="avatar">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}</span></div></div>` },
         { key: "staff_level", label: "Position", render: (s) => badge(s.role, levelLabel(s.staff_level)) },
-        { key: "upline_id", label: "Reports to", render: (s) => (up(s) && byId[up(s)] ? byId[up(s)].name : html`<span class="faint">—</span>`) },
+        { key: "upline_id", label: "Team of", render: (s) => (up(s) && byId[up(s)] ? byId[up(s)].name : html`<span class="faint">—</span>`) },
         { key: "sales", label: "Sales this month", render: (s) => html`<span class="num">${compact(sales[s.employee_id]?.business || 0)}</span>` },
         { key: "report", label: "Report", sort: false, render: (s) => html`<a class="btn" href="/api/staff/${encodeURIComponent(s.employee_id)}/report.pdf?period=${state.period}" target="_blank" rel="noopener" aria-label="PDF report for ${s.name}">${icon("file")} PDF</a>` },
         { key: "status", label: "Status", render: (s) => badge(s.status) },

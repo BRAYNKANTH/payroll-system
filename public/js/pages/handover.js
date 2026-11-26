@@ -5,7 +5,7 @@
 //   admin, all hubs    -> what is waiting to be checked, then every hub's handover for the day
 import { get, post, qs } from "../api.js";
 import { state, can, navigate } from "../app.js";
-import { $, $$, html, icon, money, badge, toast, busy, emptyState, drawer, dateLabel, dateTime } from "../ui.js";
+import { $, $$, html, icon, money, badge, toast, busy, emptyState, drawer, dateLabel, dateTime, exportButtons } from "../ui.js";
 import { today, addDays } from "../range.js";
 
 let date = null;
@@ -27,7 +27,7 @@ export default {
 
     const head = html`<div class="page-head"><div><h1>Cash handover</h1><p>${isCoach
       ? "Each day, hand the day's cash to the office. It must be at least 90% of the hub's sales for the day. The admin checks it and approves it."
-      : "Each hub's coacher hands the day's cash to the office: at least 90% of the hub's sales. Check what you received, then approve it or send it back."}</p></div></div>`;
+      : "Each hub's coacher hands the day's cash to the office: at least 90% of the hub's sales. Check what you received, then approve it or send it back."}</p></div><div class="actions">${can("read") ? exportButtons("handovers", { period: date.slice(0, 7), hub: hubCode }) : ""}</div></div>`;
 
     // ------------------------------------------------------------ a day bar: previous, date, next
     const dayBar = () => html`<div class="dl-daybar mb-4"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">

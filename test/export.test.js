@@ -60,7 +60,7 @@ function pdfStrings(buf) {
   return out.join("\n").match(/\((?:\\.|[^\\)])*\) Tj/g)?.map((s) => s.slice(1, -4).replace(/\\([\\()])/g, "$1")) || [];
 }
 const can = (...perms) => (p) => perms.includes(p);
-const ADMIN = can("read", "view_pay", "manage_products");
+const ADMIN = can("read", "view_pay", "manage_products", "manage_users");
 
 test("every report builds as an Excel file and as a PDF", async () => {
   const d = await setup();
@@ -112,7 +112,7 @@ test("pay stays out of exports for those who may not see pay, and a hub filter k
   const hubs = unzip((await exporter.make(d, "hub-summary", "xlsx", { can: mgr, period: "2026-10" })).data).get("xl/worksheets/sheet1.xml");
   assert.ok(!/Gross pay|Net pay|To bank|Manager balance/.test(hubs));
   const emp = unzip((await exporter.make(d, "employees", "xlsx", { can: mgr })).data).get("xl/worksheets/sheet1.xml");
-  assert.ok(!/Basic pay/.test(emp) && /Reports to/.test(emp));
+  assert.ok(!/Basic pay/.test(emp) && /Team of/.test(emp));
   assert.ok(/Basic pay/.test(unzip((await exporter.make(d, "employees", "xlsx", { can: ADMIN })).data).get("xl/worksheets/sheet1.xml")));
   const live = unzip((await exporter.make(d, "live", "xlsx", { can: mgr, period: "2026-10" })).data).get("xl/worksheets/sheet1.xml");
   assert.ok(!/Commission on this sale|Earned so far/.test(live));
@@ -160,4 +160,31 @@ test("the download route sends the file as an attachment, and refuses pay and pr
     assert.equal((await fetch(base + "/api/export/daily.pdf")).status, 401, "sign-in required");
     assert.equal((await fetch(base + "/api/export/nothing.pdf", { headers: { Cookie: boss } })).status, 404);
   } finally { srv.close(); }
+});
+
+test("sales, cash handovers, stock given, stock sent, hubs and users all export, with the right rows, the hub filter, and no passwords", async () => {
+  const d = await setup();
+  const pid = (await d.get("SELECT id FROM products WHERE name = 'Shine'")).id;
+  await d.run("INSERT INTO hub_issues (date, hub, product_id, qty, created_by) VALUES ('2026-10-04', 'H1', ?, 100, 'admin')", pid);
+  await d.run("INSERT INTO stock_issues (date, employee_id, product_id, qty, created_by) VALUES ('2026-10-05', 'D1', ?, 10, 'admin')", pid);
+  await d.run("INSERT INTO stock_issues (date, employee_id, product_id, qty, created_by) VALUES ('2026-10-05', 'D9', ?, 7, 'admin')", pid);
+  await d.run("INSERT INTO sale_lines (date, employee_id, product_id, qty, unit_price, amount, created_by) VALUES ('2026-10-05', 'D1', ?, 2, 85000, 170000, 'admin')", pid);
+  await d.run("INSERT INTO cash_handovers (hub, date, sales, amount, status, submitted_by) VALUES ('H1', '2026-10-05', 170000, 160000, 'approved', 'coach')");
+  await auth.setup(d, { username: "owner", full_name: "Owner", password: "password-12345" });
+  const text = async (name, opts = {}) => {
+    const f = await exporter.make(d, name, "xlsx", { can: ADMIN, period: "2026-10", ...opts });
+    const z = unzip(f.data);
+    return [...z.values()].map((b) => b.toString("utf8")).join("\n");
+  };
+  assert.match(await text("sales"), /Name D1[\s\S]*Shine/);
+  assert.match(await text("handovers"), /Hub 1[\s\S]*approved/);
+  const given = await text("stock-given");
+  assert.ok(/Name D1/.test(given) && /Name D9/.test(given));
+  const one = await text("stock-given", { hub: "H1" });
+  assert.ok(/Name D1/.test(one) && !/Name D9/.test(one), "the hub filter keeps to one hub");
+  assert.match(await text("hub-supply"), /Hub 1[\s\S]*Shine/);
+  assert.match(await text("hubs"), /Hub 2/);
+  const users = await text("users");
+  assert.ok(/owner/.test(users) && !/password|scrypt/i.test(users.replace(/Kind of login/g, "")), "usernames are listed, never passwords");
+  await assert.rejects(() => exporter.make(d, "users", "xlsx", { can: (p) => p !== "manage_users", period: "2026-10" }), /cannot see this report/);
 });

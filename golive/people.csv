@@ -1,4 +1,4 @@
-employee_id,name,position,reports_to,hub,coacher,basic_pay,phone
+employee_id,name,position,team_of,hub,coacher,basic_pay,phone
 PM01,Sathis II,promoting manager,,J3,yes,30000,
 PM02,Satheesraj,promoting manager,,J1,no,30000,
 PM03,Roshany,promoting manager,PM01,J2,yes,30000,

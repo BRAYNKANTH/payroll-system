@@ -94,8 +94,9 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
 
   const history = await db.all(`SELECT p.period, p.gross_earnings, p.total_deductions, p.net_pay, p.disbursed_amount, p.closing_balance
     FROM pay_period_summary p JOIN periods x USING (period) WHERE p.employee_id = ? AND x.status = 'finalized' ORDER BY p.period DESC LIMIT 36`, s.employee_id);
-  const security = await db.get(`SELECT COALESCE(SUM(p.security_held), 0) AS held FROM pay_period_summary p
-    JOIN periods x USING (period) WHERE p.employee_id = ? AND x.status = 'finalized'`, s.employee_id);
+  // The security deposit (its rule, the amount and the total held) is for the company only. The person sees a plain "Other deduction".
+  const hideSecurity = (o) => o && { ...o, deduction_lines: (o.deduction_lines || []).map((l) => (/^Security/i.test(l.label) ? { ...l, label: "Other deduction" } : l)) };
+  official = hideSecurity(official); estimate = hideSecurity(estimate);
 
   return {
     period, finalized,
@@ -105,7 +106,7 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
       reports_to: s.upline_name || null, phone: s.phone, nic: s.nic, join_date: s.join_date,
       bank_name: s.bank_name, bank_last4: s.bank_account_no ? s.bank_account_no.slice(-4) : null,
       pay: { pay_scheme: s.pay_scheme, target: s.target, basic_pay: s.basic_pay, commission_rate: s.commission_rate, base_commission_rate: s.base_commission_rate,
-        food_per_day: s.food_per_day, food_min_days: s.food_min_days, security_deduction_rule: s.security_deduction_rule },
+        food_per_day: s.food_per_day, food_min_days: s.food_min_days }, // the security deposit rule is for the company only
     },
     month: {
       days: daily.length, business, target: s.target, over_target: Math.max(0, business - s.target), to_go: Math.max(0, s.target - business),
@@ -114,7 +115,7 @@ async function build(db, s, period, { hideTeamSales = false } = {}) {
     },
     // a manager is shown no list of people at all (team is null for them)
     team: hideTeamSales ? null : team, team_sales_hidden: hideTeamSales, below_sales: hideTeamSales ? null : belowSales, share_sales: hideTeamSales ? null : shareSales, senior_rate: Number(settings.senior_commission_rate) || 0,
-    official, estimate, history, security_held: Number(security.held) || 0,
+    official, estimate, history, // the deposit held is for the company only: no total here
     loans: await loans.mine(db, s.employee_id, period),
   };
 }
@@ -124,7 +125,7 @@ async function payslip(db, user, period) {
   svc.assertPeriod(period);
   const s = await me(db, user);
   if (!(await svc.isFinalized(db, period))) throw httpError(403, "Your payslip is available once the month has been finalized");
-  return reports.payslipHtml(db, period, s.employee_id, null);
+  return reports.payslipHtml(db, period, s.employee_id, null, true);
 }
 
 // One closed month's payslip as data, for the phone screen. Only the signed-in person's own, only once the month is final (the same rule as the printed payslip).

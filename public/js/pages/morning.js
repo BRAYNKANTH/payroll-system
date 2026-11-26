@@ -2,7 +2,7 @@
 // One card per seller shows what they carry over, what they were given today and what they have sold. "Give stock" opens a short list of products.
 import { get, post, del, qs } from "../api.js";
 import { state, scopeHub, can } from "../app.js";
-import { $, $$, html, esc, icon, toast, busy, drawer, confirmDialog, emptyState, initials, levelLabel } from "../ui.js";
+import { $, $$, html, esc, icon, toast, busy, drawer, confirmDialog, emptyState, initials, levelLabel, exportButtons } from "../ui.js";
 
 const rs = (c) => `Rs ${(Number(c) / 100).toLocaleString("en-LK", { maximumFractionDigits: 2 })}`;
 const slToday = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -66,7 +66,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>${overview ? "Morning stock" : "Give stock"}</h1><p>${overview ? "Each hub's coacher gives the stock out to the sellers. Here you see every hub, its coacher, what the hub holds and how much has been given out." : "Sellers keep their stock from day to day, so you only top up the ones who need more."}</p></div>
-        ${overview ? "" : html`<div class="actions"><a class="btn" href="/stock-overview" data-link>${icon("box")} Hub stock</a></div>`}
+        <div class="actions">${exportButtons("stock-given", { period: state.period, hub: scopeHub() })}${overview ? "" : html`<a class="btn" href="/stock-overview" data-link>${icon("box")} Hub stock</a>`}</div>
       </div>
       <div class="daybar mb-4">
         <div class="row daynav" style="gap:8px;align-items:center">

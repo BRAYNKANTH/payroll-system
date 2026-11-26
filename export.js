@@ -300,10 +300,44 @@ const REPORTS = {
   },
   employees: async ({ db, hub, canPay }) => {
     const names = await staffNames(db);
-    return { title: "Employees", subtitle: "Everyone on record, with their position and who they report to",
-      columns: [C("Employee"), C("Name"), C("Position"), C("Hub"), C("Reports to"), C("Phone"), C("Status"), C("Joined"), C("Left"), C("Target", "money"), ...(canPay ? [C("Basic pay", "money")] : [])],
+    return { title: "Employees", subtitle: "Everyone on record, with their position and whose team they are in",
+      columns: [C("Employee"), C("Name"), C("Position"), C("Hub"), C("Team of"), C("Phone"), C("Status"), C("Joined"), C("Left"), C("Target", "money"), ...(canPay ? [C("Basic pay", "money")] : [])],
       rows: (await svc.listEntries(db, "staff", { hub: hub || undefined })).map((s) => [s.employee_id, s.name, level(s.staff_level), s.hub, names.get(s.upline_id)?.name || "", s.phone || "", s.status, s.join_date || "", s.leave_date || "", s.target, ...(canPay ? [s.basic_pay] : [])]) };
   },
+  // Every sale a seller made on the till: the receipt lines. One row per sale, with the time it was made.
+  sales: async ({ db, period, hub }) => ({ title: "Sales (till receipts)", subtitle: monthLabel(period),
+    columns: [C("Date"), C("Time"), C("Hub"), C("Employee"), C("Name"), C("Product"), C("Qty", "int", true), C("Unit price", "money"), C("Amount", "money", true)],
+    rows: (await db.all(`SELECT l.date, l.created_at, s.hub, s.employee_id, s.name, p.name AS product, l.qty, l.unit_price, l.amount FROM sale_lines l
+      JOIN staff s ON s.employee_id = l.employee_id JOIN products p ON p.id = l.product_id WHERE left(l.date, 7) = ?${hub ? " AND s.hub = ?" : ""} ORDER BY l.date, l.id`, period, ...(hub ? [hub] : [])))
+      .map((r) => [r.date, String(r.created_at || "").slice(11, 16), r.hub, r.employee_id, r.name, r.product, Number(r.qty), Number(r.unit_price), Number(r.amount)]) }),
+  // The cash each hub handed to the office, with what the office decided.
+  handovers: async ({ db, period, hub }) => ({ title: "Cash handovers", subtitle: monthLabel(period),
+    columns: [C("Date"), C("Hub"), C("Day's sales", "money", true), C("Handed over", "money", true), C("Status"), C("Handed over by"), C("Checked by"), C("Checked at"), C("Note"), C("Office note")],
+    rows: (await db.all(`SELECT c.*, h.name AS hub_name FROM cash_handovers c JOIN hubs h ON h.code = c.hub WHERE left(c.date, 7) = ?${hub ? " AND c.hub = ?" : ""} ORDER BY c.date, c.hub`, period, ...(hub ? [hub] : [])))
+      .map((r) => [r.date, r.hub_name, Number(r.sales), Number(r.amount), r.status, r.submitted_by, r.verified_by || "", r.verified_at || "", r.note || "", r.verify_note || ""]) }),
+  // Stock the coacher gave to sellers, day by day.
+  "stock-given": async ({ db, period, hub }) => ({ title: "Stock given to sellers", subtitle: monthLabel(period),
+    columns: [C("Date"), C("Hub"), C("Employee"), C("Name"), C("Product"), C("Qty", "int", true), C("Given by"), C("Note")],
+    rows: (await db.all(`SELECT i.date, s.hub, s.employee_id, s.name, p.name AS product, i.qty, i.created_by, i.note FROM stock_issues i
+      JOIN staff s ON s.employee_id = i.employee_id JOIN products p ON p.id = i.product_id WHERE left(i.date, 7) = ?${hub ? " AND s.hub = ?" : ""} ORDER BY i.date, i.id`, period, ...(hub ? [hub] : [])))
+      .map((r) => [r.date, r.hub, r.employee_id, r.name, r.product, Number(r.qty), r.created_by, r.note || ""]) }),
+  // Stock the office sent to the hubs.
+  "hub-supply": async ({ db, period, hub }) => ({ title: "Stock sent to hubs", subtitle: monthLabel(period),
+    columns: [C("Date"), C("Hub"), C("Product"), C("Qty", "int", true), C("Sent by"), C("Note")],
+    rows: (await db.all(`SELECT i.date, h.name AS hub, p.name AS product, i.qty, i.created_by, i.note FROM hub_issues i JOIN hubs h ON h.code = i.hub JOIN products p ON p.id = i.product_id
+      WHERE left(i.date, 7) = ?${hub ? " AND i.hub = ?" : ""} ORDER BY i.date, i.id`, period, ...(hub ? [hub] : []))).map((r) => [r.date, r.hub, r.product, Number(r.qty), r.created_by, r.note || ""]) }),
+  // The hubs themselves, with how many people work in each.
+  hubs: async ({ db, hub }) => ({ title: "Hubs", subtitle: "Every hub and how many active people work in it",
+    columns: [C("Code"), C("Name"), C("Location"), C("Phone"), C("Status"), C("Active people", "int", true), C("Coacher")],
+    rows: (await db.all(`SELECT h.code, h.name, h.location, h.phone, h.status,
+      (SELECT COUNT(*) FROM staff s WHERE s.hub = h.code AND s.status = 'active') AS people,
+      (SELECT string_agg(s.name, ', ') FROM staff s WHERE s.hub = h.code AND s.status = 'active' AND s.is_coacher) AS coacher
+      FROM hubs h${hub ? " WHERE h.code = ?" : ""} ORDER BY h.code`, ...(hub ? [hub] : []))).map((r) => [r.code, r.name, r.location || "", r.phone || "", r.status, Number(r.people), r.coacher || ""]) }),
+  // Who has a sign-in and what kind. Never passwords.
+  users: async ({ db }) => ({ title: "Users and roles", subtitle: "Every sign-in, its kind and its last use", perm: "manage_users",
+    columns: [C("Username"), C("Name"), C("Kind of login"), C("Hub"), C("Employee"), C("Status"), C("Last signed in"), C("Created")],
+    rows: (await db.all("SELECT username, full_name, role, hub, employee_id, status, last_login_at, created_at FROM users ORDER BY role, username"))
+      .map((u) => [u.username, u.full_name, u.role, u.hub || "", u.employee_id || "", u.status, u.last_login_at || "", u.created_at || ""]) }),
   weekly: async ({ db, period, hub, canPay }) => {
     const weeks = (await svc.weeklyView(db, period, hub || undefined)).flatMap((m) => m.weeks.map((w) => ({ m, w })));
     return { title: "Weekly sheet", subtitle: monthLabel(period),
@@ -329,7 +363,7 @@ async function make(db, name, format, { can, hub, period, query, username }) {
   if (model.perm && !can(model.perm)) throw httpError(403, "Your role cannot see this report");
   const company = (await getSettings(db)).company_name || "";
   const data = format === "xlsx" ? renderXlsx(model) : renderPdf(model, { company });
-  const slug = name + (/^(daily|live|weekly|register|commission|stock|branch-stock|hub-summary|product-profit)$/.test(name) ? "-" + per : "");
+  const slug = name + (/^(daily|live|weekly|register|commission|stock|branch-stock|hub-summary|product-profit|sales|handovers|stock-given|hub-supply)$/.test(name) ? "-" + per : "");
   return { data, type: TYPES[format], filename: `${slug}.${format}` };
 }
 
@@ -392,7 +426,7 @@ function personReportPdf(d, { canPay, company = "" }) {
   pdf.text(M, y - 14, `${company}${company ? " - " : ""}Personal report ${monthLabel(d.period)}`, 14, true); y -= 24;
   if (!d.finalized) { pdf.text(M, y - 9, "This month is not finalized yet - figures can still change.", 8.5, true, 0.5); y -= 14; }
   pdf.text(M, y - 10, `${m.name} (${m.employee_id})`, 12, true); y -= 17;
-  pdf.text(M, y - 9, [m.level_name, m.hub_name || m.hub, m.reports_to ? `reports to ${m.reports_to}` : "", m.phone, m.join_date ? `joined ${m.join_date}` : ""].filter(Boolean).join("  -  "), 8.5, false, 0.35); y -= 14;
+  pdf.text(M, y - 9, [m.level_name, m.hub_name || m.hub, m.reports_to ? `team of ${m.reports_to}` : "", m.phone, m.join_date ? `joined ${m.join_date}` : ""].filter(Boolean).join("  -  "), 8.5, false, 0.35); y -= 14;
 
   head("Month at a glance");
   if (m.sells || mo.days) {

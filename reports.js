@@ -25,7 +25,8 @@ const PAGE_CSS = `
   .net{font-size:16px;font-weight:700;margin-top:12px;padding:8px;background:#f4f6f8}
   @media print{body{margin:0} .noprint{display:none}}`;
 
-async function payslipHtml(db, period, employeeId, hub) {
+// `plain` is for the person's own copy: the security deposit is for the company's eyes, so it shows only as "Other deduction".
+async function payslipHtml(db, period, employeeId, hub, plain = false) {
   const data = await getPeriod(db, period);
   const rows = data.rows.filter((r) => (!employeeId || r.employee_id === employeeId) && (!hub || r.hub === hub));
   if (!rows.length) throw httpError(404, "No payslip — run the period first");
@@ -34,10 +35,10 @@ async function payslipHtml(db, period, employeeId, hub) {
   const slips = rows.map((r) => {
     const d = r.detail;
     const lines = (items) => items.filter((i) => i.amount !== 0 || /Basic/.test(i.label))
-      .map((i) => `<tr><td>${esc(i.label)}</td><td class="n">${fmt(i.amount)}</td></tr>`).join("");
+      .map((i) => `<tr><td>${esc(plain && /^Security/i.test(i.label) ? "Other deduction" : i.label)}</td><td class="n">${fmt(i.amount)}</td></tr>`).join("");
     const weeks = r.role === "manager" && d.weeks.length ? `
       <h2>Weekly balances</h2>
-      <table><tr><th>Week</th><th class="n">Business</th><th class="n">Profit %</th><th class="n">Profit share</th><th class="n">Rent + fee + security + draw</th><th class="n">Weekly balance</th></tr>
+      <table><tr><th>Week</th><th class="n">Business</th><th class="n">Profit %</th><th class="n">Profit share</th><th class="n">${plain ? "Rent + fee + draw" : "Rent + fee + security + draw"}</th><th class="n">Weekly balance</th></tr>
       ${d.weeks.map((w) => `<tr><td>${esc(w.week_start)} → ${esc(w.week_end)}</td><td class="n">${fmt(w.business_total)}</td>
         <td class="n">${(w.profit_percent * 100).toFixed(2)}%</td><td class="n">${fmt(w.profit_share)}</td>
         <td class="n">${fmt(w.rent + w.hub_fee + w.security_cost + w.personal_draw)}</td><td class="n">${fmt(w.weekly_balance)}</td></tr>`).join("")}

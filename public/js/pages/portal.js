@@ -36,8 +36,6 @@ function payRules(p, me, rate) {
     lines.push(`A basic pay of <b>${rs(p.basic_pay)}</b> every month, plus <b>${pct(p.commission_rate, 0)}</b> of the sales above <b>${rs(p.target)}</b>.`);
   }
   if (p.food_per_day) lines.push(`Food: <b>${rs(p.food_per_day)}</b> for every day you work${p.food_min_days ? `, once you have worked ${p.food_min_days} days or more` : ""}.`);
-  const m = /^(fixed|pct_gross|pct_basic|pct_business):([\d.]+)/.exec(p.security_deduction_rule || "");
-  if (m) lines.push(`Security deposit held back: <b>${m[1] === "fixed" ? `Rs ${m[2]}` : `${m[2]}%`}</b>${{ fixed: " each month", pct_gross: " of your total earnings", pct_basic: " of your basic pay", pct_business: " of your sales" }[m[1]]}.`);
   lines.push("Taken off your pay: the difference between your sales and the money you handed in, any stock that is missing, and any advance or loan payment.");
   return lines;
 }
@@ -52,8 +50,6 @@ const keep = (l) => l.amount !== 0 || /Basic/.test(l.label);
 
 // The engine's labels carry its internal rule names; show them in plain words.
 const plain = (label) => {
-  const sec = /^Security \((fixed|pct_gross|pct_basic|pct_business):([\d.]+)/.exec(label);
-  if (sec) return `Security deposit (${sec[1] === "fixed" ? `Rs ${sec[2]} a month` : `${sec[2]}% of your ${{ pct_gross: "total earnings", pct_basic: "basic pay", pct_business: "sales" }[sec[1]]}`})`;
   const old = [
     [/^Personal minus$/, "Advance taken"], [/^Stock shortfall$/, "Missing stock"],
     [/^Settle-up \(business − settled\)$/, "Cash not handed in (sales minus cash handed in)"],
@@ -87,10 +83,6 @@ const plainParts = (rawLabel) => {
   if (food) {
     return { label: "Food allowance", sub: food[1] };
   }
-  const sec = /^Security deposit \((.+?)\)$/.exec(label);
-  if (sec) {
-    return { label: "Security deposit", sub: sec[1] };
-  }
   const loan = /^Loan payment \((Rs [\d.,]+) still to pay(.*)\)$/.exec(label);
   if (loan) {
     return { label: "Loan payment", sub: `${loan[1]} still to pay` };
@@ -117,7 +109,6 @@ export const GLOSSARY = [
   ["Cash not handed in", "Sales minus the cash you handed in. If you hand in less than you sold, the difference is taken off your pay."],
   ["Advance", "Money you took before pay day. It is taken off your pay."],
   ["Loan payment", "The part of a loan you pay back each month."],
-  ["Security deposit", "A small amount held back from your pay as a safety deposit. Ask your hub head when it is returned."],
   ["Missing stock", "Items the records say you had, but that were not found at the stock count. Their value is taken off."],
   ["Allowance", "Extra money added by the office, for example a bonus."],
   ["Total earnings", "Everything you earned, before anything is taken off."],
@@ -210,7 +201,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head portal-head">
         <div><h1>Hello, ${me.name.split(" ")[0]}</h1>
-          <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · reports to ${me.reports_to}` : ""}</p></div>
+          <p>${badge("blue", me.level_name)} ${me.hub_name}${me.reports_to ? ` · team of ${me.reports_to}` : ""}</p></div>
         <div class="actions"><a class="btn sm" href="/api/me/report.pdf?period=${d.period}" target="_blank" rel="noopener">${icon("file")} <span class="lbl-sm">My report (PDF)</span></a><button type="button" class="btn sm" id="refresh">${icon("refresh")} <span class="lbl-sm">Refresh</span></button></div>
       </div>
       <div class="tabs portal-tabs" id="tabs" aria-label="My page sections">${[...(me.sells ? [["sell", "Sell", "Sell", "bag", ""]] : []), ["month", "This month", "Month", "chart", ""],
@@ -245,7 +236,6 @@ export default {
           // so the take-home figure above adds up with what this card says.
           stat("Taken off so far", `<small>Rs</small>${n0(pay ? pay.deductions : m.settle_up + m.personal)}`,
             pay && pay.deductions !== m.settle_up + m.personal ? "Cash, advances, deposit and more: see the breakdown" : `Cash not handed in Rs ${n0(m.settle_up)} · advances Rs ${n0(m.personal)}`, "coins", "amber"),
-          stat("Security deposit held", `<small>Rs</small>${n0(d.security_held)}`, "in total, from closed months", "shield", ""),
         ]).join(""))}</div>
 
         <!-- Apple iOS Segmented Deck Switcher (Chunked for zero scroll fatigue) -->
@@ -284,14 +274,13 @@ export default {
         </div>`,
 
       team: () => d.team_sales_hidden
-        ? html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">The people who report to you.</div></div></div>
+        ? html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">The people in your team.</div></div></div>
           <div class="card-body flush" id="team"></div></section>`
         : html`<section class="card"><div class="card-head"><div><h2>My team</h2><div class="sub">${monthName(d.period)}: sales of everyone below you. Sales only, never anyone's pay.</div></div></div>
           <div class="card-body flush" id="team"></div></section>
           <p class="muted" style="margin-top:12px">Total sales below you: <b class="num">Rs ${money(d.below_sales)}</b>.</p>`,
 
       payslips: () => d.history.length ? html`
-        <div class="sec-held-card">${icon("shield")}<div><span>Security deposit held so far</span><b>Rs ${money(d.security_held)}</b></div></div>
         <section class="card"><div class="card-body flush" id="hist"></div></section>
         ${raw(glossary())}`
         : html`<div class="card">${emptyState("No payslips yet", "Your payslip for a month appears here once the office has closed that month.", "file")}</div>`,
@@ -315,7 +304,7 @@ export default {
           row("Employee ID", `<span class="mono">${esc(me.employee_id)}</span>`),
           row("Position", me.level_name),
           row("Hub", me.hub_name),
-          row("Reports to", me.reports_to || "—"),
+          row("Team of", me.reports_to || "—"),
           row("Phone", me.phone ? `<a href="tel:${esc(me.phone)}">${esc(me.phone)}</a>` : "—"),
           row("NIC", me.nic || "—"),
           row("Joined", me.join_date || "—"),
@@ -431,7 +420,7 @@ export default {
         // A manager knows who is under them, never what they sold.
         $("#team").innerHTML = d.team.length ? html`<ul class="hs-list-flat" role="list" style="list-style:none;margin:0;padding:0">${d.team.map((r) => html`<li class="hs-row" style="padding-left:${16 + (r.depth - 1) * 18}px;cursor:default">
           <span class="avatar" aria-hidden="true">${initials(r.name)}</span><span class="hs-main"><b>${r.name}</b><span class="muted">${r.employee_id} · ${r.level_name}</span></span></li>`)}</ul>`.toString()
-          : emptyState("No one reports to you yet", "People who report to you appear here.", "users").toString();
+          : emptyState("No one is in your team yet", "People in your team appear here.", "users").toString();
       } else if (tab === "team" && d.team) {
         $("#team").innerHTML = d.team.length ? both(
           dataTable({
@@ -450,7 +439,7 @@ export default {
             sub: `${r.level_name} · ${r.days} day${r.days === 1 ? "" : "s"}${r.target ? ` · ${pct(r.business / r.target, 0)} of target` : ""}`,
             vsub: r.short ? `Short ${money(r.short)}` : "",
           })),
-          row("Total below you", money(d.below_sales), { strong: true })])) : emptyState("No one reports to you yet", "People who report to you appear here with their sales.", "users").toString();
+          row("Total below you", money(d.below_sales), { strong: true })])) : emptyState("No one is in your team yet", "People in your team appear here with their sales.", "users").toString();
       }
       if (tab === "payslips" && d.history.length) {
         $("#hist").innerHTML = both(

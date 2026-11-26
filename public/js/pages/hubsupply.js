@@ -2,7 +2,8 @@
 // The page is a short list of the hubs, each with what it holds in one line. Tap a hub to see its stock per product, the latest stock sent
 // to it (and take a mistake back), and the Send stock button.
 import { get, post, del } from "../api.js";
-import { $, $$, html, icon, toast, busy, drawer, confirmDialog, emptyState, badge } from "../ui.js";
+import { state } from "../app.js";
+import { $, $$, html, icon, toast, busy, drawer, confirmDialog, emptyState, badge, exportButtons } from "../ui.js";
 
 const rs = (c) => `Rs ${(Number(c) / 100).toLocaleString("en-LK", { maximumFractionDigits: 2 })}`;
 const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -37,7 +38,7 @@ export default {
 
     el.innerHTML = html`<div class="hsup-page">
       <div class="page-head">
-        <div><h1>Stock to hubs</h1><p>Send products from the office to a hub. The hub's coacher then gives the stock out to the sellers.</p></div>
+        <div><h1>Stock to hubs</h1><p>Send products from the office to a hub. The hub's coacher then gives the stock out to the sellers.</p></div><div class="actions">${exportButtons("hub-supply", { period: state.period })}</div>
       </div>
       ${noProducts ? html`<div class="card">${emptyState("No products yet", "Add your products first, then send them to the hubs.", "box", `<a class="btn primary" href="/products" data-link>Add products</a>`)}</div>`
         : html`${officeCard}<h2 class="section-title drill-h">Hubs</h2><div class="card hs-list"><ul role="list">${d.hubs.map(row)}</ul></div><p class="muted hs-hint">Press Send to send stock to a hub. Tap a hub's name to see what it holds.</p>`}</div>`;

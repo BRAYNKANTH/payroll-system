@@ -8,13 +8,13 @@ The site is at **www.wec.lk**. Everything below is done inside the app.
 
 ## 2. What is already set up
 - **6 hubs:** Jaffna 1, Jaffna 2, Jaffna 3, Chavakachcheri, Kilinochchi 1, Kilinochchi 2.
-- **17 managers and promoting managers**, each in their hub, with the reporting lines you gave. One coacher per hub.
+- **17 managers and promoting managers**, each in their hub, with the teams you gave (whose team each person counts in for commission). One coacher per hub.
 - **About 10 sellers under each manager** (2 supervisors and 8 distributors). These are **placeholders** named like "Issany D1" and "Issany S1".
 - **A login for every person.** The username starts with a number (for example `4821-issany`). Everyone starts with the password `demo1234`.
 
 ## 3. Make it yours (Employees and Users pages)
 1. **Employees:** open each placeholder, change the name, phone, bank details and join date. Remove the ones you do not need (mark them as left).
-2. Move a seller to another manager by changing **Reports to**.
+2. Move a seller to another manager by changing **Team of**.
 3. **Users:** change each person's password, or set a new one. Give each person only their own username and password.
 4. Add new people with **Add employee**; create their sign-in on the Users page.
 

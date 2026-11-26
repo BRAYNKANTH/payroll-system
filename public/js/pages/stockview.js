@@ -3,7 +3,7 @@
 // The actions that change stock stay on Give stock; this page is for reading.
 import { get, qs } from "../api.js";
 import { state, scopeHub, can } from "../app.js";
-import { $, html, icon, badge, dataTable, emptyState, initials, levelLabel } from "../ui.js";
+import { $, html, icon, badge, dataTable, emptyState, initials, levelLabel, exportButtons } from "../ui.js";
 import { mountRange, rangeText } from "../range.js";
 
 const dateText = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -22,7 +22,7 @@ export default {
     el.innerHTML = html`<div class="stockv-page">
       <div class="page-head">
         <div><h1>Hub stock</h1><p id="sv-sub">Stock sent by the office stays in the hub until you give it to sellers. Sellers keep what they have from day to day.</p></div>
-        <div class="actions">${link(isManager ? "/morning" : base + "/give", "Give stock to sellers", "plus", true)}${isManager ? "" : link(base + "/count", "Stock count", "sheet")}${isManager ? "" : link(base + "/sheet", "Hub count sheet", "store")}</div>
+        <div class="actions">${exportButtons("stock-given", { period: state.period, hub: scopeHub() })}${link(isManager ? "/morning" : base + "/give", "Give stock to sellers", "plus", true)}${isManager ? "" : link(base + "/count", "Stock count", "sheet")}${isManager ? "" : link(base + "/sheet", "Hub count sheet", "store")}</div>
       </div>
       <div id="sv-range" class="mb-4"></div>
       <div id="sv"><div class="loading-screen"><div class="spinner"></div></div></div></div>`.toString();

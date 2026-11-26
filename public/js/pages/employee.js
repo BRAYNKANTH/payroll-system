@@ -113,7 +113,7 @@ export default {
       overview: () => html`<div class="grid halves">
         <div class="card"><div class="card-head"><h2>Details</h2></div><div class="card-body"><dl class="kv">
           <dt>Employee ID</dt><dd class="mono">${s.employee_id}</dd><dt>Hub</dt><dd>${s.hub_name} (${s.hub})</dd>
-          <dt>Position</dt><dd>${levelLabel(s.staff_level)}</dd>${s.role === "guy" || s.upline_id ? html`<dt>Reports to</dt><dd>${s.upline_id ? html`<a href="/employees/${encodeURIComponent(s.upline_id)}" data-link>${s.upline_name}</a>` : "—"}</dd>
+          <dt>Position</dt><dd>${levelLabel(s.staff_level)}</dd>${s.role === "guy" || s.upline_id ? html`<dt>Team of</dt><dd>${s.upline_id ? html`<a href="/employees/${encodeURIComponent(s.upline_id)}" data-link>${s.upline_name}</a>` : "—"}</dd>
           ${s.manager_id && s.manager_id !== s.upline_id ? html`<dt>Payroll manager</dt><dd><a href="/employees/${encodeURIComponent(s.manager_id)}" data-link>${s.manager_name}</a></dd>` : ""}` : ""}
           ${p.direct_reports.length ? html`<dt>Direct reports</dt><dd>${p.direct_reports.map((r) => html`<div><a href="/employees/${encodeURIComponent(r.employee_id)}" data-link>${r.name}</a> <span class="faint">${levelLabel(r.staff_level)}</span></div>`)}</dd>` : ""}
           <dt>Phone</dt><dd>${s.phone || "—"}</dd><dt>NIC</dt><dd>${s.nic || "—"}</dd><dt>Joined</dt><dd>${s.join_date || "—"}</dd>${s.leave_date ? html`<dt>Left</dt><dd>${s.leave_date}${s.leave_reason ? html` <span class="faint">· ${s.leave_reason}</span>` : ""}</dd>` : ""}
@@ -138,7 +138,7 @@ export default {
         <div class="card mb-4"><div class="card-head"><h2>Net pay over time</h2></div><div class="card-body" id="chart"></div></div>
         <div class="card"><div class="card-body flush" id="hist"></div></div>` : html`<div class="card">${emptyState("No pay history yet", "Pay appears here after the first month is calculated.", "file")}</div>`,
       team: () => html`<div class="card"><div class="card-body flush">${dataTable({
-        rows: p.team, empty: "No guys report to this manager", emptyHint: "People appear here when they are set to report to this manager.", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),
+        rows: p.team, empty: "No one is in this manager's team", emptyHint: "People appear here when their Team of is set to this manager.", onRow: (g) => navigate(`/employees/${encodeURIComponent(g.employee_id)}`),
         card: (g) => html`<span class="mc-main"><b>${g.name}</b><span class="mc-sub">${[g.employee_id, g.staff_level ? levelLabel(g.staff_level) : "", can("view_pay") && g.target != null ? `Target ${money(g.target)}` : ""].filter(Boolean).join(" · ")}</span></span><span class="mc-end">${badge(g.status)}</span>`,
         cols: [{ key: "name", label: "Name", render: (g) => html`<b>${g.name}</b> <span class="faint">${g.employee_id}</span>` },
           ...(can("view_pay") ? [{ key: "basic_pay", label: "Basic", align: "r", render: (g) => money(g.basic_pay) }] : []),

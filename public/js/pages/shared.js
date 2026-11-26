@@ -13,7 +13,7 @@ export function managerGroupOf(person, byId) {
   while (!boss && cur?.upline_id && hops++ < 8) { cur = byId[cur.upline_id]; if (isManager(cur)) boss = cur; }
   if (boss) return { id: boss.employee_id, title: boss.name, sub: `${boss.staff_level === "promoting_manager" ? "Promoting manager" : "Manager"} · ${boss.employee_id}`, order: 0, name: boss.name, hub: boss.hub };
   const up = byId[person.upline_id];
-  if (up) return { id: "up:" + up.employee_id, title: `Reports to ${up.name}`, sub: up.employee_id, order: 1, name: up.name, hub: up.hub };
+  if (up) return { id: "up:" + up.employee_id, title: `Team of ${up.name}`, sub: up.employee_id, order: 1, name: up.name, hub: up.hub };
   return { id: "none", title: "No manager", sub: "", order: 2, name: "", hub: person.hub };
 }
 // People sorted the way a team reads: the manager first, then supervisors, then distributors, each by name.

@@ -8,7 +8,7 @@ people.csv   one row per manager or promoting manager:
                employee_id   a short unique id (PM01, M04 ...)
                name
                position      manager   or   promoting manager
-               reports_to    the employee_id of the person above them (empty = reports to the owner)
+               team_of       the employee_id of the person whose team this person counts in for commission (empty = nobody, the owner)
                hub           the hub code this person works in (it must be a code from hubs.csv)
                coacher       yes for the ONE person who heads that hub, otherwise no
                basic_pay     monthly basic salary
@@ -16,10 +16,10 @@ people.csv   one row per manager or promoting manager:
 
 How the rules work
   - A coacher is a manager or promoting manager with the coacher tag. There is one per hub. Pay follows the position.
-  - A promoting manager can report to another promoting manager (a ladder). A manager reports to a promoting manager or to nobody. A manager becomes a promoting manager when another manager comes under him, or one of his sellers builds a team: promote him first, then add the new manager under him.
+  - A promoting manager can be in another promoting manager's team (a ladder). A manager is in a promoting manager's team, or nobody's. A manager becomes a promoting manager when another manager comes under him, or one of his sellers builds a team: promote him first, then add the new manager under him.
   - Distributors and supervisors are NOT in this file. They are added later in the app, each under their manager or, if they are his own team, straight under a promoting manager.
   - A promoting manager is paid like a manager on his own team (weekly commission, own sales, rent and hub fee), plus 0.55% on the sales of each manager directly under him.
-  - Roshan (the owner) is not in the file. People who report to the owner have an empty reports_to.
+  - Roshan (the owner) is not in the file. People who are in nobody's team have an empty team_of.
 
 WHAT THE TOOL ADDS ON ITS OWN (so the client can start straight away)
   - About 10 sellers under every manager and promoting manager: 2 supervisors and 8 distributors, in that manager's hub. They are placeholders

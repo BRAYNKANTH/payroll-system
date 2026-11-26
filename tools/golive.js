@@ -51,7 +51,7 @@ function parseCsv(text) {
 const readTable = (file) => parseCsv(fs.readFileSync(file, "utf8"));
 const yes = (v) => /^(y|yes|true|1|x)$/i.test(String(v || "").trim());
 
-// Turns the two tables into hubs and people in the order they can be added (a person after the one they report to), and lists every problem
+// Turns the two tables into hubs and people in the order they can be added (a person after the one whose team they are in), and lists every problem
 // that can be seen from the files alone. The service rules are applied afterwards, by `check`.
 function prepare(hubRows, peopleRows) {
   const problems = [];
@@ -73,15 +73,15 @@ function prepare(hubRows, peopleRows) {
     if (!p.hub) problems.push(`${where}: no hub yet. Write the hub code this person belongs to`);
     else if (!codes.has(p.hub)) problems.push(`${where}: the hub "${p.hub}" is not in hubs.csv`);
     const pay = Number(String(p.basic_pay || "").replace(/,/g, ""));
-    people.push({ employee_id: p.employee_id, name: p.name, staff_level: level, upline_id: p.reports_to || undefined, hub: p.hub, is_coacher: yes(p.coacher), phone: p.phone || undefined,
+    people.push({ employee_id: p.employee_id, name: p.name, staff_level: level, upline_id: p.team_of || p.reports_to || undefined, hub: p.hub, is_coacher: yes(p.coacher), phone: p.phone || undefined,
       ...(level ? DEFAULT_PAY[level] : {}), ...(p.basic_pay && Number.isFinite(pay) ? { basic_pay: pay } : {}), _line: p._line });
   }
-  for (const p of people) if (p.upline_id && !ids.has(p.upline_id)) problems.push(`people.csv line ${p._line} (${p.name}): reports to ${p.upline_id}, who is not in the file`);
-  // one person above another, never in a circle: add people only after the person they report to
+  for (const p of people) if (p.upline_id && !ids.has(p.upline_id)) problems.push(`people.csv line ${p._line} (${p.name}): is in the team of ${p.upline_id}, who is not in the file`);
+  // one person above another, never in a circle: add people only after the person whose team they are in
   const ordered = [], done = new Set(), left = [...people];
   while (left.length) {
     const at = left.findIndex((p) => !p.upline_id || done.has(p.upline_id) || !ids.has(p.upline_id));
-    if (at < 0) { problems.push(`people.csv: these people report to each other in a circle: ${left.map((p) => p.name).join(", ")}`); break; }
+    if (at < 0) { problems.push(`people.csv: these people are in each other's teams, in a circle: ${left.map((p) => p.name).join(", ")}`); break; }
     const [p] = left.splice(at, 1); done.add(p.employee_id); ordered.push(p);
   }
   const heads = {};
@@ -94,7 +94,7 @@ function prepare(hubRows, peopleRows) {
 }
 
 // About `perManager` sellers under every manager and promoting manager (supervisors first among them, the rest distributors), in the manager's own
-// hub and reporting to him. Placeholder names (Issany D1, Issany S1 ...): the client renames them in the app.
+// hub and in his team. Placeholder names (Issany D1, Issany S1 ...): the client renames them in the app.
 function withSellers(plan, perManager = 10, supervisors = 2) {
   const sellers = [];
   for (const m of plan.people.filter((p) => p.staff_level === "manager" || p.staff_level === "promoting_manager")) {
@@ -119,7 +119,7 @@ function makeLogins(plan, { password = SHARED_PASSWORD, taken = [], random = (lo
     used.add(username.toLowerCase());
     const head = p.staff_level === "manager" || p.staff_level === "promoting_manager";
     out.push({ username, password, full_name: p.name, role: head ? "manager" : "staff", employee_id: p.employee_id, hub: p.hub,
-      position: p.staff_level, reports_to: p.upline_id || "" });
+      position: p.staff_level, team_of: p.upline_id || "" });
   }
   return out;
 }
@@ -134,7 +134,7 @@ async function createLogins(d, logins, actor = { username: "golive" }) {
   }
 }
 
-// Adds hubs and people through the real service, so every rule of the system applies (the ladder, the coacher tag, who may report to whom).
+// Adds hubs and people through the real service, so every rule of the system applies (the ladder, the coacher tag, whose team each may be in).
 async function load(d, plan, user = "golive") {
   for (const h of plan.hubs) await svc.createEntry(d, "hubs", { code: h.code, name: h.name, location: h.location, phone: h.phone, status: "active" }, user);
   for (const { _line, ...p } of plan.people) {
@@ -218,7 +218,7 @@ async function main() {
   if (r.wiped.length) console.log(`Cleared: ${r.wiped.join(", ")}.\nBefore: ${JSON.stringify(r.before)}`);
   if (logins.length) {
     const file = opt("logins-file") ? path.resolve(opt("logins-file")) : path.join(FOLDER, "logins.csv");
-    fs.writeFileSync(file, "\ufeff" + toCsv(logins, ["username", "password", "full_name", "position", "hub", "reports_to", "employee_id", "role"]));
+    fs.writeFileSync(file, "\ufeff" + toCsv(logins, ["username", "password", "full_name", "position", "hub", "team_of", "employee_id", "role"]));
     console.log(`The list of sign-ins was written to ${file}. It holds passwords: keep it private and never send it by chat or e-mail.`);
   }
   console.log(`Done. Now in the database: ${JSON.stringify(r.after)}\nKept logins: ${r.kept.map((u) => `${u.username} (${u.role})`).join(", ") || "none"}\nEvery new login has the password ${SHARED_PASSWORD}. Tell the client to change them (Users page).`);

@@ -35,7 +35,7 @@ test("distributor and supervisor are the same level; nobody reports to an equal 
   await assert.rejects(() => add(d, "M2", "manager", "M1"), /more senior/);
   await assert.rejects(() => add(d, "C1", "coacher", "M1"), /more senior/);
   await assert.rejects(() => add(d, "G1", "group_manager", "M1"), /must be one of/);
-  await assert.rejects(() => svc.updateEntry(d, "staff", "S1", { upline_id: "S1" }, "admin"), /themselves/);
+  await assert.rejects(() => svc.updateEntry(d, "staff", "S1", { upline_id: "S1" }, "admin"), /their own team/);
 });
 
 test("legacy role-only records still work and default their level", async () => {
