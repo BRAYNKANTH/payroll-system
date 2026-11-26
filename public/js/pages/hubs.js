@@ -41,11 +41,12 @@ export default {
       const st = stats[h.code] || {};
       return html`<article class="card hubc" aria-label="${h.name}">
         <header class="hubc-head"><span class="icon blue hubc-ic" aria-hidden="true">${icon("store")}</span>
-          <div class="hubc-title"><h2><a href="/hubs/${encodeURIComponent(h.code)}" data-link class="hub-link">${h.name}</a></h2><div class="sub">${h.code}<span class="hubc-addr">${h.location ? ` · ${h.location}` : ""}${h.phone ? ` · ${h.phone}` : ""}</span></div></div>${h.status !== "active" ? badge(h.status) : ""}</header>
+          <div class="hubc-title"><h2><a href="/hubs/${encodeURIComponent(h.code)}" data-link class="hub-link">${h.name}</a></h2><div class="sub">${h.code}<span class="hubc-addr">${h.location ? ` · ${h.location}` : ""}${h.phone ? ` · ${h.phone}` : ""}</span></div><div class="hubc-coach">${x.head ? `Coacher: ${x.head.name}` : "No coacher yet"}</div></div>${h.status !== "active" ? badge(h.status) : ""}</header>
         <div class="hubc-body">
           <div class="hubc-people"><b>${plural(x.active.length, "person", "people")}</b><span class="muted">${x.head ? `Coacher: ${x.head.name}` : "No coacher yet"}</span></div>
           <div class="muted hubc-levels">${x.levels.map(([v, n]) => `${n} ${levelLabel(v, n).toLowerCase()}`).join(" · ") || "Nobody yet"}${x.all.length > x.active.length ? ` · ${x.all.length - x.active.length} inactive` : ""}</div>
           <dl class="hubc-nums ${pay ? "" : "one"}">
+            <div class="hn-people"><dt>People</dt><dd class="num">${x.active.length}</dd></div>
             <div><dt>Sales</dt><dd class="num">${compact(x.sales)}</dd></div>
             ${pay ? html`<div><dt>Gross pay</dt><dd class="num">${compact(st.gross_pay || 0)}</dd></div>
 ` : ""}</dl>

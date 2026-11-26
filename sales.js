@@ -10,6 +10,7 @@
 const { withUser, getSettings, httpError } = require("./db");
 const engine = require("./engine");
 const svc = require("./service");
+const { teamOf } = require("./teams");
 
 const groupBy = (rows, key) => rows.reduce((m, r) => (m.get(r[key]) || m.set(r[key], []).get(r[key])).push(r) && m, new Map());
 
@@ -131,12 +132,13 @@ async function live(db, { period, hub, ids }, canPay) {
   const feed = [], people = [];
   for (const [id, list] of byPerson) {
     const s = staff.get(id);
+    const teamId = teamOf(s, staff).id;
     const sells = s.role === "guy"; // a manager's pay is built differently, so only sellers get pay figures
     let cumulative = 0, before = { gross: 0, food: 0, commission: 0 };
     list.forEach((r, i) => {
       cumulative += Number(r.business_amount);
       const entry = {
-        id: r.id, date: r.date, employee_id: id, name: r.name, hub: r.hub, staff_level: r.staff_level,
+        id: r.id, date: r.date, employee_id: id, name: r.name, hub: r.hub, staff_level: r.staff_level, team: teamId,
         business: Number(r.business_amount), settled: Number(r.settled_amount), personal: Number(r.personal_minus), notes: r.notes,
         self_entered: r.source === "portal", confirmed: r.source !== "portal" || !!r.confirmed_by, entered_by: r.created_by, entered_at: r.created_at,
         month_business: cumulative, target: Number(s.target) || 0, target_pct: s.target > 0 ? cumulative / s.target : null,
@@ -149,7 +151,7 @@ async function live(db, { period, hub, ids }, canPay) {
       feed.push(entry);
     });
     const person = {
-      employee_id: id, name: s.name, hub: s.hub, staff_level: s.staff_level, days: list.length, business: cumulative, target: Number(s.target) || 0,
+      employee_id: id, name: s.name, hub: s.hub, staff_level: s.staff_level, team: teamId, days: list.length, business: cumulative, target: Number(s.target) || 0,
       target_pct: s.target > 0 ? cumulative / s.target : null, unconfirmed: list.filter((r) => r.source === "portal" && !r.confirmed_by).length,
     };
     if (canPay && sells) {
@@ -160,7 +162,13 @@ async function live(db, { period, hub, ids }, canPay) {
   }
   feed.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id));
   people.sort((a, b) => b.business - a.business);
-  return { period, can_pay: !!canPay, unconfirmed: people.reduce((t, p) => t + p.unconfirmed, 0), feed, people };
+  // Everyone who sells in this hub (or in the manager's own team), even with no sales yet, so every team shows as a card.
+  const mine = ids ? new Set(ids) : null;
+  const roster = [...staff.values()]
+    .filter((s) => s.status === "active" && (s.role === "guy" || s.staff_level === "manager") && (!hub || s.hub === hub) && (!mine || mine.has(s.employee_id)))
+    .map((s) => ({ employee_id: s.employee_id, name: s.name, hub: s.hub, staff_level: s.staff_level, team: teamOf(s, staff) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { period, can_pay: !!canPay, unconfirmed: people.reduce((t, p) => t + p.unconfirmed, 0), feed, people, roster };
 }
 
 module.exports = { addSale, removeSale, confirm, live, today, addDays, rupees, myself, assertHandIn, DAYS_BACK };

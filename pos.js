@@ -11,6 +11,7 @@
 const { withUser, httpError } = require("./db");
 const svc = require("./service");
 const sales = require("./sales");
+const { teamOf, sellersWhere } = require("./teams");
 
 const NOW = "now_iso()";
 const MAX_QTY = 10_000;
@@ -137,23 +138,12 @@ async function endOfDay(db, user, body) {
 }
 
 // ---------------------------------------------------------------- the office: giving stock out
-const sellersWhere = "s.status = 'active' AND (s.role = 'guy' OR s.staff_level = 'manager')";
 
 async function checkSeller(db, id, scopeHub) {
   const s = await db.get(`SELECT s.employee_id, s.name, s.hub FROM staff s WHERE s.employee_id = ? AND ${sellersWhere}`, String(id || ""));
   if (!s) throw httpError(400, "Choose a seller who is active");
   if (scopeHub && s.hub !== scopeHub) throw httpError(403, "Outside your hub");
   return s;
-}
-
-// The team a seller belongs to: the manager above them (or themselves, for a manager); else whoever they report to.
-function teamOf(person, byId) {
-  const isManager = (x) => x && x.staff_level === "manager";
-  let boss = isManager(person) ? person : null, cur = person, hops = 0;
-  while (!boss && cur?.upline_id && hops++ < 8) { cur = byId.get(cur.upline_id); if (isManager(cur)) boss = cur; }
-  if (boss) return { id: boss.employee_id, title: boss.name, sub: `Manager · ${boss.employee_id}`, order: 0 };
-  const up = byId.get(person.upline_id);
-  return up ? { id: "up:" + up.employee_id, title: `Reports to ${up.name}`, sub: up.employee_id, order: 1 } : { id: "none", title: "No manager", sub: "", order: 2 };
 }
 
 // Who has what: every seller in the hub (or all hubs), with what they carry in, were given on `date`, and have sold.

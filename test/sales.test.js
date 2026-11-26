@@ -183,3 +183,19 @@ test("live view without pay rights shows the sales and nothing about pay; a hub 
   const h2 = await sales.live(d, { period: "2026-10", hub: "H2" }, false);
   assert.deepEqual(h2.feed.map((f) => f.employee_id), ["D9"]);
 });
+
+test("live view groups people into teams, and lists everyone in the hub even before they have sold", async () => {
+  const d = await setup();
+  await svc.createEntry(d, "daily", { date: "2026-10-05", employee_id: "D1", business_amount: 90000, settled_amount: 90000 }, "clerk");
+  const all = await sales.live(d, { period: "2026-10" }, false);
+  assert.ok(all.roster.length > 1, "the roster has people with no sales too");
+  assert.ok(all.roster.every((r) => r.team && typeof r.team.id === "string" && r.team.title));
+  const sold = all.people.find((p) => p.employee_id === "D1");
+  assert.equal(sold.team, all.roster.find((r) => r.employee_id === "D1").team.id, "a person and their roster entry agree on the team");
+  assert.equal(all.feed[0].team, sold.team);
+  const h2 = await sales.live(d, { period: "2026-10", hub: "H2" }, false);
+  assert.ok(h2.roster.length && h2.roster.every((r) => r.hub === "H2"), "a hub filter keeps the roster to that hub");
+  assert.ok(!h2.roster.some((r) => r.employee_id === "D1"));
+  const own = await sales.live(d, { period: "2026-10", ids: ["D1"] }, false);
+  assert.deepEqual(own.roster.map((r) => r.employee_id), ["D1"], "a manager sees only their own people");
+});
