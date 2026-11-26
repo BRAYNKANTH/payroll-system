@@ -2461,7 +2461,6 @@ details.fold + details.fold { margin-top: 8px; }
 .dash-min .page-head h1 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -.02em; line-height: 1.1; }
 .dash-min .page-head p { margin-top: 6px; color: var(--text-2); }
 .dash-min .month-card { border-radius: 18px; padding: 28px 32px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); background: var(--surface); }
-.dash-min .month-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--gold); border-radius: 18px 0 0 18px; }
 .dash-min .month-card h2 { font-size: 30px; }
 .dash-min .mc-right dt { font-size: 14px; color: var(--text-3); font-weight: 550; letter-spacing: .01em; }
 .dash-min .mc-right dd { font: 600 34px/1.1 var(--font-display); margin: 4px 0 0; font-variant-numeric: tabular-nums; }
@@ -2483,7 +2482,6 @@ details.fold + details.fold { margin-top: 8px; }
 .dash-min .hub-tile .hub-nums b { font: 600 22px var(--font-display); font-variant-numeric: tabular-nums; }
 @media (max-width: 860px) {
   .dash-min .month-card { padding: 22px 20px; }
-  .dash-min .month-card::before { width: 3px; }
   .dash-min .kpi { padding: 16px; }
   .dash-min .grid.kpis .kpi .value { font-size: 26px; }
   .dash-min .hub-tile { padding: 18px; }
@@ -2910,3 +2908,11 @@ body[data-filters="month"] #hub-filter { display: none !important; }
 .ho-form .btn.primary { min-height: 48px; justify-content: center; }
 .hint.pos { color: var(--success); }
 .hint.neg { color: var(--danger); }
+
+/* ===== World Entrepreneurs Company logo ===== */
+.brand-logo { width: 44px; height: 44px; border-radius: 50%; flex: none; display: block; object-fit: cover; box-shadow: 0 0 0 1px var(--border-strong), 0 3px 10px rgba(15, 23, 42, .18); background: #1b1917; }
+.brand-logo-lg { width: 76px; height: 76px; }
+.auth-brand .brand-logo { width: 44px; height: 44px; }
+:root[data-theme="dark"] .brand-logo { box-shadow: 0 0 0 2px rgba(255, 255, 255, .55), 0 3px 10px rgba(0, 0, 0, .5); }
+@media (prefers-contrast: more) { .brand-logo { box-shadow: 0 0 0 2px var(--text); } }
+.shell.rail .brand-logo { width: 34px; height: 34px; }

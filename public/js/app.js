@@ -214,7 +214,7 @@ function shell() {
   <a class="skip-link" href="#view">Skip to main content</a>
   <div class="shell ${isStaff() ? "" : "has-bnav"}">
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
-      <div class="brand"><div class="brand-mark" aria-hidden="true">₨</div><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
+      <div class="brand"><img class="brand-logo" src="/icons/logo-96.png" width="44" height="44" alt=""><div><div class="brand-name">${esc(state.settings.company_name || "Payroll")}</div><div class="brand-sub">Payroll & hub accounts</div></div></div>
       <button type="button" class="btn ghost icon sidebar-close" id="sidebar-close" aria-label="Close menu">${icon("x")}</button>
       <nav class="nav" id="nav" aria-label="Main">${menuItems().map((m) =>
         `${m.heading ? `<div class="nav-group">${esc(m.heading)}</div>` : ""}<a href="${m.path}" data-link data-nav="${m.path}" title="${esc(m.label)}">${icon(m.icon)}<span>${esc(m.label)}</span>${m.badge ? `<span class="count" id="pending-count" hidden></span>` : ""}</a>`).join("")}
