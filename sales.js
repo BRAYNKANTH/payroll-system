@@ -166,7 +166,7 @@ async function live(db, { period, hub, ids }, canPay) {
   const mine = ids ? new Set(ids) : null;
   const roster = [...staff.values()]
     .filter((s) => s.status === "active" && (s.role === "guy" || ["manager", "promoting_manager"].includes(s.staff_level)) && (!hub || s.hub === hub) && (!mine || mine.has(s.employee_id)))
-    .map((s) => ({ employee_id: s.employee_id, name: s.name, hub: s.hub, staff_level: s.staff_level, team: teamOf(s, staff) }))
+    .map((s) => ({ employee_id: s.employee_id, name: s.name, hub: s.hub, staff_level: s.staff_level, target: Number(s.target) || 0, team: teamOf(s, staff) }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return { period, can_pay: !!canPay, unconfirmed: people.reduce((t, p) => t + p.unconfirmed, 0), feed, people, roster };
 }

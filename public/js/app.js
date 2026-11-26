@@ -202,8 +202,8 @@ function periodPicker() {
 // The five things people open most, as a bar at the bottom of a phone. "More" opens the full menu.
 function bottomNav() {
   const all = menuItems();
-  const four = !state.user?.hub && can("read") ? ["/", "/hubs", "/employees", "/payroll"].map((p) => all.find((m) => m.path === p)).filter(Boolean) : all.slice(0, 4);
-  const items = four.map((m) => [m.path, ({ "/hubs": "Hubs", "/employees": "People" })[m.path] || m.short || m.label, m.icon]);
+  const four = !state.user?.hub && can("read") ? ["/", "/live", "/employees", "/payroll"].map((p) => all.find((m) => m.path === p)).filter(Boolean) : all.slice(0, 4);
+  const items = four.map((m) => [m.path, ({ "/live": "Sales", "/employees": "People" })[m.path] || m.short || m.label, m.icon]);
   return `<nav class="bottom-nav" id="bnav" aria-label="Main">${items.map(([path, label, ic]) =>
     `<a href="${path}" data-link data-nav="${path}">${icon(ic)}<span>${label}</span></a>`).join("")}
     <button type="button" id="bnav-more" aria-controls="sidebar" aria-haspopup="true">${icon("menu")}<span>More</span><span class="dot" id="more-dot" hidden></span></button></nav>`;

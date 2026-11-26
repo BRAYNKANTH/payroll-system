@@ -6,7 +6,7 @@ import { mountRange, monthsIn, singleMonth, today, rangeText } from "../range.js
 // The last day of the month a date is in.
 const lastDay = (iso) => { const d = new Date(iso.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(0); return d.toISOString().slice(0, 10); };
 
-let tab = "teams";
+let tab = null; // chosen on first draw: the office starts on the table of all employees, a hub head on the teams
 
 // Teams: a manager and everyone under them. The sales of the chosen dates are added up per team, so a hub reads as a few cards
 // (one per team) instead of one long list of people. A team opens to its members and its own sales by day.
@@ -71,46 +71,20 @@ function teamsView(pane, d, drawFeed) {
 const bar = (p) => (p == null ? html`<span class="faint">no target</span>` : html`<div class="row target-bar">
   <div class="progress ${p >= 1 ? "green" : p >= 0.7 ? "" : "amber"}"><span style="width:${Math.min(100, p * 100)}%"></span></div><span class="num text-sm">${pct(p, 0)}</span></div>`);
 
-// The office (no single hub chosen) does not get one merged feed of every hub: that mixes hubs together and confuses everyone.
-// It gets the hubs as a list, each with its sales for the chosen dates; a hub opens to its own live sales.
-async function hubList({ el }) {
-  document.body.dataset.filters = "month"; // every hub is listed, so the hub choice is not shown
-  el.innerHTML = html`<div class="live-page">
-    <div class="page-head"><div><h1>Live sales</h1><p>Sales are shown hub by hub. Tap a hub to see every sale in it, as it is entered.</p></div></div>
-    <div id="lv-range" class="mb-4"></div>
-    <div id="lv-hubs"><div class="loading-screen"><div class="spinner"></div></div></div></div>`.toString();
-  const lastOf = (p) => { const [y, m] = p.split("-").map(Number); return `${p}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
-  // "This month" follows the month chosen at the top, as on the Dashboard.
-  const effective = (r) => (r.preset === "month" ? { ...r, from: `${state.period}-01`, to: state.period === today().slice(0, 7) ? today() : lastOf(state.period) } : r);
-  let picker = null, seq = 0;
-  const load = async () => {
-    const mine = ++seq, r = picker.get();
-    const d = await get("/api/dashboard" + qs({ period: state.period, from: r.from, to: r.to }));
-    if (mine !== seq) return;
-    const hubs = d.by_hub;
-    $("#lv-hubs").innerHTML = hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales" data-link aria-label="${h.name}: open its live sales">
-        <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${h.staff} ${h.staff === 1 ? "person" : "people"}</span></span>
-        <span class="hs-flags"><b class="num">${h.hub_business ? money(h.hub_business) : "No sales"}</b>${h.unconfirmed ? badge("amber", `${h.unconfirmed} to confirm`) : ""}</span>
-        <span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div><p class="muted hs-hint">Tap a hub to see its sales feed and who has sold what.</p>`.toString()
-      : html`<div class="card">${emptyState("No hubs yet", "Add a hub first, then its sales appear here.", "store")}</div>`.toString();
-  };
-  picker = mountRange($("#lv-range"), { page: "live", fallback: "month", resolve: effective, onChange: () => load().catch((e) => toast(e.message, "warn")) });
-  await load();
-}
-
 export default {
   title: "Live sales",
   periodic: true,
   async render(ctx) {
-    if (can("read") && !state.user.hub && !state.routeHub) return hubList(ctx);
     const { el } = ctx;
+    const office = can("read") && !state.user.hub && !state.routeHub; // the office sees all employees at once, a hub head their own hub
+    if (!tab) tab = office ? "people" : "teams";
     el.innerHTML = html`<div class="live-page">
       <div class="page-head">
         <div><h1>Live sales</h1><p>Every sale as it is entered, and how far each person is from their target.<span id="pay-note"></span></p></div>
         <div class="actions"><span id="lv-export"></span><button class="btn" id="refresh">${icon("refresh")} Refresh</button><button class="btn primary" id="confirm-all" hidden>${icon("check")} Confirm all</button></div>
       </div>
       <div id="lv-range" class="mb-4"></div>
-      <div class="tabs" id="tabs">${[["teams", "Teams"], ["feed", "All sales"], ["people", "By person"]].map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
+      <div class="tabs" id="tabs">${[["people", office ? "All employees" : "By person"], ["teams", "Teams"], ["feed", "All sales"]].map(([k, l]) => html`<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`)}</div>
       <div id="pane"><div class="loading-screen"><div class="spinner"></div></div></div></div>`;
 
     if (new URLSearchParams(location.search).get("team")) tab = "teams"; // an address that names a team opens that team
@@ -139,6 +113,9 @@ export default {
         }
         people = [...by.values()].sort((a, b) => b.business - a.business);
       }
+      // Everyone who sells appears as a row, with nothing yet for those who have not sold in these dates.
+      const have = new Set(people.map((p) => p.employee_id));
+      for (const m of parts[0].roster || []) if (!have.has(m.employee_id)) people.push({ employee_id: m.employee_id, name: m.name, hub: m.hub, staff_level: m.staff_level, team: m.team?.id, days: 0, business: 0, target: monthToDate ? m.target || 0 : 0, target_pct: monthToDate && m.target > 0 ? 0 : null, unconfirmed: 0 });
       data = { roster: parts[0].roster, can_pay: parts[0].can_pay && monthToDate, feed_pay: parts[0].can_pay, monthToDate, feed, people, unconfirmed: feed.filter((f) => !f.confirmed).length, unconfirmedIds: feed.filter((f) => !f.confirmed).map((f) => f.id), range: r };
       // Excel and PDF only for those allowed to download reports (a manager is not: the buttons would only fail).
       $("#lv-export").innerHTML = can("read") && singleMonth(r) && r.from.endsWith("-01") ? exportButtons("live", { period: r.from.slice(0, 7), hub: scopeHub() }).toString() : "";
@@ -188,7 +165,7 @@ export default {
       else if (tab === "feed") drawFeed(pane, d.feed);
       else {
         pane.innerHTML = d.people.length ? html`<div class="card"><div class="card-body flush">${dataTable({
-          rows: d.people, footer: true, pageSize: 25, empty: "Nobody has sales in this period", emptyHint: "People show here once they have a sale in the dates you chose.",
+          rows: d.people, footer: true, pageSize: 25, empty: "No employees yet", emptyHint: "People show here when they are added to a hub.",
           onRow: (r) => navigate(`/employees/${encodeURIComponent(r.employee_id)}`), rowLabel: (r) => `Open ${r.name}`,
           // A ranking: who sold most, how far each is from the target (when that makes sense), and who has days waiting. Tap a person for the rest.
           card: (r) => html`<span class="mc-main"><b>${r.name}</b><span class="mc-sub">${levelLabel(r.staff_level)} · ${r.days} ${r.days === 1 ? "day" : "days"}</span>${d.monthToDate ? bar(r.target_pct) : ""}${r.unconfirmed ? badge("amber", `${r.unconfirmed} to confirm`) : ""}</span>

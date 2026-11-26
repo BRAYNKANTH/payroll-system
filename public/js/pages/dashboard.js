@@ -2,7 +2,6 @@ import { get, qs } from "../api.js";
 import { state, can } from "../app.js";
 import { $, html, icon, money, compact, badge, monthName, emptyState, raw, toast } from "../ui.js";
 import { mountRange, rangeText, today } from "../range.js";
-import { loadHubData, hubInfo, plural } from "../hubinfo.js";
 
 // The home page is deliberately small: what is waiting, one card per hub, and three figures for all hubs together.
 const kpi = (label, value, foot = "") => html`
@@ -66,31 +65,13 @@ export default {
     const lastDay = (p) => { const [y, m] = p.split("-").map(Number); return `${p}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`; };
     const effective = (r) => (r.preset === "month" ? { ...r, from: `${state.period}-01`, to: state.period === today().slice(0, 7) ? today() : lastDay(state.period) } : r);
 
-    let seq = 0, picker = null, hubData = null, todoStock, officeStock;
+    let seq = 0, picker = null, todoStock, officeStock;
     const load = async () => {
       const mine = ++seq, r = picker.get();
       const dashP = get("/api/dashboard" + qs({ period: state.period, hub: state.user.hub || "", from: r.from, to: r.to }));
-      // The hub list, people and review queue are fetched once, alongside the first dashboard answer; later date changes only ask for the numbers.
-      if (!hubData) hubData = await loadHubData(state.period, pay, dashP);
       const d = await dashP;
       if (mine !== seq) return;
       const k = d.kpis;
-      const info = hubInfo(hubData, state.period);
-      const stats = Object.fromEntries(d.by_hub.map((h) => [h.code, h]));
-      // One card per hub: people, sales for the chosen dates and (for those who may see pay) salaries. The whole card opens the hub.
-      // Each hub is its own card: a coloured band with the hub's code in a circle, the name and headcount centred, then the numbers side by side.
-      const ACCENTS = ["#1565d8", "#0b6fb8", "#3454c8", "#0e6f94", "#1d5fc9", "#4153c0"]; // all blues, so the home page keeps one light-blue look
-      const hubTile = (h, i) => {
-        const x = info[h.code], st = stats[h.code] || {};
-        return html`<a class="card hub-tile ht" style="--hc:${ACCENTS[i % ACCENTS.length]}" href="/hubs/${encodeURIComponent(h.code)}" data-link aria-label="${h.name}: open this hub">
-          <span class="ht-badge" aria-hidden="true">${h.code}</span>
-          <b class="ht-name">${h.name}</b>
-          <span class="ht-count">${plural(x.active.length, "person", "people")}${h.status !== "active" ? " · inactive" : ""}</span>
-          ${x.attention.length ? html`<span class="ht-chips">${x.attention.map(([tone, text]) => badge(tone, text))}</span>` : ""}
-          <span class="ht-nums ${pay ? "" : "one"}"><span class="ht-stat"><small>Sales</small><b class="num">${compact(st.hub_business || 0)}</b></span>
-            ${pay ? html`<span class="ht-stat"><small>Salaries</small><b class="num">${compact(st.to_bank || 0)}</b></span>` : ""}</span>
-          <span class="ht-open">Open hub</span></a>`;
-      };
       // A hub head's day starts with what is waiting for them: days sellers entered that need confirming, and sellers with no stock to sell.
       if (state.user.hub && can("enter_data")) {
         if (todoStock === undefined) todoStock = await get("/api/stock-issues").then((x) => x.hubs?.[0]?.without_stock ?? 0).catch(() => null);
@@ -103,16 +84,24 @@ export default {
         $("#dash-todo").innerHTML = officeTodo(d, k, officeStock || [], cashWaiting).toString();
       }
       $("#dash-sub").innerHTML = html`${monthName(d.period)} · ${badge(d.status)}`.toString();
-      const hubsSection = state.user.hub ? "" : html`<section aria-labelledby="hubs-h">
-          <div class="row between" style="margin-bottom:12px"><h2 id="hubs-h" class="section-title">Hubs</h2>
-            <a class="btn sm" href="/hubs" data-link>All hubs and people</a></div>
-          ${hubData.hubs.length ? html`<div class="grid three">${hubData.hubs.map(hubTile)}</div>`
-            : html`<div class="card">${emptyState("No hubs yet", "Add your first hub to start adding people.", "store", can("manage_hubs") ? `<a class="btn primary" href="/hubs" data-link>Add a hub</a>` : "")}</div>`}
+      // The office sees everyone together, best sellers first. Hubs matter only for the daily cash handover (see the To do list above).
+      let everyone = "";
+      if (!state.user.hub && can("read")) {
+        const live = await get("/api/live" + qs({ period: state.period })).catch(() => null);
+        const rows = live ? live.people.slice(0, 8) : [];
+        everyone = html`<section aria-labelledby="ppl-h">
+          <div class="row between" style="margin-bottom:12px"><h2 id="ppl-h" class="section-title">Best sellers this month</h2>
+            <a class="btn sm" href="/live" data-link>All employees</a></div>
+          ${rows.length ? html`<div class="card hs-list"><ul role="list">${rows.map((p) => html`<li><a class="hs-row" href="/employees/${encodeURIComponent(p.employee_id)}" data-link aria-label="${p.name}: open record">
+            <span class="hs-main"><b>${p.name}</b><span class="muted">${p.employee_id} · ${p.hub}${p.target_pct != null ? ` · ${Math.round(p.target_pct * 100)}% of target` : ""}</span></span>
+            <span class="hs-flags"><b class="num">${money(p.business)}</b>${p.unconfirmed ? badge("amber", `${p.unconfirmed} to confirm`) : ""}</span><span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div>`
+            : html`<div class="card">${emptyState("No sales yet this month", "Sales appear here as they are entered.", "chart")}</div>`}
         </section>`;
+      }
       $("#dash-body").innerHTML = html`
-        ${hubsSection}
-        <section class="${state.user.hub ? "" : "mt-5"}" aria-label="${state.user.hub ? "Your hub" : "All hubs together"}">
-          ${state.user.hub ? "" : html`<h2 class="section-title" style="margin-bottom:12px">All hubs together</h2>`}
+        ${everyone}
+        <section class="${state.user.hub ? "" : "mt-5"}" aria-label="${state.user.hub ? "Your hub" : "All employees together"}">
+          ${state.user.hub ? "" : html`<h2 class="section-title" style="margin-bottom:12px">All employees together</h2>`}
           <div class="grid kpis dash-kpis">
             ${kpi("Sales", money(k.hub_business), rangeText(r))}
             ${kpi("Cash short", money(k.settle_up), `Sales minus cash handed in, ${rangeText(r)}`)}
