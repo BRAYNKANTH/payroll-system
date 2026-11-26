@@ -22,7 +22,7 @@ export default {
       el.innerHTML = html`<div class="weekly-page">
         <div class="page-head"><div><h1>Weekly sheet</h1><p>Each manager's weeks, hub by hub. Pick a hub to see its managers and their weeks.</p></div>
           <div class="actions">${exportButtons("weekly", { period: state.period, hub: "" })}</div></div>
-        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/money" data-link aria-label="${h.name}: open its weekly sheet">
+        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/money" data-link>
           <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${h.managers} ${h.managers === 1 ? "manager" : "managers"}</span></span>
           <span class="hs-flags">${h.managers ? "" : badge("amber", "No sales")}</span>
           <span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div><p class="muted hs-hint">Tap a hub to see its managers and their weeks.</p>`

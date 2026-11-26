@@ -86,7 +86,7 @@ export default {
             : html`<div class="card mb-4"><div class="card-body muted">Nothing is waiting. Every handover has been checked.</div></div>`}</section>
         <h2 class="section-title drill-h">Each hub's handover</h2>
         ${dayBar()}
-        ${d.hubs.length ? html`<div class="card hs-list"><ul role="list">${d.hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/handover" data-link aria-label="${h.name}: open its handover">
+        ${d.hubs.length ? html`<div class="card hs-list"><ul role="list">${d.hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/handover" data-link>
           <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · sales Rs ${money(h.sales)}${h.handover ? ` · handed over Rs ${money(h.handover.amount)} (${share(h.handover.amount, h.sales)}%)` : h.sales ? ` · at least Rs ${money(h.min)} due` : " · no sales"}</span></span>
           <span class="hs-flags">${h.sales || h.handover ? statusBadge(h.handover) : badge("blue", "No sales")}</span><span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div>`
           : emptyState("No hubs yet", "Add a hub first.", "store")}</div>`.toString();

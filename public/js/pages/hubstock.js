@@ -27,7 +27,7 @@ export default {
       });
       el.innerHTML = html`<div class="hubsheet-page">
         <div class="page-head"><div><h1>Hub count sheet</h1><p>What each hub holds this month, checked against what was sent and given out. Pick a hub to see its products.</p></div></div>
-        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/stock/sheet" data-link aria-label="${h.name}: open its count sheet">
+        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/stock/sheet" data-link>
           <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${h.products ? `${h.products} ${h.products === 1 ? "product" : "products"} · Rs ${money(h.value)}` : "No count yet"}</span></span>
           <span class="hs-flags">${!h.products ? badge("amber", "Not counted") : h.off ? badge("red", `${h.off} ${h.off === 1 ? "product" : "products"} differ`) : badge("green", "Matches")}</span>
           <span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div><p class="muted hs-hint">"Differ" means the count is not what was sent minus what was given out. Tap a hub to see which products.</p>`

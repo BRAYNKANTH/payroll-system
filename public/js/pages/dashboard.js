@@ -92,7 +92,7 @@ export default {
         everyone = html`<section aria-labelledby="ppl-h">
           <div class="row between" style="margin-bottom:12px"><h2 id="ppl-h" class="section-title">Best sellers this month</h2>
             <a class="btn sm" href="/live" data-link>All employees</a></div>
-          ${rows.length ? html`<div class="card hs-list"><ul role="list">${rows.map((p) => html`<li><a class="hs-row" href="/employees/${encodeURIComponent(p.employee_id)}" data-link aria-label="${p.name}: open record">
+          ${rows.length ? html`<div class="card hs-list"><ul role="list">${rows.map((p) => html`<li><a class="hs-row" href="/employees/${encodeURIComponent(p.employee_id)}" data-link>
             <span class="hs-main"><b>${p.name}</b><span class="muted">${p.employee_id} · ${p.hub}${p.target_pct != null ? ` · ${Math.round(p.target_pct * 100)}% of target` : ""}</span></span>
             <span class="hs-flags"><b class="num">${money(p.business)}</b>${p.unconfirmed ? badge("amber", `${p.unconfirmed} to confirm`) : ""}</span><span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div>`
             : html`<div class="card">${emptyState("No sales yet this month", "Sales appear here as they are entered.", "chart")}</div>`}

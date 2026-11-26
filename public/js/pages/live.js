@@ -42,7 +42,7 @@ function teamsView(pane, d, drawFeed) {
         ${tile("Of target", pctOf == null ? "—" : pct(pctOf, 0), pctOf == null ? "Shown for this month" : "Team sales against team targets")}
       </div>
       <h2 class="section-title drill-h">People in this team</h2>
-      <div class="drill-grid mb-4">${team.members.map((m) => html`<a class="card drill-card" href="/employees/${encodeURIComponent(m.employee_id)}" data-link aria-label="${m.name}: open record">
+      <div class="drill-grid mb-4">${team.members.map((m) => html`<a class="card drill-card" href="/employees/${encodeURIComponent(m.employee_id)}" data-link>
         <span class="dc-top"><span class="avatar" aria-hidden="true">${initials(m.name)}</span><span class="dc-main"><b>${m.name}</b><span class="muted">${m.employee_id} · ${levelLabel(m.staff_level)}</span></span><span class="dc-sales"><b class="num">${money(m.business)}</b><span class="muted">${m.days} ${m.days === 1 ? "day" : "days"}</span></span></span>
         ${d.monthToDate && m.target ? html`<span class="dc-foot">${bar(m.target_pct)}</span>` : ""}${m.unconfirmed ? html`<span class="dc-foot">${badge("amber", `${m.unconfirmed} to confirm`)}</span>` : ""}</a>`)}</div>
       <h2 class="section-title drill-h">Sales by day</h2><div id="team-feed"></div>`.toString();
@@ -59,7 +59,7 @@ function teamsView(pane, d, drawFeed) {
     </div>
     <div class="drill-grid">${teams.map((t) => {
       const pctOf = d.monthToDate && t.target > 0 ? t.business / t.target : null, head = t.members.find((m) => m.staff_level === "manager" || m.staff_level === "promoting_manager");
-      return html`<a class="card drill-card" href="${path}?team=${encodeURIComponent(t.id)}" data-link aria-label="${t.title}: open this team">
+      return html`<a class="card drill-card" href="${path}?team=${encodeURIComponent(t.id)}" data-link>
         <span class="dc-top"><span class="avatar" aria-hidden="true">${initials(t.title)}</span><span class="dc-main"><b>${t.title}</b><span class="muted">${head ? "Manager" : t.sub} · ${peopleText(t.members.length)}</span></span><span class="dc-sales"><b class="num">${money(t.business)}</b></span></span>
         ${pctOf == null ? "" : html`<span class="dc-foot">${bar(pctOf)}</span>`}${t.unconfirmed ? html`<span class="dc-foot">${badge("amber", `${t.unconfirmed} to confirm`)}</span>` : ""}
         <span class="dc-open" aria-hidden="true">Open team</span></a>`;

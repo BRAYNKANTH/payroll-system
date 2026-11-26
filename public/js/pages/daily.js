@@ -66,7 +66,7 @@ async function hubList({ el }) {
     const hubs = state.hubs.filter((h) => h.status === "active");
     $("#dl-hubs").innerHTML = hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => {
       const mine = sellers.filter((s) => s.hub === h.code), n = mine.filter((s) => done.has(s.employee_id)).length, missing = mine.length - n;
-      return html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/daily" data-link aria-label="${h.name}: open its daily sheet">
+      return html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/daily" data-link>
         <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${n} of ${mine.length} entered</span></span>
         <span class="hs-flags">${!mine.length ? html`<span class="muted">No sellers</span>` : missing ? badge("amber", `${missing} to enter`) : badge("green", "Complete")}</span>
         <span class="hs-chev" aria-hidden="true"></span></a></li>`;
@@ -429,7 +429,7 @@ async function dayMode(ctx, guys, days, editable) {
       <h3 class="ro-h"><b>${t.title}</b> <span class="muted">${t.sub}</span></h3>
       <div class="card hs-list"><ul role="list">${t.people.sort(teamOrder).map((g) => {
         const e = byEmp[g.employee_id], short = e ? Number(e.settle_up_minus) : 0;
-        return html`<li><a class="hs-row" href="/employees/${encodeURIComponent(g.employee_id)}" data-link aria-label="${g.name}: open record">
+        return html`<li><a class="hs-row" href="/employees/${encodeURIComponent(g.employee_id)}" data-link>
           <span class="hs-main"><b>${g.name}</b><span class="muted">${g.employee_id} · ${levelName(g)}</span></span>
           <span class="hs-flags">${e ? html`<b class="num">${money(e.business_amount)}</b>${short > 0 ? badge("red", `short ${money(short)}`) : ""}` : badge("amber", "Not entered")}</span>
           <span class="hs-chev" aria-hidden="true"></span></a></li>`;

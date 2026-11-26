@@ -36,7 +36,7 @@ export async function mountSell(box, { onChanged = () => {} } = {}) {
           <b class="pos-big"><small>Rs</small>${n0(st.totals.amount)}</b>
           <span class="pos-cap">${st.totals.count} ${st.totals.count === 1 ? "sale" : "sales"} · ${st.totals.qty} ${st.totals.qty === 1 ? "piece" : "pieces"}</span>
         </div>
-        <button type="button" class="pos-due ${due ? "owe" : ""}" data-subtab="eod" aria-label="To hand in ${rs(due)}">
+        <button type="button" class="pos-due ${due ? "owe" : ""}" data-subtab="eod">
           <span class="pos-cap">To hand in</span>
           <b class="pos-big"><small>Rs</small>${n0(due)}</b>
         </button>

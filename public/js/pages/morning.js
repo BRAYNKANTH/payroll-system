@@ -39,7 +39,7 @@ export default {
     const holding = (g) => g.people.reduce((t, x) => t + (x.left || []).reduce((n, l) => n + l.qty, 0), 0);
     const teamCards = showTeams ? html`<div class="drill-grid">${teams.map((g) => {
       const none = g.people.filter((x) => !(x.left || []).length).length;
-      return html`<a class="card drill-card" href="${location.pathname}?team=${encodeURIComponent(g.id)}" data-link aria-label="${g.title}: open this team">
+      return html`<a class="card drill-card" href="${location.pathname}?team=${encodeURIComponent(g.id)}" data-link>
         <span class="dc-top"><span class="avatar" aria-hidden="true">${initials(g.title)}</span><span class="dc-main"><b>${g.title}</b><span class="muted">${g.sub}${g.sub ? " · " : ""}${g.people.length} ${g.people.length === 1 ? "seller" : "sellers"}</span></span>
           <span class="dc-sales"><b class="num">${given(g)}</b><span class="muted">given ${isToday ? "today" : "this day"}</span></span></span>
         <span class="dc-foot row" style="gap:8px;flex-wrap:wrap"><span class="muted">Holding ${holding(g)} pieces</span>${canGive && none ? html`<span class="badge amber">${none} without stock</span>` : ""}</span>

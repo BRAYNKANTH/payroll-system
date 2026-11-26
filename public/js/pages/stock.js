@@ -33,7 +33,7 @@ export default {
       });
       el.innerHTML = html`<div class="stockc-page">
         <div class="page-head"><div><h1>Stock count</h1><p>The month's stock count is taken hub by hub. Pick a hub to count its sellers or check the result.</p></div></div>
-        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/stock/count" data-link aria-label="${h.name}: open its stock count">
+        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/stock/count" data-link>
           <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${h.n} of ${h.total} sellers counted</span></span>
           <span class="hs-flags">${h.short > 0 ? badge("red", `Rs ${money(h.short)} short`) : h.n ? badge("green", "No shortfall") : badge("amber", "Not counted")}</span>
           <span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div><p class="muted hs-hint">Tap a hub to take or check its stock count.</p>`

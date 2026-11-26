@@ -3153,3 +3153,13 @@ a.card:hover, .hub-tile:hover, .m-card:hover { box-shadow: var(--shadow-md); bor
 .pos-bar .pos-sell { width: auto; flex: 0 0 auto; }
 .shell:not(.has-bnav) .pos-bar { bottom: 12px; }
 @media (max-width: 380px) { .pos-brow { grid-template-columns: minmax(0, 1fr) auto; } .pos-amt { grid-column: 2; text-align: right; } }
+
+/* ===== Audit fixes: contrast, tap size and readable small text ===== */
+.dc-open { color: var(--primary); font-size: 14px; }
+.pos-tabs button { height: 44px; font-size: 14px; }
+.pos-cap { font-size: 14px; }
+.row-tools .btn.sm { min-width: 44px; min-height: 44px; }
+.kpi .foot { font-size: 14px; }
+/* The hub chart settles quickly: long staggered entrances left cards half-faded when read by screen readers and tools. */
+html.fx #view.page-in .org-card { animation-duration: .3s; animation-delay: calc(var(--d, 0) * 40ms + 40ms); }
+html.fx .org-toggle { animation: none; }

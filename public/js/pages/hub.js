@@ -33,14 +33,14 @@ export default {
     const node = (s, depth = 0) => {
       const direct = kids[s.employee_id] || [], n = count(s.employee_id), own = sales[s.employee_id]?.business || 0;
       return html`<li class="org-item" data-id="${s.employee_id}" style="--d:${depth}">
-        <a href="/employees/${encodeURIComponent(s.employee_id)}" data-link class="org-card lv-${levelKey(s)}" aria-label="${s.name}, ${levelLabel(s.staff_level)}. Open record">
+        <a href="/employees/${encodeURIComponent(s.employee_id)}" data-link class="org-card lv-${levelKey(s)}">
           <span class="avatar org-av" aria-hidden="true">${initials(s.name)}</span>
           <b class="org-name">${s.name}</b>
           <span class="org-id">${s.employee_id}</span>
           <span class="org-role">${levelLabel(s.staff_level)}</span>
           <span class="org-sales"><b class="num">${compact(own)}</b> own${n ? html` · <b class="num">${compact(total(s.employee_id))}</b> team` : ""}</span>
         </a>
-        ${direct.length ? html`<button type="button" class="org-toggle" aria-expanded="true" aria-label="Show or hide the ${n} below ${s.name}"><span class="org-toggle-dot"><span class="org-chev" aria-hidden="true">▾</span> ${direct.length}</span></button>
+        ${direct.length ? html`<button type="button" class="org-toggle" aria-expanded="true" aria-label="${direct.length} direct, ${n} in all below ${s.name}: show or hide"><span class="org-toggle-dot"><span class="org-chev" aria-hidden="true">▾</span> ${direct.length}</span></button>
           <ul class="org-kids" style="--d:${depth + 1}">${direct.map((c) => node(c, depth + 1))}</ul>` : ""}
       </li>`;
     };

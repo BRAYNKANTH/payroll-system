@@ -23,7 +23,7 @@ export default {
     const low = (h) => h.stock.filter((x) => x.left > 0 && x.left <= LOW).length;
 
     // One line per hub.
-    const row = (h) => html`<li class="hs-send-row"><button type="button" class="hs-row" data-open="${h.code}" aria-label="${h.name}: see its stock">
+    const row = (h) => html`<li class="hs-send-row"><button type="button" class="hs-row" data-open="${h.code}">
       <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · ${n0(sum(h))} in the hub${h.status !== "active" ? " · inactive" : ""}</span>
         ${out(h) || low(h) ? html`<span class="hs-warn">${out(h) ? badge("red", `${out(h)} out`) : ""}${low(h) ? badge("amber", `${low(h)} low`) : ""}</span>` : ""}</span>
       <span class="hs-chev" aria-hidden="true"></span></button>
