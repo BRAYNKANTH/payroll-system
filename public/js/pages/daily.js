@@ -208,6 +208,7 @@ function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
   };
   const cell = (f, r, value) => html`<td><input data-f="${f.k}" data-money inputmode="decimal" autocomplete="off" value="${value}" ${editable ? "" : "disabled"}
     aria-label="${f.label}, ${r.label}${r.sub ? ", " + r.sub : ""}"></td>`;
+  const billHub = state.user.hub || state.routeHub || ""; // where "Products" opens the bill for this person and day
   const rowHtml = (r, i) => html`
         <tr data-i="${i}" data-standing="${r.standing || 0}" style="${r.muted ? "opacity:.6" : ""}">
           <th scope="row" class="name"><b>${r.label}</b><div class="faint text-sm fw-400">${r.sub}</div></th>
@@ -215,7 +216,7 @@ function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
           <td class="calc" data-calc aria-live="off"></td>
           ${cell(FIELDS[2], r, r.existing && r.existing.personal_minus ? amt(r.existing.personal_minus) : "")}
           <td><input class="text" data-f="notes" value="${r.existing?.notes || ""}" ${editable ? "" : "disabled"} aria-label="Notes, ${r.label}"></td>
-          <td>${r.existing?.updated_by ? html`<span class="badge plain" title="Edited by ${r.existing.updated_by}">edited</span>` : ""}</td>
+          <td>${editable && billHub && mode === "day" ? html`<a class="btn sm ghost" href="/hubs/${encodeURIComponent(billHub)}/sales/bill?seller=${encodeURIComponent(r.employee_id)}&date=${r.date}" data-link title="Enter what ${r.label} sold, product by product" aria-label="Enter ${r.label}'s sales by product">${icon("bag")} Products</a>` : ""}${r.existing?.updated_by ? html` <span class="badge plain" title="Edited by ${r.existing.updated_by}">edited</span>` : ""}</td>
         </tr>`;
   const tableOf = (idxs, foot, caption) => html`
     <div class="table-wrap" tabindex="-1"><table class="table sheet">

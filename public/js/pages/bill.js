@@ -25,6 +25,13 @@ export default {
     }
     const asHub = state.user.hub ? {} : { hub }; // the admin names the hub in each request
     const now = today(), oldest = addDays(now, -14);
+    // Opened from a row of the daily sheet (?seller=…&date=…): take the person and the day, then clear the address so the page keeps its own choices.
+    const qp = new URLSearchParams(location.search);
+    if (qp.get("seller")) {
+      pickedSeller = qp.get("seller");
+      if (/^\d{4}-\d{2}-\d{2}$/.test(qp.get("date") || "")) date = qp.get("date");
+      history.replaceState({}, "", location.pathname);
+    }
     if (!date || date > now || date < oldest) date = now;
     const st = await get("/api/hub-bill" + qs({ date, employee_id: pickedSeller || undefined, ...asHub }));
     if (pickedSeller && !st.seller) pickedSeller = "";
