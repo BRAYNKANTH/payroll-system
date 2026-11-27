@@ -92,8 +92,8 @@ test("a month of pay: manager shares, a retaining manager, and the promoting man
   // M2: Rs 140,000 is below Rs 250,000, so he is retaining: 10% of it instead of any weekly commission, plus own sales and the basic
   assert.equal(r.M2.detail.retaining, true);
   assert.equal(r.M2.gross_earnings, (14000 + 10000 + 27000) * 100);
-  // the week is worked out from his daily sheets, so the weekly rent and hub fee are taken as well
-  assert.equal(r.M2.net_pay, (14000 + 10000 + 27000 - 150 - 4000 - 500) * 100);
+  // the week is worked out from his daily sheets: the hub fee is taken, but a retaining manager pays no rent
+  assert.equal(r.M2.net_pay, (14000 + 10000 + 27000 - 150 - 500) * 100);
   assert.ok(r.M2.detail.earnings[0].label.startsWith("Retaining commission"));
 
   // PM1 and C1: basic salary plus 0.55% of everyone below (the managers' own sales included), paid to the bank

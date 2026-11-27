@@ -124,6 +124,12 @@ test("manager: below Rs 250,000 of sales he is retaining: basic + 10% of those s
   assert.equal(r.detail.retaining, true);
   assert.equal(r.gross_earnings, 1200000 + 500000 + 2700000); // 10% of Rs 120,000, own sales 25%, basic
   assert.ok(r.detail.earnings[0].label.startsWith("Retaining commission"));
+  // a retaining manager pays no rent (the hub fee, security and personal draw still count); a manager above the limit pays it
+  assert.deepEqual(r.detail.weeks.map((w) => w.rent), [0, 0]);
+  assert.equal(r.detail.deductions.find((x) => x.key === "rent").amount, 0);
+  assert.equal(r.total_deductions, 2 * (50000 + 100000 + 200000));
+  const normal = engine.computeManager({ staff: mgr, weekly: [week("2026-10-05", 10500000)], team: [], openingBalance: 0, companyReturnRate: 0, teamSales: 30000000, ownSales: 0, rules });
+  assert.deepEqual(normal.detail.weeks.map((w) => w.rent), [400000]);
   // exactly on the limit is not retaining
   const edge = engine.computeManager({ staff: mgr, weekly: [], team: [], openingBalance: 0, companyReturnRate: 0, teamSales: 25000000, ownSales: 0, rules });
   assert.equal(edge.detail.retaining, false);

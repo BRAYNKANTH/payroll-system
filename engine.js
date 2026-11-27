@@ -157,18 +157,20 @@ function managerCommissionRate(businessCents, settings, targetCents) {
 // seniorShare: for a promoting manager, the share of the managers' groups under him ({ base, rate }), on top of everything above.
 function computeManager({ staff, weekly, team = [], openingBalance, companyReturnRate, teamSales = 0, ownSales = 0, rules = {}, seniorShare = null }) {
   const { ownRate = 0, retainThreshold = 0, retainRate = 0 } = rules;
+  const monthSales = teamSales + ownSales;
+  const retaining = retainThreshold > 0 && monthSales < retainThreshold;
+  // A retaining manager pays no rent for the month (the branch sheets show Rs 0 rent every week for them); the hub fee and security still apply.
   const weeks = weekly.map((w) => {
     const profitShare = pct(w.business_total, w.profit_percent);
+    const rent = retaining ? 0 : w.rent;
     return {
       week_start: w.week_start, week_end: w.week_end, business_total: w.business_total,
       profit_percent: w.profit_percent, profit_share: profitShare,
-      rent: w.rent, hub_fee: w.hub_fee, security_cost: w.security_cost, personal_draw: w.personal_draw,
-      weekly_balance: profitShare - w.rent - w.hub_fee - w.security_cost - w.personal_draw,
+      rent, hub_fee: w.hub_fee, security_cost: w.security_cost, personal_draw: w.personal_draw,
+      weekly_balance: profitShare - rent - w.hub_fee - w.security_cost - w.personal_draw,
     };
   });
   const totalBusiness = sum(weeks, "business_total");
-  const monthSales = teamSales + ownSales;
-  const retaining = retainThreshold > 0 && monthSales < retainThreshold;
   const weeklyCommission = sum(weeks, "profit_share");
   const commission = retaining ? pct(monthSales, retainRate) : weeklyCommission;
   const ownCommission = pct(ownSales, ownRate);
@@ -211,7 +213,7 @@ function computeManager({ staff, weekly, team = [], openingBalance, companyRetur
       retaining, retain_threshold: retainThreshold,
       earnings: [
         retaining
-          ? { label: `Retaining commission (${fmtRate(retainRate)} of Rs ${fmt(monthSales)}: sales below Rs ${fmt(retainThreshold)})`, amount: commission }
+          ? { label: `Retaining commission (${fmtRate(retainRate)} of Rs ${fmt(monthSales)}: sales below Rs ${fmt(retainThreshold)}; no rent this month)`, amount: commission }
           : { label: "Weekly commission (each week's business × that week's profit share)", amount: commission },
         ...(ownSales ? [{ label: `Own sales commission (${fmtRate(ownRate)} of Rs ${fmt(ownSales)})`, amount: ownCommission }] : []),
         ...(seniorShare ? [{ label: `Share of your managers' groups (${fmtRate(seniorShare.rate)} of Rs ${fmt(shareBase)})`, amount: share }] : []),
