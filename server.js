@@ -13,6 +13,7 @@ const loans = require("./loans");
 const products = require("./products");
 const sales = require("./sales");
 const handover = require("./handover");
+const cashbook = require("./cashbook");
 const pos = require("./pos");
 const team = require("./team");
 const exporter = require("./export");
@@ -28,7 +29,7 @@ const BASE_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "
 const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "font-src 'self'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'";
 const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:; base-uri 'none'";
-const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "loans", "loan_repayments", "products", "product_receipts", "periods", "pay_period_summary", "cash_handovers", "audit_log"];
+const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "loans", "loan_repayments", "products", "product_receipts", "periods", "pay_period_summary", "cash_handovers", "cash_book_entries", "audit_log"];
 
 // Text answers are sent gzip-compressed when the browser accepts it (a 500 KB list becomes about 50 KB). Vercel and most hosts compress for us,
 // so this is skipped there; it matters on a plain Node host. Files that are already compressed (PDF, Excel, images, fonts) are left alone.
@@ -204,6 +205,10 @@ function createHandler(dbReady) {
     ["GET", /^\/api\/handovers$/, "read", ({ user, q }) => handover.list(database, { hub: user.hub || q.get("hub") || undefined, status: q.get("status") || undefined, limit: q.get("limit") })],
     ["POST", /^\/api\/handovers$/, "enter_data", ({ user, body }) => handover.submit(database, user, body)],
     ["POST", /^\/api\/handovers\/(\d+)\/verify$/, "approve_cash", ({ user, m, body }) => handover.verify(database, user, m[1], body)],
+    // The hub's cash book: cash in (from the daily sheets), what the coacher spent or paid out, the handovers, and the cash in hand.
+    ["GET", /^\/api\/cashbook$/, "read", ({ user, q }) => cashbook.summary(database, { period: q.get("period") || new Date().toISOString().slice(0, 7), hub: user.hub || q.get("hub") || undefined })],
+    ["POST", /^\/api\/cashbook$/, "enter_data", ({ user, body }) => cashbook.add(database, user, body)],
+    ["DELETE", /^\/api\/cashbook\/(\d+)$/, "enter_data", ({ user, m }) => cashbook.remove(database, user, m[1])],
     ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],
     ["DELETE", /^\/api\/me\/sales\/(\d{4}-\d{2}-\d{2})$/, "self", ({ user, m }) => sales.removeSale(database, user, m[1])],
     ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],

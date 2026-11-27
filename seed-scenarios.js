@@ -237,6 +237,18 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
   await bulk("stock_issues", ["date", "employee_id", "product_id", "qty", "note", "created_by", "created_at"], batch.issues);
   await bulk("sale_lines", ["date", "employee_id", "product_id", "qty", "unit_price", "amount", "created_by", "created_at"], batch.sales);
   await bulk("daily_log", ["date", "employee_id", "business_amount", "settled_amount", "personal_minus", "notes", "created_by", "created_at"], batch.daily);
+  // The cash book: what each hub's coacher spent or paid out of the cash, with a salary and some online money.
+  const book = [];
+  for (const code of hubs) {
+    working.forEach((day, i) => {
+      if (i % 3 === 1) book.push([code, day, "expense", "Tea and transport", (5 + Math.floor(rnd() * 10)) * 100, null, coacherOf[code], iso(day, 17, 30)]);
+      if (i % 7 === 5) book.push([code, day, "expense", "Office", 2000 + Math.floor(rnd() * 3) * 500, "Stationery and printing", coacherOf[code], iso(day, 17, 40)]);
+    });
+    book.push([code, working[10], "salary", "Salary", 20000 + Math.floor(rnd() * 5) * 1000, "Paid in cash", coacherOf[code], iso(working[10], 18, 0)]);
+    book.push([code, working[14], "online", "Bank transfer", 15000 + Math.floor(rnd() * 20) * 1000, "Customer paid the company directly", "admin", iso(working[14], 12, 0)]);
+    if (code === "J1") book.push([code, working[4], "other_in", "Float from the office", 10000, "Starting cash for the hub", "admin", iso(working[4], 9, 0)]);
+  }
+  await bulk("cash_book_entries", ["hub", "date", "kind", "category", "amount", "note", "created_by", "created_at"], book.map((r) => [r[0], r[1], r[2], r[3], r[4] * 100, r[5], r[6], r[7]]));
   await bulk("cash_handovers", ["hub", "date", "sales", "amount", "note", "status", "submitted_by", "submitted_at", "verified_by", "verified_at", "verify_note"], batch.handover);
 
   // Days that sellers with a login entered on their own phone. Older ones were confirmed by the office; some of the latest are waiting.

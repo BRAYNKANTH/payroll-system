@@ -347,6 +347,21 @@ CREATE TABLE IF NOT EXISTS cash_handovers (
 );
 CREATE INDEX IF NOT EXISTS cash_handovers_status ON cash_handovers (status, date);
 
+-- The hub's cash book: what its coacher spent, paid out or received besides the sellers' cash (which comes from the daily sheets).
+-- 'expense' and 'salary' take cash out; 'other_in' puts cash in; 'online' is money that reached the company by bank or card (not cash in hand).
+CREATE TABLE IF NOT EXISTS cash_book_entries (
+  id         bigserial PRIMARY KEY,
+  hub        text NOT NULL REFERENCES hubs(code),
+  date       text NOT NULL ${DATE_CHECK("date")},
+  kind       text NOT NULL CHECK (kind IN ('expense','salary','other_in','online')),
+  category   text,
+  amount     bigint NOT NULL CHECK (amount > 0),
+  note       text,
+  created_by text NOT NULL,
+  created_at text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS cash_book_hub_date ON cash_book_entries (hub, date);
+
 -- Stock the company receives (bought or made). The office holds everything received minus everything it sent to hubs.
 CREATE TABLE IF NOT EXISTS product_receipts (
   id         bigserial PRIMARY KEY,
@@ -524,6 +539,7 @@ const AUDITED = {
   stock_issues: { key: "id", period: "date" },
   hub_issues:  { key: "id", period: "date" },
   cash_handovers: { key: "id", period: null },
+  cash_book_entries: { key: "id", period: "date" },
   product_receipts: { key: "id", period: "date" },
   sale_lines:  { key: "id", period: "date" },
 };
