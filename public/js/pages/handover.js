@@ -110,9 +110,13 @@ export default {
       ${mine ? html`<div class="mb-4">${card({ ...mine, hub_name: h.name, sales_now: h.sales, short: mine.status !== "approved" && mine.amount < h.min })}</div>` : ""}
       ${editing ? html`<form id="ho-form" class="card ho-form mb-4" novalidate>
         <h2 class="section-title" style="margin:0 0 4px">${mine?.status === "rejected" ? "Correct and hand over again" : mine ? "Change the amount" : "Hand over the cash"}</h2>
-        <p class="muted" style="margin:0 0 12px">Type the amount you are handing to the office. It must be at least Rs ${money(h.min)}.</p>
+        <p class="muted" style="margin:0 0 12px">${mine && mine.status !== "rejected" ? "Change the amount if you handed over a different sum." : `The box is filled with the least you must hand over, Rs ${money(h.min)}. Change it if you hand over more.`}</p>
         <div class="field"><label for="ho-amt">Amount handed over (Rs) <span class="req">(required)</span></label>
-          <input class="input" id="ho-amt" name="amount" inputmode="decimal" autocomplete="off" value="${mine ? flat(mine.amount) : ""}" placeholder="${flat(h.min)}" aria-describedby="ho-hint"><span class="hint" id="ho-hint"></span></div>
+          <input class="input" id="ho-amt" name="amount" inputmode="decimal" autocomplete="off" value="${mine && mine.status !== "rejected" ? flat(mine.amount) : flat(h.min)}" placeholder="${flat(h.min)}" aria-describedby="ho-hint"><span class="hint" id="ho-hint"></span>
+          <span class="ho-quick" role="group" aria-label="Quick amounts">
+            <button type="button" class="btn sm" data-fill="${h.min}">${d.min_percent}% of sales · Rs ${money(h.min)}</button>
+            ${h.cash > h.min ? html`<button type="button" class="btn sm" data-fill="${h.cash}">All the sellers' cash · Rs ${money(h.cash)}</button>` : ""}
+          </span></div>
         <div class="field"><label for="ho-note">Note (optional)</label><input class="input" id="ho-note" name="note" maxlength="200" autocomplete="off" value="${mine?.note || ""}" placeholder="For example: handed to the office at 6 pm"></div>
         <button type="submit" class="btn primary" id="ho-submit">${icon("check")} ${mine ? "Hand over again" : "Hand over"}</button></form>` : ""}
       ${isCoach && final ? html`<div class="alert ok mb-4">${icon("check")}<div>This day's handover is approved. It cannot be changed.</div></div>` : ""}
@@ -134,6 +138,8 @@ export default {
         submit.disabled = !ok;
       };
       amt.addEventListener("input", check); check();
+      // One tap fills the box: the least that must be handed over, or all the cash the sellers handed in that day.
+      $$("[data-fill]", el).forEach((b) => (b.onclick = () => { amt.value = flat(Number(b.dataset.fill)); check(); amt.focus(); }));
       $("#ho-form").onsubmit = (e) => { e.preventDefault(); busy(submit, async () => {
         await post("/api/handovers", { date, amount: amt.value, note: $("#ho-note").value });
         toast("Handed over. The admin will check it"); this.render(ctx);

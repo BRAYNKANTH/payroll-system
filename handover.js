@@ -30,9 +30,11 @@ async function day(db, { date, hub }) {
   const hubs = await db.all(`SELECT code, name FROM hubs WHERE status = 'active'${hub ? " AND code = ?" : ""} ORDER BY code`, ...(hub ? [hub] : []));
   const sold = new Map((await db.all("SELECT s.hub, COALESCE(SUM(d.business_amount), 0) AS s FROM daily_log d JOIN staff s USING (employee_id) WHERE d.date = ? GROUP BY s.hub", d)).map((r) => [r.hub, Number(r.s)]));
   const done = new Map((await db.all("SELECT * FROM cash_handovers WHERE date = ?", d)).map((r) => [r.hub, num(r)]));
+  // The cash the sellers actually handed in that day (the daily sheet's "settled"), so the coacher can see what is in hand.
+  const cash = new Map((await db.all("SELECT s.hub, COALESCE(SUM(d.settled_amount), 0) AS c FROM daily_log d JOIN staff s USING (employee_id) WHERE d.date = ? GROUP BY s.hub", d)).map((r) => [r.hub, Number(r.c)]));
   return {
     date: d, min_percent: Math.round(MIN_SHARE * 100),
-    hubs: hubs.map((h) => { const s = sold.get(h.code) || 0; return { code: h.code, name: h.name, sales: s, min: minimum(s), handover: done.get(h.code) || null }; }),
+    hubs: hubs.map((h) => { const s = sold.get(h.code) || 0; return { code: h.code, name: h.name, sales: s, min: minimum(s), cash: cash.get(h.code) || 0, handover: done.get(h.code) || null }; }),
   };
 }
 

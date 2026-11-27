@@ -96,3 +96,13 @@ test("a handover is in the audit trail", async () => {
   const trail = await svc.auditSearch(d, { table: "cash_handovers", key: String(h.id) });
   assert.deepEqual(trail.map((t) => t.action).sort(), ["create", "update"]);
 });
+
+test("the day shows the cash the sellers handed in, so the coacher can fill the amount in one tap", async () => {
+  const d = await setup();
+  await svc.createEntry(d, "daily", { date: today(), employee_id: "D1", business_amount: 60000, settled_amount: 58000 }, "clerk");
+  await sell(d, today(), "D2", 40000);
+  const h = (await handover.day(d, { date: today(), hub: "H1" })).hubs[0];
+  assert.equal(h.sales, 10000000);
+  assert.equal(h.min, 9000000, "90% of the sales");
+  assert.equal(h.cash, 9800000, "58,000 + 40,000 handed in");
+});

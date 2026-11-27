@@ -3179,3 +3179,7 @@ html.fx .org-toggle { animation: none; }
 .flag-legend dl { margin: 8px 0 4px; display: grid; gap: 10px; }
 .flag-legend dt { font-weight: 650; }
 .flag-legend dd { margin: 2px 0 0; color: var(--text-2); }
+
+/* ===== Cash handover: one-tap amounts ===== */
+.ho-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ho-quick .btn { min-height: 44px; }
