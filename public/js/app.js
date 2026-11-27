@@ -86,6 +86,10 @@ const permOfPath = (path) => NAV.find((n) => n.path === path)?.perm;
 const sectionOf = (path) => Object.entries(SECTIONS).find(([, sec]) => sec.tabs.some(([p]) => p === path))?.[0] || null;
 const hubEntry = () => (state.user?.hub ? `/hubs/${state.user.hub}` : "/hubs");
 
+// Anyone linked to an employee who can sell (a distributor, supervisor, manager or promoting manager, a coacher included) has the till: Sell.
+const SELLING = ["distributor", "supervisor", "manager", "promoting_manager"];
+export const canSell = () => !!state.user?.employee_id && SELLING.includes(state.user.staff_level);
+
 // What the side menu shows for this person.
 function menuItems() {
   const u = state.user, out = [];
@@ -105,6 +109,7 @@ function menuItems() {
     return out;
   }
   if (can("read")) { // a coacher
+    if (canSell()) add("/me", "Sell", "bag"); // a coacher who can sell has the till first
     add("/", "Home", "dashboard");
     add(hubEntry(), "My hub", "store");
     if (can("stock")) add("/stock-overview", "Stock", "warehouse");
@@ -114,7 +119,7 @@ function menuItems() {
     add("/team", "Team sales", "chart", { short: "Team" });
     if (can("stock")) { add("/stock-overview", "Hub stock", "warehouse", { short: "Stock" }); add("/morning", "Give stock", "box", { short: "Give" }); }
   }
-  if (u.employee_id && (can("read") || !can("read_team"))) add("/me", "My page", "user");
+  if (u.employee_id && (can("read") || !can("read_team")) && !(can("read") && canSell())) add("/me", "My page", "user");
   return out;
 }
 // Which side-menu item lights up for a page.
@@ -204,7 +209,12 @@ function periodPicker() {
 // The five things people open most, as a bar at the bottom of a phone. "More" opens the full menu.
 function bottomNav() {
   const all = menuItems();
-  const four = !state.user?.hub && can("read") ? ["/", "/live", "/employees", "/payroll"].map((p) => all.find((m) => m.path === p)).filter(Boolean) : all.slice(0, 4);
+  let four = !state.user?.hub && can("read") ? ["/", "/live", "/employees", "/payroll"].map((p) => all.find((m) => m.path === p)).filter(Boolean) : all.slice(0, 4);
+  // Whoever can sell has Sell as the first of the four tabs (the admin gives up People, which stays in More).
+  if (canSell() && can("read") && !four.some((m) => m.path === "/me")) {
+    const till = all.find((m) => m.path === "/me") || { path: "/me", label: "Sell", icon: "bag" };
+    four = [{ ...till, label: "Sell", icon: "bag" }, ...four.filter((m) => m.path !== "/employees")].slice(0, 4);
+  }
   const items = four.map((m) => [m.path, ({ "/live": "Sales", "/employees": "People" })[m.path] || m.short || m.label, m.icon]);
   return `<nav class="bottom-nav" id="bnav" aria-label="Main">${items.map(([path, label, ic]) =>
     `<a href="${path}" data-link data-nav="${path}">${icon(ic)}<span>${label}</span></a>`).join("")}
