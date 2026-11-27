@@ -16,18 +16,21 @@ export default {
   async render(ctx) {
     const { el } = ctx;
     const hub = state.user.hub || state.routeHub || "";
-    if (!state.user.hub) {
-      el.innerHTML = html`<div class="page-head"><div><h1>Enter a bill</h1><p>Only the hub's coacher enters a seller's bill. The office looks at the sales on the Live sales and Daily sheet pages.</p></div></div>
-        <div class="card">${emptyState("Coachers only", "Sign in as the hub's coacher to enter a bill.", "tag")}</div>`.toString();
+    if (!hub) { // the admin picks a hub first
+      const hubs = state.hubs.filter((h) => h.status === "active");
+      el.innerHTML = html`<div class="page-head"><div><h1>Enter a bill</h1><p>Enter or correct a seller's day by product. Pick a hub.</p></div></div>
+        ${hubs.length ? html`<div class="card hs-list"><ul role="list">${hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/bill" data-link><span class="hs-main"><b>${h.name}</b><span class="muted">${h.code}</span></span><span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div>`
+          : html`<div class="card">${emptyState("No hubs yet", "Add a hub first.", "store")}</div>`}`.toString();
       return;
     }
+    const asHub = state.user.hub ? {} : { hub }; // the admin names the hub in each request
     const now = today(), oldest = addDays(now, -14);
     if (!date || date > now || date < oldest) date = now;
-    const st = await get("/api/hub-bill" + qs({ date, employee_id: pickedSeller || undefined }));
+    const st = await get("/api/hub-bill" + qs({ date, employee_id: pickedSeller || undefined, ...asHub }));
     if (pickedSeller && !st.seller) pickedSeller = "";
     const bill = new Map(); // product id -> pieces on the bill being made
 
-    el.innerHTML = html`<div class="page-head"><div><h1>Enter a bill</h1><p>For a seller who cannot use the till. Pick the day and the seller, tap + for each product they sold, then save. The stock, the weekly stock sheet and the product reports follow.</p></div>
+    el.innerHTML = html`<div class="page-head"><div><h1>Enter a bill</h1><p>For a seller who cannot use the till, entered by the hub's coacher or the admin. Pick the day and the seller, tap + for each product they sold, then save. The stock, the weekly stock sheet and the product reports follow.</p></div>
         <div class="actions"><a class="btn" href="/hubs/${encodeURIComponent(hub)}/sales/daily" data-link>Daily sheet</a></div></div>
       <div class="card mb-4"><div class="card-body"><div class="form-grid">
         <div class="field"><label for="bl-date">Day</label><input class="input" type="date" id="bl-date" value="${date}" min="${oldest}" max="${now}"></div>
@@ -107,7 +110,7 @@ export default {
       }));
       $("#bl-save", box)?.addEventListener("click", (e) => busy(e.currentTarget, async () => {
         const items = [...bill].map(([product_id, q]) => ({ product_id, qty: q }));
-        const body = { employee_id: pickedSeller, date, items, settled_amount: $("#bl-set", box).value };
+        const body = { employee_id: pickedSeller, date, items, settled_amount: $("#bl-set", box).value, ...asHub };
         let res;
         try { res = await post("/api/hub-bill", body); }
         catch (err) {

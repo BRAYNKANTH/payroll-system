@@ -217,10 +217,10 @@ function createHandler(dbReady) {
     // The hub's weekly stock sheet: opening, what was received each weekday, sold, expected and counted (Monday to Sunday).
     ["GET", /^\/api\/week-stock$/, ["read", "stock"], ({ user, q }) => weekstock.week(database, { hub: user.hub || q.get("hub") || "", date: q.get("date") || undefined })],
     ["POST", /^\/api\/week-stock\/counts$/, "stock", ({ user, body }) => weekstock.saveCounts(database, (coacherOnly(user), user), body)],
-    // The hub's coacher enters a seller's bill by product (for a seller who cannot use the till); the stock and product reports then follow.
-    ["GET", /^\/api\/hub-bill$/, "enter_data", ({ user, q }) => pos.billState(database, (coacherOnly(user), user), { employee_id: q.get("employee_id") || undefined, date: q.get("date") || undefined })],
-    ["POST", /^\/api\/hub-bill$/, "enter_data", ({ user, body }) => pos.billFor(database, (coacherOnly(user), user), body)],
-    ["DELETE", /^\/api\/hub-bill\/lines\/(\d+)$/, "enter_data", ({ user, m }) => pos.removeBillLine(database, (coacherOnly(user), user), m[1])],
+    // The coacher (own hub) or the admin (any hub) enters a seller's bill by product, for a seller who cannot use the till; the stock and product reports follow.
+    ["GET", /^\/api\/hub-bill$/, "enter_data", ({ user, q }) => pos.billState(database, user, { employee_id: q.get("employee_id") || undefined, date: q.get("date") || undefined, hub: q.get("hub") || undefined })],
+    ["POST", /^\/api\/hub-bill$/, "enter_data", ({ user, body }) => pos.billFor(database, user, body)],
+    ["DELETE", /^\/api\/hub-bill\/lines\/(\d+)$/, "enter_data", ({ user, m }) => pos.removeBillLine(database, user, m[1])],
     ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],
     ["DELETE", /^\/api\/me\/sales\/(\d{4}-\d{2}-\d{2})$/, "self", ({ user, m }) => sales.removeSale(database, user, m[1])],
     ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],

@@ -46,14 +46,16 @@ test("the coacher enters a seller's bill: the lines, the day's business and the 
   assert.equal(Number((await day(d, "D1", date)).settled_amount), 440000, "the cash handed in stays as it was");
 });
 
-test("a bill is refused when it is more than the seller holds, for another hub, or by the office", async () => {
+test("a bill is refused when it is more than the seller holds, or for another hub", async () => {
   const { d, shine, vim } = await setup();
   const date = yesterday();
   await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D1", date, items: [{ product_id: shine, qty: 4 }, { product_id: vim, qty: 7 }] }), /only has 6 Vim left/);
   assert.equal((await d.get("SELECT COUNT(*) AS n FROM sale_lines")).n, 0, "all or nothing");
   await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D2", date, items: [{ product_id: shine, qty: 1 }] }), /no Shine left\. Give them stock first/);
   await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D9", date, items: [{ product_id: shine, qty: 1 }] }), /Outside your hub/);
-  await assert.rejects(() => pos.billFor(d, ADMIN, { employee_id: "D1", date, items: [{ product_id: shine, qty: 1 }] }), /coacher/);
+  await assert.rejects(() => pos.billFor(d, ADMIN, { employee_id: "D1", date, items: [{ product_id: shine, qty: 1 }] }), /Choose the hub/, "the admin names the hub");
+  await assert.rejects(() => pos.billFor(d, ADMIN, { employee_id: "D1", hub: "H2", date, items: [{ product_id: shine, qty: 1 }] }), /Outside your hub|Choose a seller/, "the seller must be in the hub named");
+  await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D1", hub: "H2", date, items: [{ product_id: shine, qty: 1 }] }), /Outside your hub/, "a coacher cannot name another hub");
   await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D1", date, items: [] }), /at least one/);
   await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D1", date: sales.addDays(sales.today(), 1), items: [{ product_id: shine, qty: 1 }] }), /not happened/);
   await assert.rejects(() => pos.billFor(d, COACH, { employee_id: "D1", date: sales.addDays(sales.today(), -30), items: [{ product_id: shine, qty: 1 }] }), /14 days back/);
@@ -118,4 +120,18 @@ test("a person's standing daily deduction is filled in as the personal minus on 
   // a person with none is unaffected
   await svc.createEntry(d, "daily", { date: d1, employee_id: "D2", business_amount: 5000, settled_amount: 5000 }, "clerk");
   assert.equal(Number((await day(d, "D2", d1)).personal_minus), 0);
+});
+
+test("the admin can enter and correct a seller's bill too, for any hub", async () => {
+  const { d, shine } = await setup();
+  const date = yesterday();
+  const r = await pos.billFor(d, ADMIN, { employee_id: "D1", hub: "H1", date, items: [{ product_id: shine, qty: 3 }], settled_amount: "2,550" });
+  assert.equal(r.amount, 255000);
+  assert.equal((await day(d, "D1", date)).created_by, "admin");
+  const st = await pos.billState(d, ADMIN, { hub: "H1", date, employee_id: "D1" });
+  assert.equal(st.lines.length, 1);
+  const after = await pos.removeBillLine(d, ADMIN, r.lines[0].id);
+  assert.equal(after.lines.length, 0);
+  assert.equal(await day(d, "D1", date), undefined);
+  await assert.rejects(() => pos.billState(d, ADMIN, { date }), /Choose the hub/);
 });

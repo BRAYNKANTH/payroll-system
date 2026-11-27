@@ -89,8 +89,9 @@ export default {
     staffAll = staff;
     const guys = staff.filter((s) => (s.role === "guy" || s.staff_level === "manager" || s.staff_level === "promoting_manager") && s.status === "active"); // everyone who sells, managers included
     // The days are entered by the hub's own coacher. The office (no hub of its own) looks at them and checks them, but does not enter them.
-    const office = !state.user.hub;
-    const editable = can("enter_data") && !locked && !office;
+    // The hub's coacher and the admin may both enter and correct the sellers' daily sales (the admin inside a hub, or from its sheet).
+    const office = false;
+    const editable = can("enter_data") && !locked;
     const days = daysIn(state.period);
     const today = new Date().toISOString().slice(0, 10);
     if (!currentDate || !currentDate.startsWith(state.period)) currentDate = days.includes(today) ? today : days[0];
@@ -100,7 +101,7 @@ export default {
       <div class="page-head">
         <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for everyone who sells: distributors, supervisors and managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions" data-filters-host>
-          ${state.user.hub && editable ? html`<a class="btn" href="/hubs/${encodeURIComponent(state.user.hub)}/sales/bill" data-link>${icon("bag")} Enter a bill</a>` : ""}
+          ${(state.user.hub || state.routeHub) && editable ? html`<a class="btn" href="/hubs/${encodeURIComponent(state.user.hub || state.routeHub)}/sales/bill" data-link>${icon("bag")} Enter a bill</a>` : ""}
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button><button data-mode="range" class="${mode === "range" ? "on" : ""}">Date range</button></div>
           <button type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="dl-more">${icon("download")} Import / export</button>
           <div class="filter-panel" id="dl-more">
