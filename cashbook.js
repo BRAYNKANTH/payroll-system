@@ -1,7 +1,8 @@
 // The hub's cash book: what cash the hub holds, day by day.
 //
 //   Cash in      what the sellers handed in on the daily sheets (automatic), plus any "other cash in" the coacher records
-//   Cash out     what the coacher records as spent (expenses, salaries paid from the cash) plus the cash handed over to the office
+//   Cash out     what the coacher records as spent (expenses, salaries paid from the cash), the money people take (the daily sheet's "Personal
+//                minus", automatic: it is cash the person took, and it comes off their pay) plus the cash handed over to the office
 //                (the day's handover; a handover the office sent back does not count)
 //   Online       money that reached the company by bank or card instead of cash. It is shown, but it is not cash in hand.
 //   Cash in hand opening + cash in - cash out, carried from day to day and from month to month
@@ -27,32 +28,33 @@ async function before(db, hub, date) {
   const otherIn = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_book_entries WHERE hub = ? AND kind = 'other_in' AND date < ?", hub, date);
   const spent = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_book_entries WHERE hub = ? AND kind IN ('expense','salary','draw') AND date < ?", hub, date);
   const handed = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_handovers WHERE hub = ? AND status <> 'rejected' AND date < ?", hub, date);
-  return cashIn + otherIn - spent - handed;
+  const taken = await one("SELECT COALESCE(SUM(d.personal_minus), 0) AS n FROM daily_log d JOIN staff s USING (employee_id) WHERE s.hub = ? AND d.date < ?", hub, date);
+  return cashIn + otherIn - spent - handed - taken;
 }
 
 // One hub, one month: the day-by-day book, the entries, and how each team's cash stands.
 async function book(db, hub, period) {
   const [from, to] = monthBounds(period);
   const opening = await before(db, hub, from);
-  const settled = new Map((await db.all(`SELECT d.date, SUM(d.settled_amount) AS cash, SUM(d.business_amount) AS sales FROM daily_log d JOIN staff s USING (employee_id)
-    WHERE s.hub = ? AND d.date >= ? AND d.date < ? GROUP BY d.date`, hub, from, to)).map((r) => [r.date, { cash: Number(r.cash), sales: Number(r.sales) }]));
+  const settled = new Map((await db.all(`SELECT d.date, SUM(d.settled_amount) AS cash, SUM(d.business_amount) AS sales, SUM(d.personal_minus) AS taken FROM daily_log d JOIN staff s USING (employee_id)
+    WHERE s.hub = ? AND d.date >= ? AND d.date < ? GROUP BY d.date`, hub, from, to)).map((r) => [r.date, { cash: Number(r.cash), sales: Number(r.sales), taken: Number(r.taken) }]));
   const entries = (await db.all(`SELECT e.*, s.name AS employee_name FROM cash_book_entries e LEFT JOIN staff s ON s.employee_id = e.employee_id
     WHERE e.hub = ? AND e.date >= ? AND e.date < ? ORDER BY e.date, e.id`, hub, from, to)).map(num);
   const handovers = new Map((await db.all("SELECT date, amount, status FROM cash_handovers WHERE hub = ? AND date >= ? AND date < ?", hub, from, to)).map((r) => [r.date, { amount: Number(r.amount), status: r.status }]));
   const days = [];
   let run = opening;
-  const tot = { cash_in: 0, other_in: 0, expenses: 0, salaries: 0, draws: 0, handed: 0, online: 0, sales: 0 };
+  const tot = { cash_in: 0, other_in: 0, expenses: 0, salaries: 0, draws: 0, personal: 0, handed: 0, online: 0, sales: 0 };
   for (let n = 1; n <= daysIn(period); n++) {
     const date = `${period}-${String(n).padStart(2, "0")}`;
-    const sold = settled.get(date) || { cash: 0, sales: 0 };
+    const sold = settled.get(date) || { cash: 0, sales: 0, taken: 0 };
     const mine = entries.filter((e) => e.date === date);
     const sum = (k) => mine.filter((e) => e.kind === k).reduce((t, e) => t + e.amount, 0);
     const h = handovers.get(date);
-    const row = { date, sales: sold.sales, cash_in: sold.cash, other_in: sum("other_in"), expenses: sum("expense"), salaries: sum("salary"), draws: sum("draw"), online: sum("online"),
+    const row = { date, sales: sold.sales, cash_in: sold.cash, other_in: sum("other_in"), expenses: sum("expense"), salaries: sum("salary"), draws: sum("draw"), personal: sold.taken, online: sum("online"),
       handed: h && h.status !== "rejected" ? h.amount : 0, handover_status: h ? h.status : null };
-    if (!(row.sales || row.cash_in || row.other_in || row.expenses || row.salaries || row.draws || row.online || h)) continue; // a day with nothing in it is not listed
+    if (!(row.sales || row.cash_in || row.other_in || row.expenses || row.salaries || row.draws || row.personal || row.online || h)) continue; // a day with nothing in it is not listed
     row.opening = run;
-    run = run + row.cash_in + row.other_in - row.expenses - row.salaries - row.draws - row.handed;
+    run = run + row.cash_in + row.other_in - row.expenses - row.salaries - row.draws - row.personal - row.handed;
     row.closing = run;
     for (const k of Object.keys(tot)) tot[k] += row[k] || 0;
     days.push(row);

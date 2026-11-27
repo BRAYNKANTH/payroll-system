@@ -175,3 +175,24 @@ test("clearance, advertising and cards can be entered by the hub as expenses", a
   const e = await cashbook.add(d, COACH, { kind: "expense", category: "Advertising", amount: 850 });
   assert.equal(e.category, "Advertising");
 });
+
+test("the money people take (the daily sheet's personal minus) comes out of the hub's cash automatically", async () => {
+  const d = await setup();
+  const t = today(), y = sales.addDays(t, -1);
+  await svc.createEntry(d, "daily", { date: y, employee_id: "D1", business_amount: 50000, settled_amount: 50000, personal_minus: 2000 }, "clerk");
+  await svc.createEntry(d, "daily", { date: t, employee_id: "D2", business_amount: 40000, settled_amount: 40000, personal_minus: 1500 }, "clerk");
+  await svc.createEntry(d, "daily", { date: t, employee_id: "D9", business_amount: 10000, settled_amount: 10000, personal_minus: 700 }, "clerk"); // another hub
+  const b = await cashbook.book(d, "H1", t.slice(0, 7));
+  assert.equal(day(b, t).personal, 150000);
+  assert.equal(day(b, t).closing, day(b, t).opening + 4000000 - 150000, "today: cash from sellers less what D2 took");
+  if (y.slice(0, 7) === t.slice(0, 7)) {
+    assert.equal(day(b, y).personal, 200000);
+    assert.equal(day(b, y).closing, 5000000 - 200000);
+    assert.equal(day(b, t).opening, 4800000, "yesterday's cash carries, after what D1 took");
+    assert.equal(b.totals.personal, 350000);
+  }
+  // changing the daily sheet changes the cash book: nothing is entered twice
+  const row = await d.get("SELECT id FROM daily_log WHERE employee_id = 'D2' AND date = ?", t);
+  await d.run("UPDATE daily_log SET personal_minus = 0 WHERE id = ?", row.id);
+  assert.equal(day(await cashbook.book(d, "H1", t.slice(0, 7)), t).personal, 0);
+});

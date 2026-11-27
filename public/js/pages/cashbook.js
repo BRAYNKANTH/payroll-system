@@ -41,14 +41,14 @@ export default {
     }
 
     const b = await get("/api/cashbook" + qs({ period, hub }));
-    const t = b.totals, out = t.expenses + t.salaries + t.draws + t.handed;
+    const t = b.totals, out = t.expenses + t.salaries + t.draws + t.personal + t.handed;
     const canWrite = can("enter_data");
-    el.innerHTML = html`<div class="page-head"><div><h1>Cash book — ${b.name}</h1><p>${monthName(period)}. The cash the hub holds, day by day. Sellers' cash comes from the daily sheet; you add what was spent or paid out. Cash handed to the office comes from the Cash handover page.</p></div>
+    el.innerHTML = html`<div class="page-head"><div><h1>Cash book — ${b.name}</h1><p>${monthName(period)}. The cash the hub holds, day by day. Sellers' cash comes from the daily sheet, and so does the money people take (their Personal minus, also taken off their pay); you add what was spent or paid out. Cash handed to the office comes from the Cash handover page.</p></div>
         <div class="actions">${canWrite ? html`<button class="btn primary" id="cb-add">${icon("plus")} Add entry</button>` : ""}</div></div>
       <div class="grid kpis hub-kpis mb-4">
         <div class="card kpi"><div class="label">Cash at the start</div><div class="value"><small>Rs</small>${money(b.opening)}</div><div class="foot">${b.opening < 0 ? "Below zero: check the earlier entries" : "Brought from before"}</div></div>
         <div class="card kpi"><div class="label">Cash in</div><div class="value"><small>Rs</small>${money(t.cash_in + t.other_in)}</div><div class="foot">Sellers Rs ${money(t.cash_in)}${t.other_in ? ` · other Rs ${money(t.other_in)}` : ""}</div></div>
-        <div class="card kpi"><div class="label">Cash out</div><div class="value"><small>Rs</small>${money(out)}</div><div class="foot">Spent Rs ${money(t.expenses)} · salaries Rs ${money(t.salaries)}${t.draws ? ` · managers took Rs ${money(t.draws)}` : ""} · to the office Rs ${money(t.handed)}</div></div>
+        <div class="card kpi"><div class="label">Cash out</div><div class="value"><small>Rs</small>${money(out)}</div><div class="foot">Spent Rs ${money(t.expenses)} · salaries Rs ${money(t.salaries)}${t.draws ? ` · managers took Rs ${money(t.draws)}` : ""}${t.personal ? ` · people took Rs ${money(t.personal)}` : ""} · to the office Rs ${money(t.handed)}</div></div>
         <div class="card kpi"><div class="label">Cash in hand</div><div class="value ${b.closing < 0 ? "neg" : ""}"><small>Rs</small>${money(b.closing)}</div><div class="foot">${b.closing < 0 ? "Below zero: more went out than came in" : "Start + in − out"}${t.online ? ` · online Rs ${money(t.online)} (not cash)` : ""}</div></div>
       </div>
 
@@ -80,6 +80,7 @@ export default {
         { key: "expenses", label: "Spent", align: "r", render: (r) => (r.expenses ? money(r.expenses) : "—"), total: () => money(t.expenses) },
         { key: "salaries", label: "Salaries paid", align: "r", render: (r) => (r.salaries ? money(r.salaries) : "—"), total: () => money(t.salaries) },
         { key: "draws", label: "Managers took", align: "r", render: (r) => (r.draws ? money(r.draws) : "—"), total: () => money(t.draws) },
+        { key: "personal", label: "People took", align: "r", render: (r) => (r.personal ? money(r.personal) : "—"), total: () => money(t.personal) },
         { key: "handed", label: "To the office", align: "r", render: (r) => html`${r.handed ? money(r.handed) : r.handover_status === "rejected" ? "—" : "—"} ${handedBadge(r)}`, total: () => money(t.handed) },
         { key: "closing", label: "Cash in hand", align: "r", render: (r) => html`<b class="${r.closing < 0 ? "neg" : ""}">${money(r.closing)}</b>`, total: () => money(b.closing) },
       ],
