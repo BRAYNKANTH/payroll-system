@@ -140,6 +140,8 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_per_day bigint NOT NULL DEFAULT 
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS food_min_days integer NOT NULL DEFAULT 0;
 -- No longer used: managers now earn by the weekly target rule and promoting managers by senior_commission_rate (settings). Kept so old databases still open.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS team_commission_rate double precision NOT NULL DEFAULT 0;
+-- A standing daily deduction (the sheets' "morning minus"): filled in as the personal minus on each new day a person works, in cents.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS daily_minus bigint NOT NULL DEFAULT 0;
 
 -- Existing databases were created before the hub-manager role: widen the role check (the name is Postgres's default).
 -- The accountant, clerk and viewer roles no longer exist: their logins are removed (the admin does that work), then the check is narrowed.

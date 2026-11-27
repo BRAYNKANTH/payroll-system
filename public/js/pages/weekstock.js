@@ -3,7 +3,7 @@
 // The coacher counts at the end of the week and types the counts. The office, with no hub chosen, picks a hub first.
 import { get, post, qs } from "../api.js";
 import { state, can } from "../app.js";
-import { $, $$, html, icon, money, toast, busy, emptyState, dateLabel } from "../ui.js";
+import { exportButtons, $, $$, html, icon, money, toast, busy, emptyState, dateLabel } from "../ui.js";
 import { today, addDays } from "../range.js";
 
 let weekDate = null;
@@ -36,7 +36,7 @@ export default {
         <input type="date" class="input" id="ws-date" aria-label="Any day in the week" value="${weekDate}" max="${now}" style="width:160px">
         <button type="button" class="btn icon" id="ws-next" aria-label="Next week" ${addDays(w.week_start, 7) > now ? "disabled" : ""}>${icon("right")}</button>
         <b style="font-size:17px">${dateLabel(w.week_start)} – ${dateLabel(end)}</b></div></div>`;
-    el.innerHTML = html`<div class="page-head"><div><h1>Weekly stock — ${w.name}</h1><p>Opening stock plus what the office sent each day, less what was sold, is what should be here. Count what is here and type it in: the difference is what is missing, at the selling price.</p></div></div>
+    el.innerHTML = html`<div class="page-head"><div><h1>Weekly stock — ${w.name}</h1><p>Opening stock plus what the office sent each day, less what was sold, is what should be here. Count what is here and type it in: the difference is what is missing, at the selling price.</p></div><div class="actions">${exportButtons("week-stock", { hub, date: w.week_start })}</div></div>
       ${bar}
       <div class="grid kpis hub-kpis mb-4">
         <div class="card kpi"><div class="label">Sold this week</div><div class="value"><small>Rs</small>${money(w.totals.sold_value)}</div><div class="foot">${w.totals.sold} pieces</div></div>

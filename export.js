@@ -346,6 +346,46 @@ const REPORTS = {
   },
 };
 
+// ---- the hub's cash book, the weekly stock sheet and the salary payments (the pages that had no Excel or PDF button)
+Object.assign(REPORTS, {
+  // One hub, one month, day by day. With no hub: every hub's cash in hand for the month.
+  cashbook: async ({ db, period, hub }) => {
+    const cb = require("./cashbook");
+    if (!hub) {
+      const all = await cb.summary(db, { period });
+      return { title: "Cash book", subtitle: `${monthLabel(period)} - every hub`,
+        columns: [C("Hub"), C("Cash at the start", "money"), C("Cash from sellers", "money", true), C("Other cash in", "money", true), C("Spent", "money", true), C("Salaries paid", "money", true), C("Managers took", "money", true), C("People took", "money", true), C("To the office", "money", true), C("Cash in hand", "money", true)],
+        rows: all.hubs.map((h) => [h.name, h.opening, h.totals.cash_in, h.totals.other_in, h.totals.expenses, h.totals.salaries, h.totals.draws, h.totals.personal, h.totals.handed, h.closing]) };
+    }
+    const b = await cb.summary(db, { period, hub });
+    return { title: `Cash book - ${b.name}`, subtitle: `${monthLabel(period)} - cash at the start Rs ${fmtMoney(b.opening)}`,
+      columns: [C("Day"), C("Sales", "money", true), C("Cash from sellers", "money", true), C("Other cash in", "money", true), C("Spent", "money", true), C("Salaries paid", "money", true), C("Managers took", "money", true), C("People took", "money", true), C("To the office", "money", true), C("Handover"), C("Cash in hand", "money")],
+      rows: b.days.map((d) => [d.date, d.sales, d.cash_in, d.other_in, d.expenses, d.salaries, d.draws, d.personal, d.handed, d.handover_status || "", d.closing]) };
+  },
+  // Who handed in less than they sold in the month (the shortage is already taken off their pay).
+  "gave-less": async ({ db, period, hub }) => {
+    const cb = require("./cashbook");
+    const hubs = hub ? [{ code: hub }] : await db.all("SELECT code FROM hubs WHERE status = 'active' ORDER BY code");
+    const rows = [];
+    for (const h of hubs) { const b = await cb.summary(db, { period, hub: h.code }); for (const x of b.gave_less) rows.push([b.name, x.employee_id, x.name, x.team, x.sales, x.cash, x.short]); }
+    return { title: "Handed in less than sold", subtitle: `${monthLabel(period)} - expected cash is 90% of the sales; the shortage is taken off each person's pay`,
+      columns: [C("Hub"), C("Employee"), C("Name"), C("Team"), C("Sold", "money", true), C("Handed in", "money", true), C("Short", "money", true)], rows };
+  },
+  // The weekly stock sheet of one hub for the week the date is in.
+  "week-stock": async ({ db, hub, q }) => {
+    const cols = (extra = []) => [C("Product"), C("Selling price", "money"), C("Opening", "int"), ...["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => C(d, "int")), C("Total", "int"), C("Sold", "int", true), C("Should be here", "int"), C("Counted", "int"), C("Missing", "int"), C("Value", "money", true)];
+    if (!hub) return { title: "Weekly stock", subtitle: "Choose a hub to download its weekly stock sheet", columns: cols(), rows: [] };
+    const w = await require("./weekstock").week(db, { hub, date: q.get("date") || undefined });
+    return { title: `Weekly stock - ${w.name}`, subtitle: `${w.week_start} to ${w.week_end}`,
+      columns: [C("Product"), C("Selling price", "money"), C("Opening", "int"), ...["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => C(d, "int")), C("Total", "int"), C("Sold", "int", true), C("Should be here", "int"), C("Counted", "int"), C("Missing", "int"), C("Value", "money", true)],
+      rows: w.products.map((p) => [p.name, p.price, p.opening, ...p.received, p.total, p.sold, p.expected, p.counted === null ? "" : p.counted, p.missing === null ? "" : p.missing, p.missing_value === null ? "" : p.missing_value]) };
+  },
+  // What was paid against each month's salary.
+  "salary-payments": async ({ db, period, hub }) => ({ title: "Salary payments", subtitle: monthLabel(period), pay: true,
+    columns: [C("Paid on"), C("Employee"), C("Name"), C("Hub"), C("How"), C("Amount", "money", true), C("Note"), C("Recorded by")],
+    rows: (await require("./payments").list(db, period, hub || undefined)).map((p) => [p.paid_on, p.employee_id, p.name, p.hub, p.method, p.amount, p.note || "", p.created_by]) }),
+});
+
 const TYPES = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pdf: "application/pdf",
@@ -363,7 +403,7 @@ async function make(db, name, format, { can, hub, period, query, username }) {
   if (model.perm && !can(model.perm)) throw httpError(403, "Your role cannot see this report");
   const company = (await getSettings(db)).company_name || "";
   const data = format === "xlsx" ? renderXlsx(model) : renderPdf(model, { company });
-  const slug = name + (/^(daily|live|weekly|register|commission|stock|branch-stock|hub-summary|product-profit|sales|handovers|stock-given|hub-supply)$/.test(name) ? "-" + per : "");
+  const slug = name + (/^(daily|live|weekly|register|commission|stock|branch-stock|hub-summary|product-profit|sales|handovers|stock-given|hub-supply|cashbook|gave-less|salary-payments)$/.test(name) ? "-" + per : "");
   return { data, type: TYPES[format], filename: `${slug}.${format}` };
 }
 

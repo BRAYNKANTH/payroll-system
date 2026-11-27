@@ -39,6 +39,8 @@ export async function employeeForm(existing, onSaved) {
         <span class="hint" id="ef-level-hint" hidden></span></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Team of</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Whose team this person counts in. Their sales count in this person's pay and commission. It is not office management, and it can be someone from another hub.</span></div>
+      <div class="field"><label for="ef-dminus">Daily minus (Rs)</label><input class="input" id="ef-dminus" name="daily_minus" inputmode="decimal" value="${e.daily_minus ? e.daily_minus / 100 : ""}" placeholder="0">
+        <span class="hint">Taken off every day this person works (for example the morning minus). It is filled in on the daily sheet and the till; change it for one day when needed.</span></div>
       <div class="field" id="ef-coach-wrap" hidden><span class="lbl">Hub coacher</span>
         <label style="display:flex;gap:10px;align-items:center;font-weight:400"><input type="checkbox" name="is_coacher" ${e.is_coacher ? "checked" : ""}> This person is the coacher of their hub</label>
         <span class="hint" id="ef-coach-hint">The coacher heads the hub: its people, stock, daily sheets and the cash handover. One coacher per hub. Their pay and their place in the chart do not change.</span></div>
@@ -188,7 +190,7 @@ export async function employeeForm(existing, onSaved) {
       pay_scheme: tiered ? "tiered" : "over_target",
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
       food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
-      opening_balance: v.opening_balance || 0,
+      opening_balance: v.opening_balance || 0, daily_minus: v.daily_minus || 0,
       is_coacher: v.staff_level === "coacher" || (["manager", "promoting_manager"].includes(v.staff_level) && !!f.is_coacher?.checked),
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };

@@ -15,7 +15,7 @@
     "seed:neon": "node --env-file=.env --no-warnings seed.js",
     "golive": "node --env-file=.env --no-warnings tools/golive.js",
     "start:neon": "node --env-file=.env --no-warnings server.js",
-    "test": "node --test --no-warnings test/engine.test.js test/service.test.js test/auth.test.js test/chain.test.js test/rules.test.js test/portal.test.js test/portal-senior.test.js test/person-report.test.js test/pos.test.js test/scope.test.js test/loans.test.js test/products.test.js test/sales.test.js test/pay-access.test.js test/export.test.js test/audit.test.js test/speed.test.js test/handover.test.js test/cashbook.test.js test/payslip-words.test.js test/payments.test.js test/weekstock.test.js",
+    "test": "node --test --no-warnings test/engine.test.js test/service.test.js test/auth.test.js test/chain.test.js test/rules.test.js test/portal.test.js test/portal-senior.test.js test/person-report.test.js test/pos.test.js test/scope.test.js test/loans.test.js test/products.test.js test/sales.test.js test/pay-access.test.js test/export.test.js test/audit.test.js test/speed.test.js test/handover.test.js test/cashbook.test.js test/payslip-words.test.js test/payments.test.js test/weekstock.test.js test/hub-bill.test.js test/export-new-pages.test.js",
     "audit:mobile": "node tools/audit-mobile.js"
   },
   "engines": {

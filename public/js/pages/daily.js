@@ -100,6 +100,7 @@ export default {
       <div class="page-head">
         <div><h1>Daily sheet</h1><p class="hide-sm">Business and settlements for everyone who sells: distributors, supervisors and managers. Settle-up minus is calculated automatically.</p></div>
         <div class="actions" data-filters-host>
+          ${state.user.hub && editable ? html`<a class="btn" href="/hubs/${encodeURIComponent(state.user.hub)}/sales/bill" data-link>${icon("bag")} Enter a bill</a>` : ""}
           <div class="seg"><button data-mode="day" class="${mode === "day" ? "on" : ""}">By day</button><button data-mode="emp" class="${mode === "emp" ? "on" : ""}">By employee</button><button data-mode="range" class="${mode === "range" ? "on" : ""}">Date range</button></div>
           <button type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="dl-more">${icon("download")} Import / export</button>
           <div class="filter-panel" id="dl-more">
@@ -207,7 +208,7 @@ function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
   const cell = (f, r, value) => html`<td><input data-f="${f.k}" data-money inputmode="decimal" autocomplete="off" value="${value}" ${editable ? "" : "disabled"}
     aria-label="${f.label}, ${r.label}${r.sub ? ", " + r.sub : ""}"></td>`;
   const rowHtml = (r, i) => html`
-        <tr data-i="${i}" style="${r.muted ? "opacity:.6" : ""}">
+        <tr data-i="${i}" data-standing="${r.standing || 0}" style="${r.muted ? "opacity:.6" : ""}">
           <th scope="row" class="name"><b>${r.label}</b><div class="faint text-sm fw-400">${r.sub}</div></th>
           ${FIELDS.slice(0, 2).map((f) => cell(f, r, r.existing ? amt(r.existing[f.k]) : ""))}
           <td class="calc" data-calc aria-live="off"></td>
@@ -324,6 +325,18 @@ function buildGrid({ rows, editable, firstCol, onSaved, groups = null }) {
     }
     grid.dataset.dirty = dirty;
   };
+  // A person's standing daily deduction (their "daily minus") is filled in as the personal minus when the business is typed on a new day.
+  // Type another amount, or 0, to change it for the day: once the box has been touched it is left alone.
+  grid.addEventListener("input", (e) => {
+    const tr = e.target.closest("tr[data-i]");
+    if (!tr) return;
+    const pm = tr.querySelector('[data-f="personal_minus"]');
+    if (e.target === pm) { pm.dataset.touched = "1"; return; }
+    if (e.target.dataset.f !== "business_amount" || !editable) return;
+    const standing = Number(tr.dataset.standing) || 0, r = rows[tr.dataset.i];
+    if (standing > 0 && !r.existing && !pm.dataset.touched && pm.value.trim() === "" && e.target.value.trim() !== "") pm.value = amt(standing);
+    if (standing > 0 && !r.existing && !pm.dataset.touched && e.target.value.trim() === "") pm.value = "";
+  });
   grid.addEventListener("input", refresh);
   sheetKeys(grid);
   moneyInputs(grid);
@@ -438,7 +451,7 @@ async function dayMode(ctx, guys, days, editable) {
   }
   const rows = [], groups = [];
   for (const t of [...teams.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))) {
-    const idxs = t.people.sort(teamOrder).map((g) => rows.push({ label: g.name, sub: `${g.employee_id} · ${levelName(g)}`, date: currentDate, employee_id: g.employee_id, existing: byEmp[g.employee_id], group: t.id }) - 1);
+    const idxs = t.people.sort(teamOrder).map((g) => rows.push({ label: g.name, sub: `${g.employee_id} · ${levelName(g)}`, date: currentDate, employee_id: g.employee_id, existing: byEmp[g.employee_id], group: t.id, standing: Number(g.daily_minus) || 0 }) - 1);
     groups.push({ id: t.id, title: t.title, sub: `${t.sub}${scopeHub() || !t.hub ? "" : " · " + t.hub}`, idxs });
   }
   buildGrid({ firstCol: "Employee", editable, rows, groups, onSaved: () => dayMode(ctx, guys, days, editable) });
@@ -547,7 +560,7 @@ function quickEntry({ guys, byEmp, date, toGrid, refresh }) {
         <div class="field"><label for="q-biz">Business (Rs)</label><input class="input" id="q-biz" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${rupees(e?.business_amount)}"></div>
         <div class="field"><label for="q-set">Handed in (Rs)</label><input class="input" id="q-set" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${rupees(e?.settled_amount)}"></div>
         <p class="q-diff" id="q-diff" role="status"></p>
-        <div class="field"><label for="q-adv">Advance taken (Rs), if any</label><input class="input" id="q-adv" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${e?.personal_minus ? rupees(e.personal_minus) : ""}"></div>
+        <div class="field"><label for="q-adv">Advance or daily minus (Rs), if any</label><input class="input" id="q-adv" inputmode="decimal" autocomplete="off" enterkeyhint="next" value="${e?.personal_minus ? rupees(e.personal_minus) : !e && g?.daily_minus ? rupees(g.daily_minus) : ""}"></div>
         <div class="field"><label for="q-note">Note, if any</label><input class="input" id="q-note" autocomplete="off" enterkeyhint="done" value="${e?.notes || ""}"></div>
         <div class="step-errors" id="q-err" role="alert" tabindex="-1" hidden></div>
         <div class="q-actions"><button type="button" class="btn" id="q-skip">Skip</button><button type="submit" class="btn primary" id="q-save">Save and next</button></div>

@@ -62,6 +62,7 @@ export default {
             <a href="/api/payroll/${p}/register" target="_blank" rel="noopener">${icon("eye")} Register (print view)</a>
             ${can("export") ? html`<a href="/api/payroll/${p}/register.csv">${icon("download")} Register as CSV</a>` : ""}
             <a href="/api/payroll/${p}/payslips" target="_blank" rel="noopener">${icon("printer")} All payslips (print view)</a>
+            ${can("view_pay") ? html`<a href="/api/export/salary-payments.xlsx?period=${p}">${icon("download")} Salary payments (Excel)</a><a href="/api/export/salary-payments.pdf?period=${p}">${icon("file")} Salary payments (PDF)</a>` : ""}
           </div></details>
         </div>
         ${noted ? html`<details class="flag-legend"><summary>What do the notes mean?</summary>

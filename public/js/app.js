@@ -72,7 +72,7 @@ const noSearch = () => isStaff() || (!can("read") && can("read_team"));
 const WS_TABS = [
   { key: "overview", label: "Overview", page: "hub", perm: "read" },
   { key: "people", label: "People", page: "employees", perm: "read" },
-  { key: "sales", label: "Sales", subs: [["", "Live sales", "live"], ["daily", "Daily sheet", "daily"], ["handover", "Cash handover", "handover"], ["cashbook", "Cash book", "cashbook"]] },
+  { key: "sales", label: "Sales", subs: [["", "Live sales", "live"], ["daily", "Daily sheet", "daily"], ["handover", "Cash handover", "handover"], ["cashbook", "Cash book", "cashbook"], ["bill", "Enter a bill", "bill"]] },
   { key: "stock", label: "Stock", subs: [["", "Hub stock", "stockview"], ["give", "Give stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub count sheet", "hubstock"], ["week", "Weekly stock", "weekstock"]] },
   { key: "money", label: "Money", subs: [["", "Weekly sheet", "weekly"]] }, // a person's own take-outs (advances, personal minus) are recorded on the daily sheet inside the hub
 ];

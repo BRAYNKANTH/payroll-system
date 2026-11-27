@@ -71,11 +71,13 @@ async function state(db, user) {
 async function syncDay(t, user, s, date) {
   const sum = num((await t.get("SELECT COALESCE(SUM(amount), 0) AS n FROM sale_lines WHERE employee_id = ? AND date = ?", s.employee_id, date)).n);
   const row = await t.get("SELECT id, settled_amount, personal_minus FROM daily_log WHERE employee_id = ? AND date = ?", s.employee_id, date);
+  // the person's standing daily deduction (the sheets' "morning minus") goes on a new day; a day holding only that is still empty
+  const standing = num((await t.get("SELECT daily_minus FROM staff WHERE employee_id = ?", s.employee_id))?.daily_minus);
   if (row) {
-    if (sum === 0 && num(row.settled_amount) === 0 && num(row.personal_minus) === 0) await t.run("DELETE FROM daily_log WHERE id = ?", row.id);
+    if (sum === 0 && num(row.settled_amount) === 0 && (num(row.personal_minus) === 0 || num(row.personal_minus) === standing)) await t.run("DELETE FROM daily_log WHERE id = ?", row.id);
     else await t.run(`UPDATE daily_log SET business_amount = ?, updated_by = ?, updated_at = ${NOW} WHERE id = ?`, sum, user.username, row.id);
   } else if (sum > 0) {
-    await t.run("INSERT INTO daily_log (date, employee_id, business_amount, settled_amount, personal_minus, created_by, source) VALUES (?,?,?,0,0,?, 'portal')", date, s.employee_id, sum, user.username);
+    await t.run("INSERT INTO daily_log (date, employee_id, business_amount, settled_amount, personal_minus, created_by, source) VALUES (?,?,?,0,?,?, 'portal')", date, s.employee_id, sum, standing, user.username);
   }
   return sum;
 }
@@ -431,4 +433,107 @@ async function takeFromHub(db, user, id) {
   return { deleted: true };
 }
 
-module.exports = { state, sell, sellMany, undo, endOfDay, morning, give, giveMany, stockOverview, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };
+// ---------------------------------------------------------------- the coacher enters a seller's bill
+// For a seller who cannot use the till (no phone, no signal), the hub's coacher enters the day's bill: the products and the pieces sold.
+// It is the same sale lines as the till makes, so the seller's stock, the weekly stock sheet and the product reports are right, and the
+// day's business is the bill's total. The day is the office's entry (not waiting for confirmation).
+const BILL_DAYS_BACK = 14;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const billDate = (raw) => {
+  const date = String(raw || sales.today());
+  if (!DATE_RE.test(date) || isNaN(Date.parse(date))) throw httpError(400, "The date must look like 2026-11-18");
+  if (date > sales.today()) throw httpError(400, "You cannot enter a day that has not happened yet");
+  if (date < sales.addDays(sales.today(), -BILL_DAYS_BACK)) throw httpError(400, `A bill can be entered up to ${BILL_DAYS_BACK} days back`);
+  return date;
+};
+const hubOf = (user) => { if (!user.hub) throw httpError(403, "Only the hub's coacher enters a bill for a seller"); return user.hub; };
+
+// The sellers of the hub with what each sold that day, and for the chosen seller: products with the stock left, today's lines and the day.
+async function billState(db, user, { employee_id, date: rawDate } = {}) {
+  const hub = hubOf(user);
+  const date = billDate(rawDate);
+  const sellers = (await db.all(`SELECT s.employee_id, s.name, s.staff_level, s.upline_id FROM staff s WHERE ${sellersWhere} AND s.hub = ? ORDER BY lower(s.name)`, hub)).map((s) => ({ ...s }));
+  const dayRows = new Map((await db.all("SELECT d.employee_id, d.business_amount, d.settled_amount FROM daily_log d JOIN staff s USING (employee_id) WHERE d.date = ? AND s.hub = ?", date, hub))
+    .map((r) => [r.employee_id, r]));
+  const withLines = new Set((await db.all("SELECT DISTINCT l.employee_id FROM sale_lines l JOIN staff s USING (employee_id) WHERE l.date = ? AND s.hub = ?", date, hub)).map((r) => r.employee_id));
+  const list = sellers.map((s) => ({ employee_id: s.employee_id, name: s.name, staff_level: s.staff_level, business: num(dayRows.get(s.employee_id)?.business_amount), entered: dayRows.has(s.employee_id), by_products: withLines.has(s.employee_id) }));
+  const out = { date, closed: await svc.isFinalized(db, date.slice(0, 7)), sellers: list, seller: null };
+  if (!employee_id) return out;
+  const s = await checkSeller(db, employee_id, hub);
+  const stock = await stockOf(db, s.employee_id, date);
+  const products = await db.all("SELECT id, name, list_price, status FROM products ORDER BY lower(name)");
+  out.seller = { employee_id: s.employee_id, name: s.name };
+  out.products = products.map((p) => {
+    const x = stock.get(key(p.id)) || { carried: 0, issued: 0, sold: 0, left: 0 };
+    return { id: Number(p.id), name: p.name, price: num(p.list_price), active: p.status === "active", carried: x.carried, issued: x.issued, sold: x.sold, left: x.left };
+  }).filter((p) => p.active || p.carried || p.issued || p.sold);
+  out.lines = (await db.all(`SELECT l.id, l.qty, l.unit_price, l.amount, l.created_by, p.name AS product FROM sale_lines l JOIN products p ON p.id = l.product_id
+    WHERE l.employee_id = ? AND l.date = ? ORDER BY l.id`, s.employee_id, date)).map((l) => ({ id: Number(l.id), product: l.product, qty: l.qty, unit_price: num(l.unit_price), amount: num(l.amount), by: l.created_by }));
+  const day = await db.get("SELECT business_amount, settled_amount, personal_minus, source, confirmed_by FROM daily_log WHERE employee_id = ? AND date = ?", s.employee_id, date);
+  const linesSum = out.lines.reduce((t, l) => t + l.amount, 0);
+  out.day = { recorded: !!day, business: day ? num(day.business_amount) : 0, settled: day ? num(day.settled_amount) : 0, personal: day ? num(day.personal_minus) : 0,
+    typed_total: day && num(day.business_amount) > 0 && num(day.business_amount) !== linesSum ? num(day.business_amount) : 0 };
+  return out;
+}
+
+// Saves a bill: every line or none. Same checks as the till: only products the seller holds, never more than they have in hand.
+async function billFor(db, user, body) {
+  const hub = hubOf(user);
+  const s = await checkSeller(db, body.employee_id, hub);
+  const date = billDate(body.date);
+  const want = new Map();
+  for (const it of Array.isArray(body.items) ? body.items : []) {
+    const id = Number(it.product_id);
+    if (!Number.isInteger(id)) throw httpError(400, "Choose a product from the list");
+    want.set(id, (want.get(id) || 0) + qty(it.qty));
+  }
+  if (!want.size) throw httpError(400, "Add at least one product to the bill");
+  const handedRaw = body.settled_amount === undefined || body.settled_amount === null || String(body.settled_amount).trim() === "" ? null : sales.rupees("Cash handed in", body.settled_amount);
+  const result = await withUser(db, user.username, async (t) => {
+    if (await svc.isFinalized(t, date.slice(0, 7))) throw httpError(409, "That month is closed");
+    const stock = await stockOf(t, s.employee_id, date);
+    const before = num((await t.get("SELECT COALESCE(SUM(amount), 0) AS n FROM sale_lines WHERE employee_id = ? AND date = ?", s.employee_id, date)).n);
+    const row = await t.get("SELECT id, business_amount, settled_amount, personal_minus FROM daily_log WHERE employee_id = ? AND date = ?", s.employee_id, date);
+    if (row && num(row.business_amount) > 0 && num(row.business_amount) !== before && body.confirm_replace !== true && body.confirm_replace !== "true") {
+      throw httpError(409, `REPLACE: that day already has Rs ${(num(row.business_amount) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 })} typed on the daily sheet without products. Saving this bill replaces that total with the bill's total.`);
+    }
+    const lines = [];
+    for (const [id, n] of want) {
+      const p = await t.get("SELECT id, name, list_price, status FROM products WHERE id = ?", id);
+      if (!p || p.status !== "active") throw httpError(400, "Choose a product from the list");
+      const have = stock.get(key(p.id))?.left || 0;
+      if (have <= 0) throw httpError(409, `${s.name} has no ${p.name} left. Give them stock first`);
+      if (n > have) throw httpError(409, `${s.name} only has ${have} ${p.name} left`);
+      const price = num(p.list_price);
+      const made = await t.get(`INSERT INTO sale_lines (date, employee_id, product_id, qty, unit_price, amount, created_by) VALUES (?,?,?,?,?,?,?) RETURNING id, qty, unit_price, amount`,
+        date, s.employee_id, p.id, n, price, n * price, user.username);
+      lines.push({ id: Number(made.id), product: p.name, qty: made.qty, unit_price: num(made.unit_price), amount: num(made.amount) });
+    }
+    const total = num((await t.get("SELECT COALESCE(SUM(amount), 0) AS n FROM sale_lines WHERE employee_id = ? AND date = ?", s.employee_id, date)).n);
+    if (handedRaw !== null && handedRaw > total) throw httpError(400, "The cash handed in cannot be more than the bill's total");
+    if (row) {
+      await t.run(`UPDATE daily_log SET business_amount = ?, settled_amount = ?, updated_by = ?, updated_at = ${NOW} WHERE id = ?`, total, handedRaw ?? num(row.settled_amount), user.username, row.id);
+    } else {
+      const standing = num((await t.get("SELECT daily_minus FROM staff WHERE employee_id = ?", s.employee_id))?.daily_minus);
+      await t.run("INSERT INTO daily_log (date, employee_id, business_amount, settled_amount, personal_minus, created_by) VALUES (?,?,?,?,?,?)", date, s.employee_id, total, handedRaw ?? 0, standing, user.username);
+    }
+    return { lines, amount: lines.reduce((x, l) => x + l.amount, 0), day_total: total };
+  }, { lockKey: "pos:" + s.employee_id });
+  return { ...result, state: await billState(db, user, { employee_id: s.employee_id, date }) };
+}
+
+// Takes one line of a bill away (a mistake), and puts the day's total right.
+async function removeBillLine(db, user, id) {
+  const hub = hubOf(user);
+  const line = await db.get("SELECT l.id, l.date, l.employee_id, s.hub FROM sale_lines l JOIN staff s ON s.employee_id = l.employee_id WHERE l.id = ?", Number(id));
+  if (!line) throw httpError(404, "That line was not found");
+  if (line.hub !== hub) throw httpError(403, "Outside your hub");
+  await withUser(db, user.username, async (t) => {
+    if (await svc.isFinalized(t, line.date.slice(0, 7))) throw httpError(409, "That month is closed");
+    await t.run("DELETE FROM sale_lines WHERE id = ?", line.id);
+    await syncDay(t, user, { employee_id: line.employee_id }, line.date);
+  }, { lockKey: "pos:" + line.employee_id });
+  return billState(db, user, { employee_id: line.employee_id, date: line.date });
+}
+
+module.exports = { billState, billFor, removeBillLine, state, sell, sellMany, undo, endOfDay, morning, give, giveMany, stockOverview, takeBack, stockOf, poolOf, hubSupply, giveToHub, takeFromHub };

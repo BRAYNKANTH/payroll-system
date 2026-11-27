@@ -6,7 +6,7 @@
 // A coacher keeps the book for their hub. The office, with no hub chosen, sees every hub's cash and opens one.
 import { get, post, del, qs } from "../api.js";
 import { state, can } from "../app.js";
-import { $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, confirmDialog, dateLabel, monthName } from "../ui.js";
+import { exportButtons, $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, confirmDialog, dateLabel, monthName } from "../ui.js";
 import { today } from "../range.js";
 
 const KIND_NAME = { expense: "Expense", salary: "Salary paid", draw: "Manager took cash", other_in: "Other cash in", online: "Online money" };
@@ -32,7 +32,7 @@ export default {
     // ---------------------------------------------------------------- the office with no hub chosen: every hub's cash
     if (!hub) {
       const all = await get("/api/cashbook" + qs({ period }));
-      el.innerHTML = html`<div class="page-head"><div><h1>Cash book — ${monthName(period)}</h1><p>The cash each hub holds. Cash in is what the sellers handed in; cash out is what the coacher spent or paid and what was handed over to the office. Open a hub to see its days.</p></div></div>
+      el.innerHTML = html`<div class="page-head"><div><h1>Cash book — ${monthName(period)}</h1><p>The cash each hub holds. Cash in is what the sellers handed in; cash out is what the coacher spent or paid and what was handed over to the office. Open a hub to see its days.</p></div><div class="actions">${exportButtons("cashbook", { period, hub: "" })}</div></div>
         ${all.hubs.length ? html`<div class="card hs-list"><ul role="list">${all.hubs.map((h) => html`<li><a class="hs-row" href="/hubs/${encodeURIComponent(h.code)}/sales/cashbook" data-link>
           <span class="hs-main"><b>${h.name}</b><span class="muted">${h.code} · in ${rs(h.totals.cash_in + h.totals.other_in)} · out ${rs(h.totals.expenses + h.totals.salaries + h.totals.handed)}</span></span>
           <span class="hs-flags"><b class="num ${h.closing < 0 ? "neg" : ""}">${rs(h.closing)}</b><span class="muted">in hand</span></span><span class="hs-chev" aria-hidden="true"></span></a></li>`)}</ul></div>`
@@ -44,7 +44,7 @@ export default {
     const t = b.totals, out = t.expenses + t.salaries + t.draws + t.personal + t.handed;
     const canWrite = can("enter_data");
     el.innerHTML = html`<div class="page-head"><div><h1>Cash book — ${b.name}</h1><p>${monthName(period)}. The cash the hub holds, day by day. Sellers' cash comes from the daily sheet, and so does the money people take (their Personal minus, also taken off their pay); you add what was spent or paid out. Cash handed to the office comes from the Cash handover page.</p></div>
-        <div class="actions">${canWrite ? html`<button class="btn primary" id="cb-add">${icon("plus")} Add entry</button>` : ""}</div></div>
+        <div class="actions">${exportButtons("cashbook", { period, hub })}${canWrite ? html`<button class="btn primary" id="cb-add">${icon("plus")} Add entry</button>` : ""}</div></div>
       <div class="grid kpis hub-kpis mb-4">
         <div class="card kpi"><div class="label">Cash at the start</div><div class="value"><small>Rs</small>${money(b.opening)}</div><div class="foot">${b.opening < 0 ? "Below zero: check the earlier entries" : "Brought from before"}</div></div>
         <div class="card kpi"><div class="label">Cash in</div><div class="value"><small>Rs</small>${money(t.cash_in + t.other_in)}</div><div class="foot">Sellers Rs ${money(t.cash_in)}${t.other_in ? ` · other Rs ${money(t.other_in)}` : ""}</div></div>
@@ -61,7 +61,7 @@ export default {
       <h2 class="section-title drill-h">Each team's cash this month</h2>
       <div class="card mb-4"><div class="card-body flush" id="cb-teams"></div></div>
 
-      <h2 class="section-title drill-h">Who handed in less than they sold</h2>
+      <div class="row between" style="margin-bottom:12px"><h2 class="section-title drill-h" style="margin:0">Who handed in less than they sold</h2>${exportButtons("gave-less", { period, hub })}</div>
       <div class="card mb-4"><div class="card-body flush" id="cb-less"></div></div>
 
       <h2 class="section-title drill-h">Team cash on one day</h2>

@@ -54,6 +54,7 @@ const ENTITIES = {
       base_commission_rate: { type: "rate" },
       food_per_day: { type: "money" },
       food_min_days: { type: "int" },
+      daily_minus: { type: "money" }, // taken off every day they work, filled in as the personal minus on a new day (the sheets' "morning minus")
       security_deduction_rule: { type: "text", check: (v) => engine.parseSecurityRule(v) },
       bank_name: { type: "text" },
       bank_code: { type: "text" },
@@ -344,6 +345,10 @@ async function createEntry(db, kind, body, user, scopeHub) {
   if (!e) throw httpError(404, `Unknown entity ${kind}`);
   if (kind === "weekly") body = weeklyDefaults(body, await getSettings(db), (await db.get("SELECT target FROM staff WHERE employee_id = ?", body.manager_id))?.target);
   const row = clean(e, body, { creating: true });
+  if (kind === "daily" && (row.personal_minus === undefined || row.personal_minus === null)) { // a new day takes the person's standing daily deduction
+    const dm = Number((await db.get("SELECT daily_minus FROM staff WHERE employee_id = ?", row.employee_id))?.daily_minus) || 0;
+    if (dm > 0) row.personal_minus = dm;
+  }
   if (kind === "staff") await applyChain(db, row, {}, row.employee_id);
   await validateRefs(db, kind, row);
   await assertScope(db, kind, row, scopeHub);
@@ -424,7 +429,7 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
   if (rows.length > 3000) throw httpError(400, "Too many rows in one save (max 3000)");
 
   // Validate everything up front, with staff looked up once.
-  const staff = new Map((await db.all("SELECT employee_id, role, hub, staff_level, target FROM staff")).map((s) => [s.employee_id, s]));
+  const staff = new Map((await db.all("SELECT employee_id, role, hub, staff_level, target, daily_minus FROM staff")).map((s) => [s.employee_id, s]));
   const okStaff = (s) => !!s && (kind === "weekly" ? holdsWeekly(s.staff_level) : kind === "daily" ? sellsDaily(s.staff_level) : s.role === "guy");
   const wrongStaff = kind === "weekly" ? "a manager" : kind === "daily" ? "someone who sells" : "a distributor or supervisor";
   const settings = kind === "weekly" ? await getSettings(db) : null;
@@ -469,7 +474,9 @@ async function bulkUpsert(db, kind, rows, user, scopeHub) {
           const cols = Object.keys(p.row).filter((c) => !keys.includes(c) && p.row[c] !== existing[c]);
           plan.set(k, cols.length ? { update: existing.id, cols, row: p.row } : { same: true });
         } else {
-          plan.set(k, { insert: { ...p.row, created_by: user } });
+          // a new day with no personal minus given takes the person's standing daily deduction
+          const dm = kind === "daily" && p.row.personal_minus === undefined ? Number(staff.get(p.row.employee_id)?.daily_minus) || 0 : 0;
+          plan.set(k, { insert: { ...p.row, ...(dm > 0 ? { personal_minus: dm } : {}), created_by: user } });
         }
       }
       const items = [...plan.values()];
