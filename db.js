@@ -362,6 +362,36 @@ CREATE TABLE IF NOT EXISTS cash_book_entries (
 );
 CREATE INDEX IF NOT EXISTS cash_book_hub_date ON cash_book_entries (hub, date);
 
+-- What was actually paid to a person for a month's salary (the sheets' "paid / pending", cheques and part payments).
+-- A month's salary is the pay period summary's disbursed amount; payments add up against it. Payments are recorded after the month is calculated
+-- and also after it is closed, so this table is not locked with the month.
+CREATE TABLE IF NOT EXISTS salary_payments (
+  id          bigserial PRIMARY KEY,
+  period      text NOT NULL,
+  employee_id text NOT NULL REFERENCES staff(employee_id),
+  amount      bigint NOT NULL CHECK (amount > 0),
+  method      text NOT NULL CHECK (method IN ('cash','cheque','bank','other')),
+  paid_on     text NOT NULL ${DATE_CHECK("paid_on")},
+  note        text,
+  created_by  text NOT NULL,
+  created_at  text NOT NULL DEFAULT ${NOW}
+);
+CREATE INDEX IF NOT EXISTS salary_payments_period ON salary_payments (period, employee_id);
+
+-- The weekly stock sheet: the pieces the coacher counted for a product at the end of a week (the week starts on a Monday).
+CREATE TABLE IF NOT EXISTS hub_week_counts (
+  id         bigserial PRIMARY KEY,
+  hub        text NOT NULL REFERENCES hubs(code),
+  week_start text NOT NULL ${DATE_CHECK("week_start")},
+  product_id bigint NOT NULL REFERENCES products(id),
+  counted    integer NOT NULL CHECK (counted >= 0),
+  created_by text NOT NULL,
+  created_at text NOT NULL DEFAULT ${NOW},
+  updated_by text,
+  updated_at text,
+  UNIQUE (hub, week_start, product_id)
+);
+
 -- Stock the company receives (bought or made). The office holds everything received minus everything it sent to hubs.
 CREATE TABLE IF NOT EXISTS product_receipts (
   id         bigserial PRIMARY KEY,
@@ -540,6 +570,8 @@ const AUDITED = {
   hub_issues:  { key: "id", period: "date" },
   cash_handovers: { key: "id", period: null },
   cash_book_entries: { key: "id", period: "date" },
+  salary_payments: { key: "id", period: null },
+  hub_week_counts: { key: "id", period: "week_start" },
   product_receipts: { key: "id", period: "date" },
   sale_lines:  { key: "id", period: "date" },
 };

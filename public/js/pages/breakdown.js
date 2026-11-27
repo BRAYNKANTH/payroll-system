@@ -1,5 +1,5 @@
 // Detailed breakdown drawer for one payroll summary row, with approve / reject actions.
-import { get, post } from "../api.js";
+import { get, post, del } from "../api.js";
 import { can, refreshPending } from "../app.js";
 import { $, html, icon, money, badge, drawer, toast, busy, confirmDialog, dateTime, roleLabel, levelLabel, initials, pct, modal } from "../ui.js";
 
@@ -39,6 +39,41 @@ export function openPayslip(period, id) {
 export async function openBreakdown(r, period, opts) {
   const full = r.detail ? r : { ...r, ...(await get(`/api/payroll/${period}/${encodeURIComponent(r.employee_id)}`)) };
   breakdownDrawer(full, opts);
+}
+
+// What was paid against this salary: the list of payments, and (for the admin) a small form to add one or remove a wrong one.
+const METHOD = { cash: "Cash", cheque: "Cheque", bank: "Bank", other: "Other" };
+async function paymentsBox(dr, r, onChange) {
+  const box = document.createElement("section");
+  box.className = "pay-box";
+  box.setAttribute("aria-label", "Salary payments");
+  dr.panel.querySelector(".drawer-body").append(box);
+  const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+  const draw = async () => {
+    const all = await get(`/api/payroll/${r.period}/payments`);
+    const mine = all.filter((x) => x.employee_id === r.employee_id);
+    const paid = mine.reduce((t, x) => t + x.amount, 0), left = Number(r.disbursed_amount) - paid;
+    const status = paid >= Number(r.disbursed_amount) ? badge("green", "Paid") : paid > 0 ? badge("amber", "Part paid") : badge("blue", "Not paid");
+    box.innerHTML = html`<h4 class="pay-h">Salary payments ${status}</h4>
+      <p class="muted" style="margin:0 0 8px">Salary Rs ${money(r.disbursed_amount)} · paid Rs ${money(paid)} · ${left > 0 ? html`still to pay <b>Rs ${money(left)}</b>` : "nothing left to pay"}</p>
+      ${mine.length ? html`<ul class="pay-list" role="list">${mine.map((x) => html`<li><span><b>Rs ${money(x.amount)}</b> · ${METHOD[x.method]} · ${x.paid_on}${x.note ? html` · <span class="muted">${x.note}</span>` : ""}</span>
+        ${can("run_payroll") ? html`<button type="button" class="btn sm danger-ghost" data-rm-pay="${x.id}" aria-label="Remove the payment of Rs ${money(x.amount)} on ${x.paid_on}">${icon("trash")}</button>` : ""}</li>`)}</ul>` : html`<p class="muted">No payment recorded yet.</p>`}
+      ${can("run_payroll") && left > 0 ? html`<form class="pay-form" autocomplete="off" novalidate>
+        <div class="field"><label for="py-amt">Amount paid (Rs)</label><input class="input" id="py-amt" name="amount" inputmode="decimal" value="${(left / 100).toFixed(2)}"></div>
+        <div class="field"><label for="py-method">How</label><select class="input" id="py-method" name="method"><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="bank">Bank</option><option value="other">Other</option></select></div>
+        <div class="field"><label for="py-date">Paid on</label><input class="input" type="date" id="py-date" name="paid_on" value="${today}" max="${today}"></div>
+        <div class="field"><label for="py-note">Note</label><input class="input" id="py-note" name="note" maxlength="200" placeholder="Cheque number, who received it"></div>
+        <button type="submit" class="btn primary" id="py-save">${icon("check")} Record payment</button></form>` : ""}`.toString();
+    box.querySelector(".pay-form")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      busy(box.querySelector("#py-save"), async () => {
+        await post(`/api/payroll/${r.period}/payments`, { employee_id: r.employee_id, ...Object.fromEntries(new FormData(e.target)) });
+        toast("Payment recorded"); await draw(); onChange?.();
+      });
+    });
+    box.querySelectorAll("[data-rm-pay]").forEach((b) => (b.onclick = () => busy(b, async () => { await del(`/api/payments/${b.dataset.rmPay}`); toast("Payment removed"); await draw(); onChange?.(); })));
+  };
+  await draw();
 }
 
 export function breakdownDrawer(r, { finalized, onChange }) {
@@ -98,6 +133,7 @@ export function breakdownDrawer(r, { finalized, onChange }) {
       ${reviewable && r.status !== "approved" ? html`<button class="btn success" id="bd-approve">${icon("check")} Approve</button>` : ""}`.toString(),
   });
   $("#bd-slip", dr.panel).onclick = () => openPayslip(r.period, r.employee_id);
+  if (Number(r.disbursed_amount) > 0) paymentsBox(dr, r, onChange);
   $("#bd-approve", dr.panel)?.addEventListener("click", async (e) => {
     const note = await confirmDialog({
       title: `Approve ${r.name}?`,

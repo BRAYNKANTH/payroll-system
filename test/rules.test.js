@@ -89,6 +89,13 @@ test("a month of pay: manager shares, a retaining manager, and the promoting man
   // the sellers' own pay is not charged to him: D1 keeps 25,000 + 30% of 30,000 over target (+ food)
   assert.equal(r.D1.gross_earnings, (25000 + 9000 + 150) * 100);
 
+  // the read-only Weekly sheet follows the same rule: no rent for the retaining manager, rent for the other
+  const wk = Object.fromEntries((await svc.weeklyView(d, "2026-10")).map((m) => [m.manager_id, m]));
+  assert.equal(wk.M2.retaining, true);
+  assert.deepEqual(wk.M2.weeks.map((w) => w.rent), [0]);
+  assert.equal(wk.M1.retaining, false);
+  assert.deepEqual(wk.M1.weeks.map((w) => w.rent), [400000]);
+
   // M2: Rs 140,000 is below Rs 250,000, so he is retaining: 10% of it instead of any weekly commission, plus own sales and the basic
   assert.equal(r.M2.detail.retaining, true);
   assert.equal(r.M2.gross_earnings, (14000 + 10000 + 27000) * 100);

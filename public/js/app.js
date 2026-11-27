@@ -40,6 +40,7 @@ const NAV = [
   { path: "/cashbook", label: "Cash book", icon: "wallet", page: "cashbook", perm: "read" },
   { path: "/stock", label: "Stock count", icon: "box", page: "stock", perm: "read" },
   { path: "/branch-stock", label: "Hub count sheet", icon: "store", page: "hubstock", perm: "read" },
+  { path: "/week-stock", label: "Weekly stock", icon: "warehouse", page: "weekstock", perm: "read" },
   { group: "Payroll" },
   { path: "/payroll", label: "Payroll run", icon: "play", page: "payroll", perm: "view_pay" },
   { path: "/payslips", label: "Payslips", icon: "file", page: "payslips", perm: "view_pay" },
@@ -72,7 +73,7 @@ const WS_TABS = [
   { key: "overview", label: "Overview", page: "hub", perm: "read" },
   { key: "people", label: "People", page: "employees", perm: "read" },
   { key: "sales", label: "Sales", subs: [["", "Live sales", "live"], ["daily", "Daily sheet", "daily"], ["handover", "Cash handover", "handover"], ["cashbook", "Cash book", "cashbook"]] },
-  { key: "stock", label: "Stock", subs: [["", "Hub stock", "stockview"], ["give", "Give stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub count sheet", "hubstock"]] },
+  { key: "stock", label: "Stock", subs: [["", "Hub stock", "stockview"], ["give", "Give stock", "morning"], ["count", "Stock count", "stock"], ["sheet", "Hub count sheet", "hubstock"], ["week", "Weekly stock", "weekstock"]] },
   { key: "money", label: "Money", subs: [["", "Weekly sheet", "weekly"]] }, // a person's own take-outs (advances, personal minus) are recorded on the daily sheet inside the hub
 ];
 const SECTIONS = {

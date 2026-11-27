@@ -3183,3 +3183,15 @@ html.fx .org-toggle { animation: none; }
 /* ===== Cash handover: one-tap amounts ===== */
 .ho-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .ho-quick .btn { min-height: 44px; }
+
+/* ===== Salary payments (in the pay details panel) ===== */
+.pay-box { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.pay-h { margin: 0 0 6px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.pay-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.pay-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.pay-form { display: grid; gap: 10px; }
+.pay-form .btn { min-height: 44px; }
+
+/* ===== Weekly stock sheet ===== */
+.ws-count { width: 72px; min-height: 44px; text-align: right; font: 650 15px var(--font); font-variant-numeric: tabular-nums; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); padding: 0 8px; }
+.ws-count[aria-invalid] { border-color: var(--danger); }

@@ -289,6 +289,16 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
   }
   await svc.bulkUpsert(d, "hubstock", hubStock, "admin");
 
+  // ---- the weekly stock sheet: the last full week is counted by each hub's coacher, with a few pieces missing in two hubs
+  const weekstock = require("./weekstock");
+  const lastWeek = addDays(weekstock.mondayOf(todaySL), -7);
+  const lostAt = { J2: { "Washing powder 1kg": 7 }, K1: { "Bath soap 3-pack": 4 } };
+  for (const code of hubs) {
+    const w = await weekstock.week(d, { hub: code, date: lastWeek });
+    const counts = w.products.map((p) => ({ product_id: p.id, counted: Math.max(0, p.expected - ((lostAt[code] || {})[p.name] || 0)) }));
+    if (counts.length) await weekstock.saveCounts(d, { username: coacherOf[code], hub: code }, { week_start: lastWeek, counts });
+  }
+
   // ---- loans, advances and allowances ---------------------------------------------------------------------------------------------------
   await svc.createEntry(d, "allowances", { period: PERIOD, employee_id: "M01D07", description: "Attendance bonus", amount: 2500 }, "admin");
   await svc.createEntry(d, "allowances", { period: PERIOD, employee_id: "M01S02", description: "Festival bonus (Deepavali)", amount: 5000 }, "admin");

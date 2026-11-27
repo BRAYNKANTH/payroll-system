@@ -66,8 +66,23 @@ async function book(db, hub, period) {
     const x = teams.get(t.id) || teams.set(t.id, { id: t.id, title: t.title, sub: t.sub, sales: 0, cash: 0, people: 0 }).get(t.id);
     x.sales += Number(r.sales); x.cash += Number(r.cash); x.people++;
   }
-  const teamRows = [...teams.values()].map((t) => ({ ...t, not_handed_in: t.sales - t.cash, share: t.sales ? t.cash / t.sales : null })).sort((a, b) => b.sales - a.sales);
-  return { hub, period, opening, closing: run, totals: tot, days, entries, teams: teamRows };
+  // What each team (manager) sold and handed in on each day, and what it still owed from before the month: the sheets' "settle-up detail" and
+  // "last week balance". A team's balance is sales minus cash handed in, added up from day to day.
+  const perDay = await db.all(`SELECT d.date, d.employee_id, SUM(d.business_amount) AS sales, SUM(d.settled_amount) AS cash FROM daily_log d JOIN staff s USING (employee_id)
+    WHERE s.hub = ? AND d.date >= ? AND d.date < ? GROUP BY d.date, d.employee_id ORDER BY d.date`, hub, from, to);
+  const prior = await db.all(`SELECT d.employee_id, SUM(d.business_amount - d.settled_amount) AS gap FROM daily_log d JOIN staff s USING (employee_id) WHERE s.hub = ? AND d.date < ? GROUP BY d.employee_id`, hub, from);
+  const meta = new Map(), carried = {}, byDay = new Map();
+  for (const r of prior) { const t = teamOf(byId.get(r.employee_id), byId); meta.set(t.id, { id: t.id, title: t.title, sub: t.sub }); carried[t.id] = (carried[t.id] || 0) + Number(r.gap); }
+  for (const r of perDay) {
+    const t = teamOf(byId.get(r.employee_id), byId);
+    meta.set(t.id, { id: t.id, title: t.title, sub: t.sub });
+    const day = byDay.get(r.date) || byDay.set(r.date, new Map()).get(r.date);
+    const x = day.get(t.id) || day.set(t.id, { id: t.id, sales: 0, cash: 0 }).get(t.id);
+    x.sales += Number(r.sales); x.cash += Number(r.cash);
+  }
+  const teamDays = [...byDay.entries()].map(([date, m]) => ({ date, teams: [...m.values()].map((x) => ({ ...x, gap: x.sales - x.cash })) }));
+  const teamRows = [...teams.values()].map((t) => ({ ...t, not_handed_in: t.sales - t.cash, share: t.sales ? t.cash / t.sales : null, carried: carried[t.id] || 0 })).sort((a, b) => b.sales - a.sales);
+  return { hub, period, opening, closing: run, totals: tot, days, entries, teams: teamRows, team_days: teamDays, team_meta: [...meta.values()], team_carried: carried };
 }
 
 // For the office with no hub chosen: one line per hub for the month.

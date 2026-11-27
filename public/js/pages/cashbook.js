@@ -57,7 +57,10 @@ export default {
       <div class="card mb-4"><div class="card-body flush" id="cb-entries"></div></div>
 
       <h2 class="section-title drill-h">Each team's cash this month</h2>
-      <div class="card"><div class="card-body flush" id="cb-teams"></div></div>`.toString();
+      <div class="card mb-4"><div class="card-body flush" id="cb-teams"></div></div>
+
+      <h2 class="section-title drill-h">Team cash on one day</h2>
+      <div class="card"><div class="card-body" id="cb-teamday"></div></div>`.toString();
 
     // ---------------------------------------------------------------- days
     $("#cb-days").innerHTML = b.days.length ? dataTable({
@@ -105,6 +108,41 @@ export default {
         { key: "share", label: "Of sales", align: "r", render: (x) => (x.share == null ? "—" : `${Math.round(x.share * 100)}%`) },
       ],
     }).toString() : emptyState("No sales this month", "Teams appear once sellers have days on the daily sheet.", "users").toString();
+
+    // ---------------------------------------------------------------- one day, team by team
+    // For each team: what it sold, what it handed in, the gap that day, and the gap added up from the start (with what it owed from before).
+    const dayBox = $("#cb-teamday");
+    if (!b.team_days.length) dayBox.innerHTML = emptyState("No sales this month", "Team cash by day appears once sellers have days on the daily sheet.", "users").toString();
+    else {
+      let pick = b.team_days[b.team_days.length - 1].date;
+      const meta = Object.fromEntries(b.team_meta.map((m) => [m.id, m]));
+      const drawDay = () => {
+        const run = {};
+        for (const [id, v] of Object.entries(b.team_carried)) run[id] = v;
+        let shown = [];
+        for (const day of b.team_days) {
+          for (const t of day.teams) run[t.id] = (run[t.id] || 0) + t.gap;
+          if (day.date === pick) shown = day.teams.map((t) => ({ ...t, balance: run[t.id] })).sort((a, c) => c.sales - a.sales);
+          if (day.date >= pick) break;
+        }
+        dayBox.innerHTML = html`<div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><label for="cb-pick"><b>Day</b></label>
+            <select class="input" id="cb-pick" style="width:auto">${b.team_days.map((x) => html`<option value="${x.date}" ${x.date === pick ? "selected" : ""}>${dateLabel(x.date)}</option>`)}</select>
+            <span class="muted">Balance = what the team still owes, added up from before the month to this day.</span></div>
+          ${dataTable({
+            rows: shown, sortable: false, footer: true,
+            card: (x) => html`<span class="mc-main"><b>${meta[x.id]?.title || x.id}</b><span class="mc-sub">sold ${rs(x.sales)} · handed in ${rs(x.cash)}</span></span><span class="mc-end"><b class="${x.gap > 0 ? "neg" : ""}">${money(x.gap)}</b><br><span class="muted">balance ${money(x.balance)}</span></span>`,
+            cols: [
+              { key: "id", label: "Team", render: (x) => html`<b>${meta[x.id]?.title || x.id}</b><div class="faint text-sm">${meta[x.id]?.sub || ""}</div>`, total: () => "All teams" },
+              { key: "sales", label: "Sold", align: "r", render: (x) => money(x.sales), total: (rs2) => money(rs2.reduce((s, x) => s + x.sales, 0)) },
+              { key: "cash", label: "Handed in", align: "r", render: (x) => money(x.cash), total: (rs2) => money(rs2.reduce((s, x) => s + x.cash, 0)) },
+              { key: "gap", label: "Not handed in", align: "r", render: (x) => html`<span class="${x.gap > 0 ? "neg" : ""}">${money(x.gap)}</span>`, total: (rs2) => money(rs2.reduce((s, x) => s + x.gap, 0)) },
+              { key: "balance", label: "Balance to this day", align: "r", render: (x) => html`<b class="${x.balance > 0 ? "neg" : ""}">${money(x.balance)}</b>`, total: (rs2) => money(rs2.reduce((s, x) => s + x.balance, 0)) },
+            ],
+          })}`.toString();
+        $("#cb-pick").onchange = (e) => { pick = e.target.value; drawDay(); };
+      };
+      drawDay();
+    }
 
     // ---------------------------------------------------------------- add and remove
     const open = () => {

@@ -2,6 +2,7 @@ import { get } from "../api.js";
 import { state, scopeHub } from "../app.js";
 import { readQuery, writeQuery, $, html, icon, money, badge, dataTable, emptyState, monthName, levelLabel, announce } from "../ui.js";
 import { openPayslip } from "./breakdown.js";
+import { payBadge } from "./payroll.js";
 
 let q = "";
 
@@ -44,6 +45,7 @@ export default {
           { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions) },
           { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>` },
           { key: "status", label: "Status", render: (r) => badge(r.status) },
+          { key: "pay_status", label: "Salary", render: (r) => payBadge(r) },
         ],
       }).toString() : emptyState("No payslips yet", "Payslips appear once payroll has been calculated for this month.", "file").toString();
       return shown.length;

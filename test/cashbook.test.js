@@ -119,3 +119,16 @@ test("the cash book edits are in the audit trail", async () => {
   assert.equal(log.length, 1);
   assert.equal(log[0].action, "create");
 });
+
+test("each team's cash by day, with what it still owed from before", async () => {
+  const d = await setup();
+  const t = today(), y = sales.addDays(t, -1);
+  await sell(d, y, "D1", 60000, 55000);                       // yesterday D1 left Rs 5,000 not handed in
+  await sell(d, t, "D1", 20000, 20000); await sell(d, t, "D2", 40000, 38000);
+  const b = await cashbook.book(d, "H1", t.slice(0, 7));
+  const today1 = b.team_days.find((x) => x.date === t);
+  assert.deepEqual(today1.teams.map((x) => [x.id, x.sales, x.cash, x.gap]), [["M1", 6000000, 5800000, 200000]]);
+  if (y.slice(0, 7) === t.slice(0, 7)) assert.equal(b.team_days.find((x) => x.date === y).teams[0].gap, 500000);
+  else assert.equal(b.team_carried.M1, 500000, "yesterday was last month, so it is carried in");
+  assert.equal(b.team_meta.find((m) => m.id === "M1").title, "Name M1");
+});

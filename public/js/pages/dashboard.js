@@ -52,6 +52,8 @@ function officeTodo(d, k, noStock, cash) {
         title: "Salaries are worked out", ok: `Rs ${money(k.to_bank)} for everyone.`, todo: "Press Work out salaries once the sheets above are done." },
       { done: closed, href: "/payroll", ic: "lock",
         title: "The month is closed", ok: "Salaries and payslips are ready to view.", todo: "Check the salaries and payslips, then close the month. It locks the sheets." },
+      { done: k.calculated && !k.unpaid, href: "/payroll", ic: "wallet",
+        title: "Everyone is paid", ok: "Every salary is marked as paid.", todo: k.calculated ? `${k.unpaid} ${k.unpaid === 1 ? "salary is" : "salaries are"} still to be paid. Pay them, then press Mark as paid on the Payroll page.` : "Work out the salaries first." },
     ] : []),
   ];
   const next = steps.findIndex((x) => !x.done), left = steps.filter((x) => !x.done).length;

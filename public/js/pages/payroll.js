@@ -1,10 +1,13 @@
 import { get, post, qs } from "../api.js";
 import { state, can, scopeHub, refreshPending } from "../app.js";
-import { readQuery, writeQuery, exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, dataTable, monthName, dateTime, emptyState, levelLabel, announce, confirmDialog } from "../ui.js";
+import { readQuery, writeQuery, exportButtons, $, $$, html, icon, money, compact, badge, toast, busy, drawer, dataTable, monthName, dateTime, emptyState, levelLabel, announce, confirmDialog } from "../ui.js";
 import { openBreakdown, FLAG_HELP, flagLabel } from "./breakdown.js";
 
 let filter = "all";
 let search = "";
+
+// pending / part paid / paid, next to the amount paid. Nothing is shown for someone with no salary to pay.
+export const payBadge = (r) => (r.pay_status === "paid" ? badge("green", "Paid") : r.pay_status === "part" ? badge("amber", "Part paid") : r.pay_status === "pending" ? badge("blue", "Not paid") : "");
 
 export default {
   title: "Salaries",
@@ -22,6 +25,8 @@ export default {
     const sum = (k, rows = all) => rows.reduce((t, r) => t + r[k], 0);
     const k = dash.kpis;
     const sellers = all.filter((r) => r.role === "guy"), managers = all.filter((r) => r.role === "manager");
+    const unpaidRows = all.filter((r) => r.pay_status === "pending" || r.pay_status === "part"), unpaidN = unpaidRows.length;
+    const paidSum = all.reduce((t, r) => t + (r.paid || 0), 0);
     const bankSellers = sum("disbursed_amount", sellers), bankManagers = sum("disbursed_amount", managers);
 
     el.innerHTML = html`
@@ -31,6 +36,7 @@ export default {
           ${calculated ? exportButtons("register", { period: p }) : ""}
           ${badge(data.status)}
           ${can("finalize") && !scopeHub() && calculated && !finalized ? html`<button class="btn primary" id="close-month">${icon("lock")} Close month</button>` : ""}
+          ${can("run_payroll") && calculated && unpaidN ? html`<button class="btn ${finalized ? "primary" : ""}" id="pay-all">${icon("check")} Mark as paid</button>` : ""}
           ${can("run_payroll") && !finalized ? html`<button class="btn ${calculated ? "" : "primary"}" id="run">${icon("refresh")} ${calculated ? "Update salary figures" : "Work out salaries"}</button>` : ""}
         </div>
       </div>
@@ -41,7 +47,7 @@ export default {
           <div class="foot">${noted ? `${noted} with a note to look at` : "No notes to look at"}</div></div>
         <div class="card kpi"><div class="label"><span class="icon">${icon("wallet")}</span>Sellers' gross earnings</div><div class="value"><small>Rs</small>${compact(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("gross_earnings", all.filter((r) => r.role === "guy")))}</b><span class="kpi-note"> · Sellers, distributors and supervisors. Managers are listed separately.</span></div></div>
         <div class="card kpi"><div class="label"><span class="icon amber">${icon("coins")}</span>Sellers' deductions</div><div class="value"><small>Rs</small>${compact(sum("total_deductions", all.filter((r) => r.role === "guy")))}</div><div class="foot"><b class="num">Rs ${money(sum("total_deductions", all.filter((r) => r.role === "guy")))}</b><span class="kpi-note"> · Money to settle up, stock shortfall, personal deductions, security</span></div></div>
-        <div class="card kpi"><div class="label"><span class="icon green">${icon("wallet")}</span>Salaries (everyone)</div><div class="value"><small>Rs</small>${compact(sum("disbursed_amount"))}</div><div class="foot"><b class="num">Rs ${money(sum("disbursed_amount"))}</b><span class="kpi-note"> · ${all.filter((r) => r.disbursed_amount > 0).length} people paid</span></div></div>
+        <div class="card kpi"><div class="label"><span class="icon green">${icon("wallet")}</span>Salaries (everyone)</div><div class="value"><small>Rs</small>${compact(sum("disbursed_amount"))}</div><div class="foot"><b class="num">Rs ${money(sum("disbursed_amount"))}</b><span class="kpi-note"> · Paid so far Rs ${money(paidSum)}${unpaidN ? ` · ${unpaidN} still to pay` : all.some((r) => r.disbursed_amount > 0) ? " · everyone is paid" : ""}</span></div></div>
       </div>
 
       <p class="reconcile" id="reconcile"><b>How the salary total adds up:</b> sellers Rs <span class="num">${money(bankSellers)}</span> + managers Rs <span class="num">${money(bankManagers)}</span> = <b class="num">Rs ${money(bankSellers + bankManagers)}</b> in total. Sellers' net pay before the opening balance is Rs <span class="num">${money(sum("net_pay", sellers))}</span>.</p>
@@ -49,7 +55,7 @@ export default {
       <div class="card">
         <div class="card-head">
           <div class="row">
-            <div class="seg" id="pay-filters" role="group" aria-label="Show">${[["all", "All"], ["review", `With notes (${noted})`], ["guy", "Sales staff"], ["manager", "Managers"]].map(([f, l]) => html`<button type="button" data-f="${f}" class="${filter === f ? "on" : ""}" aria-pressed="${filter === f ? "true" : "false"}">${l}</button>`)}</div>
+            <div class="seg" id="pay-filters" role="group" aria-label="Show">${[["all", "All"], ["review", `With notes (${noted})`], ["guy", "Sales staff"], ["manager", "Managers"], ["unpaid", `Not paid (${unpaidN})`]].map(([f, l]) => html`<button type="button" data-f="${f}" class="${filter === f ? "on" : ""}" aria-pressed="${filter === f ? "true" : "false"}">${l}</button>`)}</div>
             <div class="search"><span>${icon("search")}</span><input class="input sm" id="q" aria-label="Search employees" placeholder="Search name, ID or hub" value="${search}" style="width:220px"></div>
           </div>
           <details class="more-menu"><summary class="btn sm">More views and downloads</summary><div class="more-list">
@@ -70,7 +76,7 @@ export default {
     const drawTable = () => {
       const q = search.toLowerCase();
       const rows = all.filter((r) =>
-        (filter === "all" || (filter === "review" ? !!r.flags?.length : r.role === filter)) &&
+        (filter === "all" || (filter === "review" ? !!r.flags?.length : filter === "unpaid" ? r.pay_status === "pending" || r.pay_status === "part" : r.role === filter)) &&
         (!q || r.name.toLowerCase().includes(q) || r.employee_id.toLowerCase().includes(q) || hubName(r.hub).toLowerCase().includes(q)));
       // One list of everyone, by name. Click a heading to sort; the hub is a column, and the totals row adds up whatever is shown.
       rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -91,6 +97,7 @@ export default {
           { key: "total_deductions", label: "Deductions", align: "r", render: (r) => money(r.total_deductions), total: (rs) => money(sum("total_deductions", rs)) },
           { key: "net_pay", label: "Net pay", align: "r", render: (r) => html`<b class="${r.net_pay < 0 ? "neg" : ""}">${money(r.net_pay)}</b>`, total: (rs) => money(sum("net_pay", rs)) },
           { key: "disbursed_amount", label: "Salary", align: "r", render: (r) => money(r.disbursed_amount), total: (rs) => money(sum("disbursed_amount", rs)) },
+          { key: "paid", label: "Paid", align: "r", render: (r) => html`${r.paid ? money(r.paid) : "—"} ${payBadge(r)}`, total: (rs) => money(sum("paid", rs)) },
           { key: "closing_balance", label: "Closing", align: "r", render: (r) => html`<span class="${r.closing_balance < 0 ? "neg" : ""}">${money(r.closing_balance)}</span>`, total: (rs) => money(sum("closing_balance", rs)) },
           { key: "status", label: "Status", render: (r) => html`${badge(r.status)}${r.flags.length ? html`<div style="margin-top:4px">${r.flags.map((f) => html`<span class="chip" title="${FLAG_HELP[f.code]?.what || f.message}">${flagLabel(f.code)}</span>`)}</div>` : ""}` },
         ],
@@ -143,6 +150,25 @@ export default {
         toast(`${month} is closed. Payslips are ready.`, "ok");
         refreshPending();
         this.render(ctx);
+      });
+    });
+    // Mark as paid: everyone who still has something to pay (the amounts left), by cash, cheque or bank, on a date.
+    $("#pay-all")?.addEventListener("click", () => {
+      const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+      const left = unpaidRows.reduce((t, r) => t + (r.disbursed_amount - (r.paid || 0)), 0);
+      const dr = drawer({
+        title: "Mark salaries as paid",
+        body: html`<p class="muted" style="margin-top:0">${unpaidN} ${unpaidN === 1 ? "person has" : "people have"} Rs ${money(left)} still to pay. This records that the whole amount left was paid to each of them. For one person, or a part payment, open the person and add a payment there.</p>
+          <form id="pf" class="form-grid" autocomplete="off" novalidate>
+            <div class="field"><label for="pa-method">How it was paid</label><select class="input" id="pa-method" name="method"><option value="bank">Bank</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="other">Other</option></select></div>
+            <div class="field"><label for="pa-date">Paid on</label><input class="input" type="date" id="pa-date" name="paid_on" value="${today}" max="${today}"></div>
+            <div class="field full"><label for="pa-note">Note (optional)</label><input class="input" id="pa-note" name="note" maxlength="200" placeholder="For example: November salaries"></div></form>`.toString(),
+        foot: `<button class="btn" data-close>Cancel</button><button class="btn primary" id="pa-save">Mark ${unpaidN} as paid</button>`,
+      });
+      $("#pa-save", dr.panel).onclick = (e) => busy(e.currentTarget, async () => {
+        const v = Object.fromEntries(new FormData($("#pf", dr.panel)));
+        const r = await post(`/api/payroll/${p}/payments/bulk`, v);
+        toast(`${r.paid_people} marked as paid · Rs ${money(r.amount)}`); dr.close(); this.render(ctx);
       });
     });
     $("#run")?.addEventListener("click", run);

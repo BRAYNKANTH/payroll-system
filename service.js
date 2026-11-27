@@ -557,8 +557,17 @@ async function weeklyView(db, period, hub) {
   return staff.filter((m) => holdsWeekly(m.staff_level) && m.status === "active" && (!hub || m.hub === hub)).map((m) => {
     const rows = [m, ...staff.filter((s) => s.manager_id === m.employee_id)].flatMap((x) => dBy.get(x.employee_id) || []);
     const weeks = managerWeeks(period, settings, m, rows, sBy.get(m.employee_id) || []);
-    return { manager_id: m.employee_id, name: m.name, hub: m.hub, target: Number(m.target) || Number(settings.manager_commission_threshold),
-      weeks: weeks.map((w) => ({ ...w, week_start: String(w.week_start).slice(0, 10), weekly_balance: Math.round(Number(w.business_total) * Number(w.profit_percent)) - ["rent", "hub_fee", "security_cost", "personal_draw"].reduce((t, k) => t + Number(w[k] || 0), 0) })) };
+    // A manager whose month of sales (own + team's) is below the retaining limit pays no rent that month: the same rule as the payroll run.
+    const [mFrom, mTo] = monthBounds(period);
+    const monthSales = [m, ...staff.filter((s) => s.manager_id === m.employee_id)].flatMap((x) => dBy.get(x.employee_id) || [])
+      .reduce((t, r) => (r.date >= mFrom && r.date < mTo ? t + Number(r.business_amount) : t), 0);
+    const limit = Number(settings.manager_retain_threshold) || 0;
+    const retaining = limit > 0 && monthSales < limit;
+    return { manager_id: m.employee_id, name: m.name, hub: m.hub, target: Number(m.target) || Number(settings.manager_commission_threshold), retaining, month_sales: monthSales,
+      weeks: weeks.map((w) => {
+        const rent = retaining ? 0 : Number(w.rent || 0);
+        return { ...w, rent, week_start: String(w.week_start).slice(0, 10), weekly_balance: Math.round(Number(w.business_total) * Number(w.profit_percent)) - rent - ["hub_fee", "security_cost", "personal_draw"].reduce((t, k) => t + Number(w[k] || 0), 0) };
+      }) };
   });
 }
 
@@ -707,8 +716,14 @@ async function getPeriod(db, period, { detail = true } = {}) {
     SELECT ${cols}, s.name, s.hub, s.manager_id, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
     WHERE p.period = ? ORDER BY p.role DESC, s.hub, p.employee_id`, period))
     .map((r) => ({ ...r, ...(detail ? { detail: JSON.parse(r.detail) } : {}), flags: JSON.parse(r.flags) }));
+  // What has been paid against each salary (see payments.js): paid so far and pending / part / paid.
+  const paid = new Map((await db.all("SELECT employee_id, SUM(amount) AS n FROM salary_payments WHERE period = ? GROUP BY employee_id", period)).map((r) => [r.employee_id, Number(r.n)]));
+  for (const r of rows) { r.paid = paid.get(r.employee_id) || 0; r.pay_status = payStatus(Number(r.disbursed_amount), r.paid); }
   return { ...info, rows };
 }
+
+// pending: nothing paid yet. part: something paid, some still to pay. paid: all paid. none: no salary to pay this month.
+const payStatus = (salary, paid) => (salary <= 0 ? "none" : paid >= salary ? "paid" : paid > 0 ? "part" : "pending");
 
 // One person's row with the full working, for the breakdown drawer.
 async function getPeriodRow(db, period, employeeId, scopeHub) {
@@ -716,7 +731,8 @@ async function getPeriodRow(db, period, employeeId, scopeHub) {
   const r = await db.get(`SELECT p.*, s.name, s.hub, s.manager_id, s.staff_level FROM pay_period_summary p JOIN staff s USING (employee_id)
     WHERE p.period = ? AND p.employee_id = ?`, period, employeeId);
   if (!r || (scopeHub && r.hub !== scopeHub)) throw httpError(404, "No payroll row for that person");
-  return { ...r, detail: JSON.parse(r.detail), flags: JSON.parse(r.flags) };
+  const paid = Number((await db.get("SELECT COALESCE(SUM(amount), 0) AS n FROM salary_payments WHERE period = ? AND employee_id = ?", period, employeeId)).n);
+  return { ...r, detail: JSON.parse(r.detail), flags: JSON.parse(r.flags), paid, pay_status: payStatus(Number(r.disbursed_amount), paid) };
 }
 
 async function review(db, period, employeeId, user, decision, note) {
@@ -1003,6 +1019,8 @@ async function dashboard(db, period, hub, range = null) {
       // For the monthly checklist: days that have passed with no sheet (today is still being entered), and whether any stock count exists for the month.
       missing_days_past: completeness.reduce((t, c) => t + c.missing.filter((d) => d < new Date().toISOString().slice(0, 10)).length, 0),
       stock_counted: stock.length,
+      // salaries of the month still waiting to be paid in full (for the checklist on Home)
+      unpaid: summaries.filter((r) => r.pay_status === "pending" || r.pay_status === "part").length,
     },
     by_hub: byHub,
     trend,

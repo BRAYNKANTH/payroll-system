@@ -23,7 +23,33 @@ const PAGE_CSS = `
   .slip{max-width:720px;margin:0 auto 32px;page-break-after:always}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-top:8px}
   .net{font-size:16px;font-weight:700;margin-top:12px;padding:8px;background:#f4f6f8}
+  .words{margin:10px 0 0;font-size:12px} .sign{display:flex;gap:48px;margin-top:44px} .sign div{flex:1;font-size:12px;text-align:center}
+  .sign span{display:block;border-top:1px solid #1b1f24;margin-bottom:4px}
   @media print{body{margin:0} .noprint{display:none}}`;
+
+// An amount in cents written out in words, for the payslip: 2090890 -> "Rupees Twenty Thousand Nine Hundred and Eight and Ninety Cents Only".
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+function under1000(n) {
+  const parts = [];
+  if (n >= 100) { parts.push(ONES[Math.floor(n / 100)] + " Hundred"); n %= 100; if (n) parts.push("and"); }
+  if (n >= 20) { parts.push(TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "")); } else if (n) parts.push(ONES[n]);
+  return parts.join(" ");
+}
+function wordsOf(n) {
+  if (n === 0) return "Zero";
+  const scales = [[1e9, "Billion"], [1e6, "Million"], [1e3, "Thousand"]];
+  const out = [];
+  for (const [size, name] of scales) { if (n >= size) { out.push(under1000(Math.floor(n / size)) + " " + name); n %= size; } }
+  if (n) { const tail = under1000(n); out.push(out.length && n < 100 ? "and " + tail : tail); }
+  return out.join(" ");
+}
+function amountInWords(cents) {
+  const neg = cents < 0, abs = Math.abs(Math.round(cents));
+  const rupees = Math.floor(abs / 100), c = abs % 100;
+  const text = `Rupees ${wordsOf(rupees)}${c ? ` and ${wordsOf(c)} ${c === 1 ? "Cent" : "Cents"}` : ""} Only`;
+  return neg ? `Minus ${text}` : text;
+}
 
 // `plain` is for the person's own copy: the security deposit is for the company's eyes, so it shows only as "Other deduction".
 async function payslipHtml(db, period, employeeId, hub, plain = false) {
@@ -71,6 +97,8 @@ async function payslipHtml(db, period, employeeId, hub, plain = false) {
         <tr class="total"><td>Closing balance (carried forward)</td><td class="n">${fmt(r.closing_balance)}</td></tr>
       </table>
       <div class="net">Net pay: Rs ${fmt(r.net_pay)}${r.role === "guy" ? ` · Paid: Rs ${fmt(r.disbursed_amount)}` : ""}</div>
+      <p class="words">Salary payable in words: <b>${esc(amountInWords(r.disbursed_amount))}</b></p>
+      <div class="sign"><div><span></span>Authority signature</div><div><span></span>${r.role === "manager" ? "Manager" : "Employee"} signature</div></div>
       <p class="muted">Status: ${esc(r.status.replace("_", " "))}${r.reviewed_by ? ` by ${esc(r.reviewed_by)}` : ""} · Computed ${esc(r.computed_at)}</p>
     </section>`;
   }).join("");
@@ -118,4 +146,4 @@ async function registerHtml(db, period) {
     <div style="overflow-x:auto"><table><tr>${head}</tr>${body}${total}</table></div></body></html>`;
 }
 
-module.exports = { payslipHtml, registerHtml, registerCsv };
+module.exports = { amountInWords, payslipHtml, registerHtml, registerCsv };

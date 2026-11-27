@@ -32,7 +32,7 @@ export default {
     const rows = data.flatMap((m) => m.weeks.map((w) => ({ ...m, w, key: m.manager_id + w.week_start })));
     el.innerHTML = html`<div class="weekly-page">
       <div class="page-head">
-        <div><h1>Weekly sheet</h1><p>For viewing only. Each manager's week is worked out from the daily sheets: his own sales plus his team's.${pay ? " Commission is 20% when the week reaches his target, otherwise 15%. Rent and hub fee are taken every week." : ""}</p></div>
+        <div><h1>Weekly sheet</h1><p>For viewing only. Each manager's week is worked out from the daily sheets: his own sales plus his team's.${pay ? " Commission is 20% when the week reaches his target, otherwise 15%. Rent and hub fee are taken every week, except that a retaining manager (month's sales below the limit) pays no rent." : ""}</p></div>
         <div class="actions">${exportButtons("weekly", { period: state.period, hub: scopeHub() })}</div>
       </div>
       <div class="card"><div class="card-body flush" id="grid"></div></div></div>`;
@@ -41,7 +41,7 @@ export default {
       rows, sortable: false, pageSize: 50, caption: "Managers' weeks",
       // A heading for each manager with their month, then that manager's weeks.
       groupBy: (r) => r.manager_id,
-      groupLabel: (key, rs) => `<b>${rs[0].name}</b> <span class="muted">· ${rs[0].hub} · ${rs.length} ${rs.length === 1 ? "week" : "weeks"}</span>`,
+      groupLabel: (key, rs) => `<b>${rs[0].name}</b> <span class="muted">· ${rs[0].hub} · ${rs.length} ${rs.length === 1 ? "week" : "weeks"}</span>${rs[0].retaining ? ` <span class="badge amber">Retaining: no rent</span>` : ""}`,
       card: (r) => html`<span class="mc-main"><b>${week(r)}</b>${pay ? html`<span class="mc-sub">Balance <span class="${r.w.weekly_balance < 0 ? "neg" : ""}">${money(r.w.weekly_balance)}</span></span>` : ""}</span><span class="mc-val">Rs ${money(r.w.business_total)}</span>`,
       cols: [
         { key: "name", label: "Manager", render: (r) => html`<b>${r.name}</b> <span class="faint">${r.hub}</span>` },
