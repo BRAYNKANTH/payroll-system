@@ -40,6 +40,28 @@
         "data/october"
       ],
       "port": 8090
+    },
+    {
+      "name": "payroll-scenarios",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--no-warnings",
+        "server.js",
+        "data/scenarios",
+        "8093"
+      ],
+      "port": 8093
+    },
+    {
+      "name": "payroll-real-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--no-warnings",
+        "server.js",
+        "data/real-preview",
+        "8094"
+      ],
+      "port": 8094
     }
   ]
 }
