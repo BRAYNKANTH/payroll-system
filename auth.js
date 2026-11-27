@@ -13,7 +13,8 @@ const PERMISSIONS = {
   coacher: ["read", "read_team", "enter_data", "manage_team", "stock", "self"],
   admin: ["read", "read_team", "enter_data", "manage_staff", "run_payroll", "review", "export", "manage_hubs", "manage_loans", "manage_products", "view_pay", "finalize", "manage_users", "settings", "stock", "approve_cash"],
 };
-const permissionsOf = (u) => [...(PERMISSIONS[u.role] || []), ...(u.role === "manager" && u.stock_keeper ? ["stock"] : [])];
+// Stock is managed only by each hub's coacher (and viewed by the office). A manager never gets the stock permission, whatever the old "stock keeper" tag says.
+const permissionsOf = (u) => [...(PERMISSIONS[u.role] || [])];
 const can = (user, perm) => !!user && (user.permissions || PERMISSIONS[user.role] || []).includes(perm);
 // perm may be a list: any one of them is enough.
 function requirePerm(user, perm) {

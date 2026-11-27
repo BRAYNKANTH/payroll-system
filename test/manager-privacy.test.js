@@ -76,21 +76,21 @@ test("a manager sees only the total business of their team: no names, no people,
   } finally { srv.close(); }
 });
 
-test("a stock keeper manager sees which stock sellers hold, never how much they sold", async () => {
+test("stock is managed only by the hub's coacher: a manager, even one tagged as a stock keeper, cannot open it", async () => {
   const d = await setup();
-  await d.run("UPDATE staff SET stock_keeper = true WHERE employee_id = 'M1'");
+  await d.run("UPDATE staff SET stock_keeper = true WHERE employee_id = 'M1'");   // the old tag no longer gives any access
   const srv = createServer(d).listen(0, "127.0.0.1");
   await new Promise((r) => srv.once("listening", r));
   const base = `http://127.0.0.1:${srv.address().port}`;
   const signIn = async (username) => (await fetch(base + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
     body: JSON.stringify({ username, password: PW }) })).headers.get("set-cookie").split(";")[0];
-  const json = async (p, cookie) => JSON.parse(await (await fetch(base + p, { headers: { Cookie: cookie } })).text());
+  const status = async (path, cookie, method = "GET", body) => (await fetch(base + path, { method, headers: { Cookie: cookie, "Content-Type": "application/json", "X-Requested-With": "fetch" }, ...(body ? { body: JSON.stringify(body) } : {}) })).status;
   try {
     const mgr = await signIn("mgr"), coach = await signIn("coach");
     for (const path of ["/api/stock-overview", `/api/stock-overview?from=${day}&to=${day}`, `/api/stock-issues?date=${day}`]) {
-      const asManager = JSON.stringify(await json(path, mgr));
-      assert.ok(!/"sold/.test(asManager), `${path}: no sold figures for a manager`);
-      assert.ok(/"sold/.test(JSON.stringify(await json(path, coach))), `${path}: the coacher still sees them`);
+      assert.equal(await status(path, mgr), 403, `${path}: a manager has no stock access`);
+      assert.equal(await status(path, coach), 200, `${path}: the coacher manages the stock`);
     }
+    assert.equal(await status("/api/stock-issues", mgr, "POST", { employee_id: "D1", lines: [] }), 403, "a manager cannot give stock out");
   } finally { srv.close(); }
 });

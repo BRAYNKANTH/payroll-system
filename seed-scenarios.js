@@ -90,14 +90,15 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
     M01D06: { user: "dist-stock-short", what: "Distributor whose stock count finds products MISSING (value taken off, note raised)", usual: 4400, attend: 1, lost: [["Cutlery set 24pc", 3], ["Cup set 6pc", 2]] },
     M01D07: { user: "dist-loan", what: "Distributor with a loan being repaid, an advance and a bonus (allowance)", usual: 4500, attend: 1, advanceDay: 2000 },
     M01D08: { user: "dist-new", what: "Distributor who JOINED mid-month (16 Nov): only counted from that day", usual: 4000, attend: 1 },
+    M05D05: { user: "dist-low-cash", what: "Distributor who hands in only about half of what they sell: the team (Santhees) falls BELOW the expected 90% and is marked; the shortage is taken off this seller's pay", usual: 4200, attend: 1, lowCash: 0.5 },
     M06D01: { user: "dist-unconfirmed", what: "Distributor whose last two days were entered on the phone and are NOT YET CONFIRMED", usual: 4500, attend: 1, portalUnconfirmed: 2 },
     M06D02: { user: "dist-absent", what: "Distributor who worked only about half the days", usual: 4600, attend: 0.5 },
-    M01S01: { user: "sup-under", what: "Supervisor UNDER target (target Rs 120,000) and under 21 days: NO food allowance", usual: 3900, attend: 0.8 },
-    M01S02: { user: "sup-over", what: "Supervisor OVER target and every day worked (21+ days): food allowance paid", usual: 7600, attend: 1 },
+    M01S01: { user: "sup-under", what: "Supervisor UNDER target (target Rs 120,000) and under 25 days: NO food allowance", usual: 3900, attend: 0.8 },
+    M01S02: { user: "sup-over", what: "Supervisor OVER target who also works Sundays (25 days): more than 24 days, so the food allowance is paid", usual: 7600, attend: 1, worksSundays: true },
     M06: { user: "mgr-over", what: "Manager whose team is OVER the weekly target: the higher profit share (20%)", usual: 1500, attend: 0.95, teamUsual: 5600 },
     M07: { user: "mgr-under", what: "Manager whose team is UNDER the weekly target: the lower profit share (15%), not retaining", usual: 1200, attend: 0.95, teamUsual: 1250 },
     M05: { user: "mgr-retaining", what: "RETAINING manager: month's sales below the retaining limit, so a flat share of the month's sales", usual: 600, attend: 0.9, teamUsual: 650 },
-    M09: { user: "mgr-stock", what: "Manager who is also the STOCK KEEPER (gives stock out and counts it)", usual: 1500, attend: 0.95, stockKeeper: true },
+    M09: { user: "mgr-plain", what: "Ordinary manager: sees only their own team's sales. No stock access: stock is managed only by each hub's coacher", usual: 1500, attend: 0.95 },
     PM02: { user: "promo-1", what: "Promoting manager: pay from the sales of the managers under them (includes the under-target manager M07)", usual: 0, attend: 0 },
     PM04: { user: "promo-2", what: "Promoting manager with a large group", usual: 0, attend: 0 },
   };
@@ -114,7 +115,6 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
     await auth.createUser(d, admin, { username: login, full_name: by.get(id).name, role: "staff", employee_id: id, password: PASSWORD });
     creds.push([login, `${by.get(id).name} (${id}, ${by.get(id).hub}): ${sc.what}`]);
   }
-  if (SC.M09?.stockKeeper) await svc.updateEntry(d, "staff", "M09", { stock_keeper: true }, "admin");
 
   // ---- who sells, and how much on a normal day -----------------------------------------------------------------------------------
   let seed = 4242;
@@ -153,11 +153,13 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
   const working = dates.filter((x) => new Date(x + "T00:00:00Z").getUTCDay() !== 0);
   const dailyMeta = new Map(); // "date|id" -> row
   const shortCount = {};
-  for (const day of working) {
+  for (const day of dates) {
+    const sunday = new Date(day + "T00:00:00Z").getUTCDay() === 0;
     for (const code of hubs) {
       const plan = [];
       for (const s of sellers) {
         if (s.hub !== code || day < s.from || (s.until && day > s.until)) continue;
+        if (sunday && !s.sc.worksSundays) continue;
         // a fixed share of days: the dates are spread by position so e.g. "half the days" is really about half
         const idx = working.indexOf(day);
         const works = s.attend >= 1 ? true : ((idx * 0.618 + (s.id.length % 7) * 0.13) % 1) < s.attend;
@@ -209,6 +211,7 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
         const sc = x.s.sc;
         if (sc.shortDays && (shortCount[x.s.id] || 0) < sc.shortDays && rnd() < 0.4) { settled = business - (800 + Math.round(rnd() * 20) * 100); shortCount[x.s.id] = (shortCount[x.s.id] || 0) + 1; }
         else if (!sc.shortDays && rnd() < 0.04) settled = business - 100 * (1 + Math.floor(rnd() * 4)); // an ordinary small slip now and then
+        if (sc.lowCash) settled = Math.round(business * sc.lowCash);
         if (sc.extraDay && day === working[9]) { settled = business + 600; notes = "Paid back an earlier shortage"; }
         if (sc.advanceDay && day === working[6]) personal = sc.advanceDay;
         hubSales += business;
@@ -247,8 +250,13 @@ const START = "2026-11-02"; // Sunday the 1st is a closed day; the first working
     book.push([code, working[10], "salary", "Salary", 20000 + Math.floor(rnd() * 5) * 1000, "Paid in cash", coacherOf[code], iso(working[10], 18, 0)]);
     book.push([code, working[14], "online", "Bank transfer", 15000 + Math.floor(rnd() * 20) * 1000, "Customer paid the company directly", "admin", iso(working[14], 12, 0)]);
     if (code === "J1") book.push([code, working[4], "other_in", "Float from the office", 10000, "Starting cash for the hub", "admin", iso(working[4], 9, 0)]);
+    // cash two managers took: it is deducted from their pay for that week
+    if (code === "J1") book.push([code, working[8], "draw", "Manager's salary", 20000, "Salary taken in cash", coacherOf[code], iso(working[8], 18, 10), "M06"]);
+    if (code === "J3") book.push([code, working[9], "draw", "Manager's salary", 8000, "Advance on salary", coacherOf[code], iso(working[9], 18, 10), "M07"]);
+    if (code === "J1") book.push([code, working[12], "expense", "Clearance", 3500, "Clearing charge", coacherOf[code], iso(working[12], 17, 50)]);
+    if (code === "J2") book.push([code, working[12], "expense", "Cards", 850, "ID cards", coacherOf[code], iso(working[12], 17, 50)]);
   }
-  await bulk("cash_book_entries", ["hub", "date", "kind", "category", "amount", "note", "created_by", "created_at"], book.map((r) => [r[0], r[1], r[2], r[3], r[4] * 100, r[5], r[6], r[7]]));
+  await bulk("cash_book_entries", ["hub", "date", "kind", "category", "amount", "note", "created_by", "created_at", "employee_id"], book.map((r) => [r[0], r[1], r[2], r[3], r[4] * 100, r[5], r[6], r[7], r[8] || null]));
   await bulk("cash_handovers", ["hub", "date", "sales", "amount", "note", "status", "submitted_by", "submitted_at", "verified_by", "verified_at", "verify_note"], batch.handover);
 
   // Days that sellers with a login entered on their own phone. Older ones were confirmed by the office; some of the latest are waiting.

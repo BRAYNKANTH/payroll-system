@@ -49,7 +49,7 @@ test("guy: positive net pay first clears debt carried in", () => {
 // Tiered scheme, figures taken from the business's own Excel payslips (Rs → cents ×100).
 const supervisor = {
   ...guy, pay_scheme: "tiered", basic_pay: 3000000, target: 12000000, commission_rate: 0.3,
-  base_commission_rate: 0.25, food_per_day: 15000, food_min_days: 21, security_deduction_rule: "pct_business:1",
+  base_commission_rate: 0.25, food_per_day: 15000, food_min_days: 25, security_deduction_rule: "pct_business:1",
 };
 const distributor = { ...supervisor, basic_pay: 2500000, target: 10000000, food_min_days: 0 };
 // `days` entries totalling `business`, with `minus` of settle-up shortfall on the first day.
@@ -58,15 +58,21 @@ const month = (days, business, minus) => Array.from({ length: days }, (_, i) =>
     i === 0 ? business - (days - 1) * Math.floor(business / days) - minus : Math.floor(business / days)));
 const calc = (staff, daily) => engine.computeGuy({ staff, daily, stock: [], allowances: [], openingBalance: 0, securityHeldToDate: 0 });
 
-test("tiered: supervisor over target gets fixed basic + 30% over target, no food under 21 days", () => {
+test("tiered: supervisor over target gets fixed basic + 30% over target, no food unless more than 24 days are worked", () => {
   const r = calc(supervisor, month(20, 18069000, 1969000));
   assert.equal(r.gross_earnings, 3000000 + 1820700);        // 30,000 + 30% × 60,690
-  assert.equal(r.detail.food_allowance, 0);                  // 20 days < 21
+  assert.equal(r.detail.food_allowance, 0);                  // 20 days: food needs more than 24
   assert.equal(r.detail.security_deducted, 180690);          // 1% of business
   assert.equal(r.net_pay, 2671010);                          // Rs 26,710.10 as in the sheet
 });
 
-test("tiered: supervisor with 21+ days gets food for every day", () => {
+test("tiered: a supervisor gets food for every day only when more than 24 days are worked", () => {
+  // the sheets: 21 and 22 days got no food; 25, 26 and 29 days got it for every day
+  for (const [days, food] of [[21, 0], [22, 0], [24, 0], [25, 25 * 15000], [26, 26 * 15000]]) assert.equal(calc(supervisor, month(days, 15000000, 0)).detail.food_allowance, food, `${days} days`);
+}
+);
+
+test("tiered: supervisor with 29 days gets food for every day", () => {
   const r = calc(supervisor, month(29, 16641000, 2570000));
   assert.equal(r.detail.food_allowance, 29 * 15000);         // Rs 4,350
   assert.equal(r.net_pay, 2090890);                          // Rs 20,908.90 as in the sheet

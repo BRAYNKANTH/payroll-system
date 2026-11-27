@@ -110,7 +110,7 @@ test("about ten sellers are added under every manager and promoting manager: two
     assert.ok(mine.every((x) => x.hub === m.hub), "same hub as the manager");
   }
   const sup = p.people.find((x) => x.employee_id === "M01S01"), dist = p.people.find((x) => x.employee_id === "M01D01");
-  assert.deepEqual([sup.target, sup.basic_pay, sup.food_min_days], [120000, 30000, 21], "a supervisor: higher target and basic, food from 21 days");
+  assert.deepEqual([sup.target, sup.basic_pay, sup.food_min_days], [120000, 30000, 25], "a supervisor: higher target and basic, food only when more than 24 days are worked");
   assert.deepEqual([dist.target, dist.basic_pay, dist.food_min_days], [100000, 25000, 0]);
   assert.equal(new Set(p.people.map((x) => x.employee_id)).size, p.people.length, "every id is unique");
 });
@@ -151,5 +151,5 @@ test("go-live with sellers and logins: the admin and the named login survive, ev
   for (const l of logins) assert.ok((await auth.login(d, l.username, "demo1234")).token, `${l.username} signs in`);
   const coach = await d.get("SELECT u.role FROM users u JOIN staff s ON s.employee_id = u.employee_id WHERE s.name = 'Issany' AND s.employee_id = 'M01'");
   assert.equal(coach.role, "coacher", "the hub's coacher gets the coacher login");
-  assert.equal(JSON.parse((await db.getSettings(d)).position_defaults).supervisor.food_min_days, 21, "new people pre-fill the 21-day food rule");
+  assert.equal(JSON.parse((await db.getSettings(d)).position_defaults).supervisor.food_min_days, 25, "new people pre-fill the food rule: more than 24 days");
 });

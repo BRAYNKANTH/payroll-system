@@ -525,22 +525,36 @@ function mondaysIn(period) {
   for (let d = new Date(Date.UTC(y, m - 1, 1)); d.getUTCMonth() === m - 1; d.setUTCDate(d.getUTCDate() + 1)) if (d.getUTCDay() === 1) out.push(d.toISOString().slice(0, 10));
   return out;
 }
-function managerWeeks(period, settings, manager, dailyRows, saved) {
+// `draws` are the cash this manager took from the hub's cash (the cash book's "cash taken by a manager"). What was taken in a week is deducted from
+// the manager's pay for that week, as "money drawn for personal use".
+function managerWeeks(period, settings, manager, dailyRows, saved, draws = []) {
   const savedBy = new Map(saved.map((w) => [String(w.week_start).slice(0, 10), w]));
   const out = [];
   for (const ws of mondaysIn(period)) {
-    if (savedBy.has(ws)) { out.push(savedBy.get(ws)); continue; }
     const we = isoAdd(ws, 6);
+    const taken = draws.reduce((t, d) => (d.date >= ws && d.date <= we ? t + Number(d.amount) : t), 0);
+    if (savedBy.has(ws)) { const w = savedBy.get(ws); out.push({ ...w, personal_draw: Number(w.personal_draw || 0) + taken }); continue; }
     const business = dailyRows.reduce((t, r) => (r.date >= ws && r.date <= we ? t + Number(r.business_amount) : t), 0);
-    if (!business) continue;
+    if (!business) { // no sales that week, but cash the manager took still comes off their pay
+      if (taken) out.push({ week_start: ws, week_end: we, business_total: 0, profit_percent: engine.managerCommissionRate(0, settings, manager.target), rent: 0, hub_fee: 0, security_cost: 0, personal_draw: taken });
+      continue;
+    }
     out.push({
       week_start: ws, week_end: we, business_total: business,
       profit_percent: engine.managerCommissionRate(business, settings, manager.target),
       rent: Number(settings.manager_rent_default) || 0, hub_fee: Number(settings.manager_hub_fee_default) || 0,
-      security_cost: Math.round(business * (Number(settings.manager_security_rate) || 0)), personal_draw: 0,
+      security_cost: Math.round(business * (Number(settings.manager_security_rate) || 0)), personal_draw: taken,
     });
   }
   return out;
+}
+
+// The cash managers took in the weeks of a month (the weeks can run into the next month), grouped by manager.
+async function managerDraws(db, period) {
+  const mondays = mondaysIn(period);
+  if (!mondays.length) return new Map();
+  const rows = await db.all("SELECT employee_id, date, amount FROM cash_book_entries WHERE kind = 'draw' AND date >= ? AND date < ?", mondays[0], isoAdd(mondays[mondays.length - 1], 7));
+  return groupBy(rows, "employee_id");
 }
 
 // Read-only weekly view for the office: every manager's weeks worked out from the daily sheets (nothing is entered here).
@@ -553,10 +567,10 @@ async function weeklyView(db, period, hub) {
   const end = mondays.length ? isoAdd(mondays[mondays.length - 1], 7) : from;
   const dailyAll = mondays.length ? await db.all("SELECT * FROM daily_log WHERE date >= ? AND date < ?", mondays[0], end) : [];
   const saved = await db.all("SELECT * FROM weekly_log WHERE week_start >= ? AND week_start < ?", ...monthBounds(period));
-  const dBy = groupBy(dailyAll, "employee_id"), sBy = groupBy(saved, "manager_id");
+  const dBy = groupBy(dailyAll, "employee_id"), sBy = groupBy(saved, "manager_id"), drawBy = await managerDraws(db, period);
   return staff.filter((m) => holdsWeekly(m.staff_level) && m.status === "active" && (!hub || m.hub === hub)).map((m) => {
     const rows = [m, ...staff.filter((s) => s.manager_id === m.employee_id)].flatMap((x) => dBy.get(x.employee_id) || []);
-    const weeks = managerWeeks(period, settings, m, rows, sBy.get(m.employee_id) || []);
+    const weeks = managerWeeks(period, settings, m, rows, sBy.get(m.employee_id) || [], drawBy.get(m.employee_id) || []);
     // A manager whose month of sales (own + team's) is below the retaining limit pays no rent that month: the same rule as the payroll run.
     const [mFrom, mTo] = monthBounds(period);
     const monthSales = [m, ...staff.filter((s) => s.manager_id === m.employee_id)].flatMap((x) => dBy.get(x.employee_id) || [])
@@ -588,7 +602,7 @@ async function runPeriod(db, period, user) {
     const spill = lastMonday && isoAdd(lastMonday, 7) > to ? await t.all("SELECT * FROM daily_log WHERE date >= ? AND date < ?", to, isoAdd(lastMonday, 7)) : []; // the last week runs into next month
     const weekDaily = groupBy([...dailyAll, ...spill], "employee_id");
     const daily = groupBy(dailyAll, "employee_id"), stock = groupBy(stockAll, "employee_id");
-    const allow = groupBy(allowAll, "employee_id"), weekly = groupBy(weeklyAll, "manager_id");
+    const allow = groupBy(allowAll, "employee_id"), weekly = groupBy(weeklyAll, "manager_id"), drawBy = await managerDraws(t, period);
     // Latest earlier summary per employee (opening balance + previous net pay) and security held so far.
     const prevRows = await t.all(`SELECT DISTINCT ON (employee_id) employee_id, period, closing_balance, net_pay FROM pay_period_summary
       WHERE period < ? ORDER BY employee_id, period DESC`, period);
@@ -650,7 +664,7 @@ async function runPeriod(db, period, user) {
       results.set(m.employee_id, {
         staff: m, prev,
         result: engine.computeManager({
-          staff: m, weekly: managerWeeks(period, settings, m, [m, ...sellers].flatMap((x) => weekDaily.get(x.employee_id) || []), weekly.get(m.employee_id) || []), team, openingBalance,
+          staff: m, weekly: managerWeeks(period, settings, m, [m, ...sellers].flatMap((x) => weekDaily.get(x.employee_id) || []), weekly.get(m.employee_id) || [], drawBy.get(m.employee_id) || []), team, openingBalance,
           companyReturnRate: 0, // a manager returns no share to the company; only the coacher hands cash to the owner
           teamSales: sellers.reduce((t, g) => t + salesOf(g.employee_id), 0), ownSales: salesOf(m.employee_id), rules,
           seniorShare: promoting ? { base: managersGroups(m.employee_id), rate: Number(settings.senior_commission_rate) } : null,

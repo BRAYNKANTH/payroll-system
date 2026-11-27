@@ -104,7 +104,7 @@ export default {
         <span class="mc-end">${roleBadge(u.role)}<br>${badge(u.status)}</span>`,
       cols: [
         { key: "full_name", label: "User", render: (u) => html`<div class="who"><div class="avatar">${initials(u.full_name)}</div><div><b>${u.full_name}</b><span>${u.username}</span></div></div>` },
-        { key: "role", label: "Role", render: (u) => html`${roleBadge(u.role)}${u.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}` },
+        { key: "role", label: "Role", render: (u) => html`${roleBadge(u.role)}` },
         { key: "hub", label: "Hub access", render: (u) => (u.role === "staff" || u.role === "manager" ? html`<span class="badge plain">${u.employee_id}</span>` : u.hub ? html`<span class="badge plain">${u.hub} only</span>` : html`<span class="faint">All hubs</span>`) },
         { key: "last_login_at", label: "Last sign-in", render: (u) => ago(u.last_login_at) },
         { key: "status", label: "Status", render: (u) => badge(u.status) },

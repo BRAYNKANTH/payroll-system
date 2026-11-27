@@ -361,6 +361,10 @@ CREATE TABLE IF NOT EXISTS cash_book_entries (
   created_at text NOT NULL DEFAULT ${NOW}
 );
 CREATE INDEX IF NOT EXISTS cash_book_hub_date ON cash_book_entries (hub, date);
+-- 'draw' is cash a manager took from the hub's cash (salary or personal use): it is deducted from that manager's pay for the week it was taken.
+ALTER TABLE cash_book_entries ADD COLUMN IF NOT EXISTS employee_id text REFERENCES staff(employee_id);
+ALTER TABLE cash_book_entries DROP CONSTRAINT IF EXISTS cash_book_entries_kind_check;
+ALTER TABLE cash_book_entries ADD CONSTRAINT cash_book_entries_kind_check CHECK (kind IN ('expense','salary','other_in','online','draw'));
 
 -- What was actually paid to a person for a month's salary (the sheets' "paid / pending", cheques and part payments).
 -- A month's salary is the pay period summary's disbursed amount; payments add up against it. Payments are recorded after the month is calculated
@@ -391,6 +395,10 @@ CREATE TABLE IF NOT EXISTS hub_week_counts (
   updated_at text,
   UNIQUE (hub, week_start, product_id)
 );
+
+-- Supervisors get the food allowance only when more than 24 days are worked (it was 21): move existing supervisors and the saved position defaults.
+UPDATE staff SET food_min_days = 25 WHERE staff_level = 'supervisor' AND food_min_days = 21;
+UPDATE settings SET value = replace(value, '"food_min_days":21', '"food_min_days":25') WHERE key = 'position_defaults';
 
 -- Stock the company receives (bought or made). The office holds everything received minus everything it sent to hubs.
 CREATE TABLE IF NOT EXISTS product_receipts (

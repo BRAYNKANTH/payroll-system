@@ -20,7 +20,7 @@ The site is at **www.wec.lk**. Everything below is done inside the app.
 
 ## 4. Pay rules that are already set
 - **Distributor:** target Rs 100,000, basic Rs 25,000, 30% of sales above the target, 25% of all sales below it, food Rs 150 a day.
-- **Supervisor:** target Rs 120,000, basic Rs 30,000, same rates, food Rs 150 a day **only from the 21st day worked**.
+- **Supervisor:** target Rs 120,000, basic Rs 30,000, same rates, food Rs 150 a day **only when more than 24 days are worked**.
 - **Manager:** basic Rs 27,000. **Promoting manager:** basic Rs 30,000 plus a share on the managers directly under them.
 - All of these can be changed in **Settings** (Pay defaults) or per person.
 

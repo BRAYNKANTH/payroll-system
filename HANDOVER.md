@@ -68,7 +68,7 @@ New `staff` columns: `pay_scheme`, `base_commission_rate`, `food_per_day`, `food
 `ALTER TABLE ... IF NOT EXISTS` in `db.js`). Employee form and profile page show them. The new tests reproduce three
 real Excel payslips to the cent (net 26,710.10 / 20,908.90 / 4,082.00).
 
-Typical Excel values: supervisor target 120,000, fixed basic 30,000, food 150/day only from 21 days;
+Typical Excel values: supervisor target 120,000, fixed basic 30,000, food 150/day only when more than 24 days are worked;
 distributor target 100,000, fixed basic 25,000, food 150/day always; base commission 25%; over-target 30%.
 
 ### Not done

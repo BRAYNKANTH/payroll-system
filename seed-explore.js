@@ -59,7 +59,7 @@ const remote = process.argv.includes("--remote");
   // ---- settings, pay setup, hubs ------------------------------------------------------------------------------------------------
   const PAY = {
     distributor: { pay_scheme: "tiered", target: 100000, basic_pay: 25000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 0, security_deduction_rule: "pct_business:1" },
-    supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 21, security_deduction_rule: "pct_business:1" },
+    supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 25, security_deduction_rule: "pct_business:1" },
     manager: { target: 100000, basic_pay: 27000 }, promoting_manager: { basic_pay: 29000 }, coacher: { basic_pay: 30000 },
   };
   // The pay defaults must match what seed.js stores, so read them from there rather than guess.

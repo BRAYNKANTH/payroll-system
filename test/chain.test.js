@@ -65,7 +65,7 @@ test("a go-live balance is the opening balance of the first month only", async (
 
 test("position pay defaults are validated and stored", async () => {
   const d = await setup();
-  const good = { supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 21, security_deduction_rule: "pct_business:1" } };
+  const good = { supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 25, security_deduction_rule: "pct_business:1" } };
   const s = await svc.updateSettings(d, { position_defaults: JSON.stringify(good) }, "admin");
   assert.equal(JSON.parse(s.position_defaults).supervisor.target, 120000);
   await assert.rejects(() => svc.updateSettings(d, { position_defaults: JSON.stringify({ boss: {} }) }, "admin"), /No pay defaults/);

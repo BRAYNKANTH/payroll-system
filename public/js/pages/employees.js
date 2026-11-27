@@ -39,9 +39,6 @@ export async function employeeForm(existing, onSaved) {
         <span class="hint" id="ef-level-hint" hidden></span></div>
       <div class="field" id="ef-upline-wrap"><label for="ef-upline">Team of</label><select class="input" id="ef-upline" name="upline_id"></select>
         <span class="hint" id="ef-upline-hint">Whose team this person counts in. Their sales count in this person's pay and commission. It is not office management, and it can be someone from another hub.</span></div>
-      <div class="field" id="ef-keeper-wrap" hidden><span class="lbl">Stock keeper</span>
-        <label style="display:flex;gap:10px;align-items:center;font-weight:400"><input type="checkbox" name="stock_keeper" ${e.stock_keeper ? "checked" : ""}> Can handle the stock of the whole hub</label>
-        <span class="hint">A stock keeper can see and give stock to everyone in the hub, not only the people under them. Their other access does not change.</span></div>
       <div class="field" id="ef-coach-wrap" hidden><span class="lbl">Hub coacher</span>
         <label style="display:flex;gap:10px;align-items:center;font-weight:400"><input type="checkbox" name="is_coacher" ${e.is_coacher ? "checked" : ""}> This person is the coacher of their hub</label>
         <span class="hint" id="ef-coach-hint">The coacher heads the hub: its people, stock, daily sheets and the cash handover. One coacher per hub. Their pay and their place in the chart do not change.</span></div>
@@ -104,7 +101,6 @@ export async function employeeForm(existing, onSaved) {
     const guy = !isManagerLevel(f.staff_level.value);
     $$("[data-guy]", f).forEach((x) => (x.hidden = !guy));
     const lvl = f.staff_level.value;
-    $("#ef-keeper-wrap", f).hidden = lvl !== "manager"; // only a manager can be a stock keeper
     // The coacher tag goes on a manager or a promoting manager. One per hub: say who has it now.
     $("#ef-coach-wrap", f).hidden = !["manager", "promoting_manager"].includes(lvl);
     const holder = f.is_coacher?.checked ? staff.find((x) => x.is_coacher && x.status === "active" && x.hub === f.hub.value && x.employee_id !== e.employee_id) : null;
@@ -192,7 +188,7 @@ export async function employeeForm(existing, onSaved) {
       pay_scheme: tiered ? "tiered" : "over_target",
       base_commission_rate: tiered && v.base_commission_pct ? Number(v.base_commission_pct) / 100 : 0,
       food_per_day: tiered ? v.food_per_day || 0 : 0, food_min_days: tiered ? Number(v.food_min_days) || 0 : 0,
-      opening_balance: v.opening_balance || 0, stock_keeper: v.staff_level === "manager" && !!f.stock_keeper?.checked,
+      opening_balance: v.opening_balance || 0,
       is_coacher: v.staff_level === "coacher" || (["manager", "promoting_manager"].includes(v.staff_level) && !!f.is_coacher?.checked),
       bank_name: v.bank_name, bank_code: v.bank_code, branch_code: v.branch_code, bank_account_no: v.bank_account_no,
     };
@@ -223,7 +219,7 @@ export default {
 
     const allCols = [
       { key: "name", label: "Employee", render: (s) => html`<div class="who"><div class="avatar" style="${s.role === "manager" ? "background:color-mix(in srgb, var(--accent) 78%, #000)" : ""}">${initials(s.name)}</div><div><b>${s.name}</b><span>${s.employee_id}${s.phone ? html`<span class="phone"> · ${s.phone}</span>` : ""}</span></div></div>` },
-      { key: "staff_level", label: "Position", render: (s) => html`${badge(s.role, levelLabel(s.staff_level))}${s.stock_keeper ? html` ${badge("amber", "Stock keeper")}` : ""}${s.is_coacher && s.staff_level !== "coacher" ? html` ${badge("green", "Coacher")}` : ""}` },
+      { key: "staff_level", label: "Position", render: (s) => html`${badge(s.role, levelLabel(s.staff_level))}${s.is_coacher && s.staff_level !== "coacher" ? html` ${badge("green", "Coacher")}` : ""}` },
       { key: "hub", label: "Hub", render: (s) => hubName(s.hub) },
       { key: "upline_id", label: "Team of", render: (s) => { const u = s.upline_id || s.manager_id; return u ? byId[u]?.name || u : html`<span class="faint">—</span>`; } },
       ...(!can("view_pay") ? [] : [{ key: "basic_pay", label: "Basic pay", align: "r", render: (s) => s.role === "guy" || s.basic_pay ? money(s.basic_pay) : html`<span class="faint">—</span>` }]),

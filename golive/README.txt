@@ -24,7 +24,7 @@ How the rules work
 WHAT THE TOOL ADDS ON ITS OWN (so the client can start straight away)
   - About 10 sellers under every manager and promoting manager: 2 supervisors and 8 distributors, in that manager's hub. They are placeholders
     named like 'Issany D1' and 'Issany S1'. The client renames, moves or removes them in the app.
-      Distributor: target 100,000, basic 25,000.   Supervisor: target 120,000, basic 30,000, food only from the 21st day worked.
+      Distributor: target 100,000, basic 25,000.   Supervisor: target 120,000, basic 30,000, food only when more than 24 days are worked.
     Use  --sellers=0  for none, or  --sellers=6  for six each.
   - A login for every person (managers, promoting managers and sellers). The username starts with a random 4-digit number
     (for example 4821-issany or 7305-issany-d1) and the password for everyone is  demo1234.

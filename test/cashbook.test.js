@@ -132,3 +132,46 @@ test("each team's cash by day, with what it still owed from before", async () =>
   else assert.equal(b.team_carried.M1, 500000, "yesterday was last month, so it is carried in");
   assert.equal(b.team_meta.find((m) => m.id === "M1").title, "Name M1");
 });
+
+test("cash a manager took is recorded in the cash book and deducted from their pay for that week", async () => {
+  const d = await setup();
+  await svc.updateEntry(d, "staff", "M1", { basic_pay: 27000, target: 100000 }, "admin");
+  const t = today();
+  await sell(d, t, "D1", 60000); await sell(d, t, "D2", 40000);
+  await assert.rejects(() => cashbook.add(d, COACH, { kind: "draw", amount: 100 }), /Choose the manager/);
+  await assert.rejects(() => cashbook.add(d, COACH, { kind: "draw", employee_id: "D1", amount: 100 }), /Choose the manager/);
+  const e = await cashbook.add(d, COACH, { kind: "draw", employee_id: "M1", amount: 20000, note: "Salary advance" });
+  assert.equal(e.employee_id, "M1");
+  const b = await cashbook.book(d, "H1", period());
+  assert.equal(day(b, t).draws, 2000000);
+  assert.equal(b.totals.draws, 2000000);
+  assert.equal(day(b, t).closing, 10000000 - 2000000, "the cash taken is out of the cash in hand");
+  assert.equal(b.entries.find((x) => x.kind === "draw").employee_name, "Name M1");
+  assert.deepEqual(b.managers.map((m) => m.id), ["M1"]);
+  // the pay run takes it off that manager
+  await svc.runPeriod(d, period(), "admin");
+  const row = (await svc.getPeriod(d, period())).rows.find((r) => r.employee_id === "M1");
+  assert.equal(row.detail.deductions.find((x) => x.key === "personal_draw").amount, 2000000);
+  const weekly = (await svc.weeklyView(d, period())).find((m) => m.manager_id === "M1");
+  assert.equal(weekly.weeks.reduce((s, w) => s + w.personal_draw, 0), 2000000);
+});
+
+test("teams and sellers below the expected 90% of their sales are marked", async () => {
+  const d = await setup();
+  await sell(d, today(), "D1", 60000, 60000); await sell(d, today(), "D2", 40000, 30000);   // the team handed in Rs 90,000 of Rs 100,000
+  let b = await cashbook.book(d, "H1", period());
+  assert.deepEqual([b.teams[0].expected, b.teams[0].below, b.teams[0].short_of_expected], [9000000, false, 0], "exactly 90% is enough");
+  assert.deepEqual(b.gave_less.map((x) => [x.employee_id, x.short]), [["D2", 1000000]], "the one who handed in less");
+  await sell(d, sales.addDays(today(), -1), "D1", 50000, 40000);                                  // a day when the team is below 90%
+  b = await cashbook.book(d, "H1", period());
+  const y = b.team_days.find((x) => x.date === sales.addDays(today(), -1));
+  if (y) assert.deepEqual([y.teams[0].expected, y.teams[0].below], [4500000, true]);
+  assert.equal(b.min_percent, 90);
+});
+
+test("clearance, advertising and cards can be entered by the hub as expenses", async () => {
+  const d = await setup();
+  assert.ok(["Clearance", "Advertising", "Cards"].every((c) => cashbook.CATEGORIES.includes(c)));
+  const e = await cashbook.add(d, COACH, { kind: "expense", category: "Advertising", amount: 850 });
+  assert.equal(e.category, "Advertising");
+});

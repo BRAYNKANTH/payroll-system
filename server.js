@@ -30,6 +30,8 @@ const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; cha
 const BASE_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin", "X-Frame-Options": "SAMEORIGIN" };
 const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "font-src 'self'; img-src 'self' data:; frame-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'";
+// Stock is managed only by a hub's own coacher: returns that hub, or refuses (the office and everyone else only look).
+const coacherOnly = (user) => { if (!user.hub) throw svc.httpError(403, "Stock is managed by each hub's coacher"); return user.hub; };
 const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:; base-uri 'none'";
 const BACKUP_TABLES = ["settings", "hubs", "users", "staff", "daily_log", "weekly_log", "stock_recon", "hub_stock", "allowances", "loans", "loan_repayments", "products", "product_receipts", "periods", "pay_period_summary", "cash_handovers", "cash_book_entries", "salary_payments", "hub_week_counts", "audit_log"];
 
@@ -199,9 +201,10 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/hub-stock\/(\d+)$/, "manage_products", ({ user, m }) => pos.takeFromHub(database, user, m[1])],
     ["GET", /^\/api\/stock-issues$/, "stock", ({ user, q }) => pos.morning(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })
       .then((r) => (auth.can(user, "read") ? r : withoutSold(r)))],
-    ["POST", /^\/api\/stock-issues\/bulk$/, "stock", ({ user, body }) => pos.giveMany(database, user, body, user.hub)],
-    ["POST", /^\/api\/stock-issues$/, "stock", ({ user, body }) => pos.give(database, user, body, user.hub)],
-    ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "stock", ({ user, m }) => pos.takeBack(database, user, m[1], user.hub)],
+    // Stock is managed only by the hub's own coacher: giving it out, taking it back and counting it. The office sends stock to hubs and looks at the rest.
+    ["POST", /^\/api\/stock-issues\/bulk$/, "stock", ({ user, body }) => pos.giveMany(database, user, body, coacherOnly(user))],
+    ["POST", /^\/api\/stock-issues$/, "stock", ({ user, body }) => pos.give(database, user, body, coacherOnly(user))],
+    ["DELETE", /^\/api\/stock-issues\/(\d+)$/, "stock", ({ user, m }) => pos.takeBack(database, user, m[1], coacherOnly(user))],
     // Cash handover: the coacher hands the day's cash to the office (at least 90% of the day's sales); the admin approves it.
     ["GET", /^\/api\/handovers\/day$/, "read", ({ user, q }) => handover.day(database, { date: q.get("date") || undefined, hub: user.hub || q.get("hub") || undefined })],
     ["GET", /^\/api\/handovers$/, "read", ({ user, q }) => handover.list(database, { hub: user.hub || q.get("hub") || undefined, status: q.get("status") || undefined, limit: q.get("limit") })],
@@ -213,7 +216,7 @@ function createHandler(dbReady) {
     ["DELETE", /^\/api\/cashbook\/(\d+)$/, "enter_data", ({ user, m }) => cashbook.remove(database, user, m[1])],
     // The hub's weekly stock sheet: opening, what was received each weekday, sold, expected and counted (Monday to Sunday).
     ["GET", /^\/api\/week-stock$/, ["read", "stock"], ({ user, q }) => weekstock.week(database, { hub: user.hub || q.get("hub") || "", date: q.get("date") || undefined })],
-    ["POST", /^\/api\/week-stock\/counts$/, "stock", ({ user, body }) => weekstock.saveCounts(database, user, body)],
+    ["POST", /^\/api\/week-stock\/counts$/, "stock", ({ user, body }) => weekstock.saveCounts(database, (coacherOnly(user), user), body)],
     ["POST", /^\/api\/me\/sales$/, "self", ({ user, body }) => sales.addSale(database, user, body)],
     ["DELETE", /^\/api\/me\/sales\/(\d{4}-\d{2}-\d{2})$/, "self", ({ user, m }) => sales.removeSale(database, user, m[1])],
     ["GET", /^\/api\/me\/documents$/, "self", ({ user }) => portal.listDocuments(database, user)],
@@ -272,7 +275,7 @@ function createHandler(dbReady) {
       return { file: d.buffer, type: d.mime, filename: d.file_name };
     }],
     ["DELETE", /^\/api\/documents\/(\d+)$/, ["manage_staff", "manage_team"], ({ m, user }) => svc.deleteDocument(database, m[1], user.username, user.hub)],
-    ["POST", /^\/api\/(daily|stock|hubstock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, user.hub)],
+    ["POST", /^\/api\/(daily|stock|hubstock)\/bulk$/, "enter_data", ({ user, body, m }) => svc.bulkUpsert(database, m[1], body.rows, user.username, m[1] === "daily" ? user.hub : coacherOnly(user))],
     ["POST", /^\/api\/(daily|stock|hubstock)$/, "enter_data", ({ user, body, m }) => svc.createEntry(database, m[1], body, user.username, user.hub)],
     ["PUT", /^\/api\/(daily|stock|hubstock)\/(\d+)$/, "enter_data", ({ user, body, m }) => svc.updateEntry(database, m[1], m[2], body, user.username, user.hub)],
     ["DELETE", /^\/api\/(daily|stock|hubstock)\/(\d+)$/, "enter_data", ({ user, m }) => svc.deleteEntry(database, m[1], m[2], user.username, user.hub)],

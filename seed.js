@@ -66,7 +66,7 @@ if (existingAdmin && demoPw && !(await d.get("SELECT 1 AS x FROM users WHERE low
 // Pay setup per position. Distributors and supervisors are the same level and differ only in target and rates. A manager's target is weekly.
 const PAY = {
   distributor: { pay_scheme: "tiered", target: 100000, basic_pay: 25000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 0, security_deduction_rule: "pct_business:1" },
-  supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 21, security_deduction_rule: "pct_business:1" },
+  supervisor: { pay_scheme: "tiered", target: 120000, basic_pay: 30000, commission_rate: 0.3, base_commission_rate: 0.25, food_per_day: 150, food_min_days: 25, security_deduction_rule: "pct_business:1" },
   manager: { target: 100000, basic_pay: 27000 }, promoting_manager: { basic_pay: 29000 }, coacher: { basic_pay: 30000 },
 };
 await svc.updateSettings(d, {

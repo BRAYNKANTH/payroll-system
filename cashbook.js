@@ -11,8 +11,10 @@ const { withUser, httpError } = require("./db");
 const sales = require("./sales");
 const svc = require("./service");
 
-const KINDS = { expense: "Expense", salary: "Salary paid", other_in: "Other cash in", online: "Online money received" };
-const CATEGORIES = ["Tea and transport", "Office", "Fuel", "Rent", "Supplies", "Other"];
+const KINDS = { expense: "Expense", salary: "Salary paid", draw: "Cash taken by a manager", other_in: "Other cash in", online: "Online money received" };
+// What the hub may enter as an expense. Clearance, advertising and cards are the charges on the branch sheets; the hub writes them here.
+const CATEGORIES = ["Tea and transport", "Office", "Fuel", "Rent", "Supplies", "Clearance", "Advertising", "Cards", "Other"];
+const { MIN_SHARE } = require("./handover");
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const num = (r) => ({ ...r, id: Number(r.id), amount: Number(r.amount) });
 const monthBounds = (period) => [period + "-01", svc.shiftPeriod(period, 1) + "-01"];
@@ -23,7 +25,7 @@ async function before(db, hub, date) {
   const one = async (sql, ...a) => Number((await db.get(sql, ...a)).n) || 0;
   const cashIn = await one("SELECT COALESCE(SUM(d.settled_amount), 0) AS n FROM daily_log d JOIN staff s USING (employee_id) WHERE s.hub = ? AND d.date < ?", hub, date);
   const otherIn = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_book_entries WHERE hub = ? AND kind = 'other_in' AND date < ?", hub, date);
-  const spent = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_book_entries WHERE hub = ? AND kind IN ('expense','salary') AND date < ?", hub, date);
+  const spent = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_book_entries WHERE hub = ? AND kind IN ('expense','salary','draw') AND date < ?", hub, date);
   const handed = await one("SELECT COALESCE(SUM(amount), 0) AS n FROM cash_handovers WHERE hub = ? AND status <> 'rejected' AND date < ?", hub, date);
   return cashIn + otherIn - spent - handed;
 }
@@ -34,22 +36,23 @@ async function book(db, hub, period) {
   const opening = await before(db, hub, from);
   const settled = new Map((await db.all(`SELECT d.date, SUM(d.settled_amount) AS cash, SUM(d.business_amount) AS sales FROM daily_log d JOIN staff s USING (employee_id)
     WHERE s.hub = ? AND d.date >= ? AND d.date < ? GROUP BY d.date`, hub, from, to)).map((r) => [r.date, { cash: Number(r.cash), sales: Number(r.sales) }]));
-  const entries = (await db.all("SELECT * FROM cash_book_entries WHERE hub = ? AND date >= ? AND date < ? ORDER BY date, id", hub, from, to)).map(num);
+  const entries = (await db.all(`SELECT e.*, s.name AS employee_name FROM cash_book_entries e LEFT JOIN staff s ON s.employee_id = e.employee_id
+    WHERE e.hub = ? AND e.date >= ? AND e.date < ? ORDER BY e.date, e.id`, hub, from, to)).map(num);
   const handovers = new Map((await db.all("SELECT date, amount, status FROM cash_handovers WHERE hub = ? AND date >= ? AND date < ?", hub, from, to)).map((r) => [r.date, { amount: Number(r.amount), status: r.status }]));
   const days = [];
   let run = opening;
-  const tot = { cash_in: 0, other_in: 0, expenses: 0, salaries: 0, handed: 0, online: 0, sales: 0 };
+  const tot = { cash_in: 0, other_in: 0, expenses: 0, salaries: 0, draws: 0, handed: 0, online: 0, sales: 0 };
   for (let n = 1; n <= daysIn(period); n++) {
     const date = `${period}-${String(n).padStart(2, "0")}`;
     const sold = settled.get(date) || { cash: 0, sales: 0 };
     const mine = entries.filter((e) => e.date === date);
     const sum = (k) => mine.filter((e) => e.kind === k).reduce((t, e) => t + e.amount, 0);
     const h = handovers.get(date);
-    const row = { date, sales: sold.sales, cash_in: sold.cash, other_in: sum("other_in"), expenses: sum("expense"), salaries: sum("salary"), online: sum("online"),
+    const row = { date, sales: sold.sales, cash_in: sold.cash, other_in: sum("other_in"), expenses: sum("expense"), salaries: sum("salary"), draws: sum("draw"), online: sum("online"),
       handed: h && h.status !== "rejected" ? h.amount : 0, handover_status: h ? h.status : null };
-    if (!(row.sales || row.cash_in || row.other_in || row.expenses || row.salaries || row.online || h)) continue; // a day with nothing in it is not listed
+    if (!(row.sales || row.cash_in || row.other_in || row.expenses || row.salaries || row.draws || row.online || h)) continue; // a day with nothing in it is not listed
     row.opening = run;
-    run = run + row.cash_in + row.other_in - row.expenses - row.salaries - row.handed;
+    run = run + row.cash_in + row.other_in - row.expenses - row.salaries - row.draws - row.handed;
     row.closing = run;
     for (const k of Object.keys(tot)) tot[k] += row[k] || 0;
     days.push(row);
@@ -80,9 +83,19 @@ async function book(db, hub, period) {
     const x = day.get(t.id) || day.set(t.id, { id: t.id, sales: 0, cash: 0 }).get(t.id);
     x.sales += Number(r.sales); x.cash += Number(r.cash);
   }
-  const teamDays = [...byDay.entries()].map(([date, m]) => ({ date, teams: [...m.values()].map((x) => ({ ...x, gap: x.sales - x.cash })) }));
-  const teamRows = [...teams.values()].map((t) => ({ ...t, not_handed_in: t.sales - t.cash, share: t.sales ? t.cash / t.sales : null, carried: carried[t.id] || 0 })).sort((a, b) => b.sales - a.sales);
-  return { hub, period, opening, closing: run, totals: tot, days, entries, teams: teamRows, team_days: teamDays, team_meta: [...meta.values()], team_carried: carried };
+  // The expected cash is 90% of the sales. A team (or a day of a team) below it is marked. What a seller handed in short is already taken off that
+  // seller's pay as "cash not handed in", so nothing is charged twice: this only shows who it was.
+  const expectedOf = (sales) => Math.ceil(sales * MIN_SHARE);
+  const teamDays = [...byDay.entries()].map(([date, m]) => ({ date, teams: [...m.values()].map((x) => ({ ...x, gap: x.sales - x.cash, expected: expectedOf(x.sales), below: x.cash < expectedOf(x.sales) })) }));
+  const teamRows = [...teams.values()].map((t) => ({ ...t, not_handed_in: t.sales - t.cash, share: t.sales ? t.cash / t.sales : null, carried: carried[t.id] || 0,
+    expected: expectedOf(t.sales), below: t.cash < expectedOf(t.sales), short_of_expected: Math.max(0, expectedOf(t.sales) - t.cash) })).sort((a, b) => b.sales - a.sales);
+  // Everyone who handed in less than they sold this month, with the team they are in.
+  const gaveLess = per.filter((r) => Number(r.sales) > Number(r.cash)).map((r) => {
+    const s = byId.get(r.employee_id), t = teamOf(s, byId);
+    return { employee_id: r.employee_id, name: s.name, team: t.title, sales: Number(r.sales), cash: Number(r.cash), short: Number(r.sales) - Number(r.cash) };
+  }).sort((a, b) => b.short - a.short);
+  const managers = staff.filter((s) => s.hub === hub && s.status === "active" && (s.staff_level === "manager" || s.staff_level === "promoting_manager")).map((s) => ({ id: s.employee_id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name));
+  return { hub, period, opening, closing: run, totals: tot, days, entries, teams: teamRows, team_days: teamDays, team_meta: [...meta.values()], team_carried: carried, gave_less: gaveLess, managers, min_percent: Math.round(MIN_SHARE * 100) };
 }
 
 // For the office with no hub chosen: one line per hub for the month.
@@ -112,11 +125,18 @@ async function add(db, user, body) {
   if (date < sales.addDays(now, -400)) throw httpError(400, "That date is too far back");
   const amount = sales.rupees("Amount", body.amount);
   if (amount <= 0) throw httpError(400, "Enter an amount above 0");
-  const category = String(body.category || "").trim().slice(0, 60) || (kind === "salary" ? "Salary" : kind === "expense" ? "Other" : null);
+  let employeeId = null;
+  if (kind === "draw") { // cash a manager took: it is deducted from that manager's pay for the week
+    employeeId = String(body.employee_id || "");
+    const m = await db.get("SELECT employee_id, hub, status, staff_level FROM staff WHERE employee_id = ?", employeeId);
+    if (!m || m.status !== "active" || !["manager", "promoting_manager"].includes(m.staff_level)) throw httpError(400, "Choose the manager who took the cash");
+    if (m.hub !== hub) throw httpError(400, "That manager belongs to another hub");
+  }
+  const category = String(body.category || "").trim().slice(0, 60) || (kind === "salary" ? "Salary" : kind === "draw" ? "Manager's salary" : kind === "expense" ? "Other" : null);
   const note = String(body.note || "").trim().slice(0, 200) || null;
   if (await svc.isFinalized(db, date.slice(0, 7))) throw httpError(409, "That month is closed, so its cash book can no longer change");
-  return num(await withUser(db, user.username, (t) => t.get(`INSERT INTO cash_book_entries (hub, date, kind, category, amount, note, created_by) VALUES (?,?,?,?,?,?,?) RETURNING *`,
-    hub, date, kind, category, amount, note, user.username)));
+  return num(await withUser(db, user.username, (t) => t.get(`INSERT INTO cash_book_entries (hub, date, kind, category, amount, note, created_by, employee_id) VALUES (?,?,?,?,?,?,?,?) RETURNING *`,
+    hub, date, kind, category, amount, note, user.username, employeeId)));
 }
 
 async function remove(db, user, id) {

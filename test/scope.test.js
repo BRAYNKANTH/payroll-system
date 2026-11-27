@@ -1,4 +1,4 @@
-// Who sees what: a coacher heads a hub and sees all of it; a manager sees only the people under them; a stock keeper (a manager with the tag)
+// Who sees what: a coacher heads a hub and sees all of it; a manager sees only the people under them; the old stock keeper tag no longer gives stock access (a manager with the tag)
 // can also handle the stock of everyone in the hub. Nobody below the admin sees pay.
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -54,20 +54,18 @@ test("a manager's team is everyone who reports to them, directly or through othe
   assert.equal(JSON.stringify(await as(d, "man1")).includes("teamIds"), false, "the list is not sent to the browser");
 });
 
-test("permissions: a manager only looks at their people; a stock keeper handles stock; a coacher runs the hub", async () => {
+test("permissions: a manager only looks at their people and never handles stock; a coacher runs the hub", async () => {
   const { d } = await setup();
   const man = await as(d, "man1");
   assert.deepEqual(man.permissions, ["read_team", "self"]);
   for (const p of ["read", "enter_data", "manage_team", "stock", "view_pay"]) assert.ok(!auth.can(man, p), p);
   await svc.updateEntry(d, "staff", "M1", { stock_keeper: true }, "owner");
   const keeper = await as(d, "man1");
-  assert.ok(auth.can(keeper, "stock") && keeper.stock_keeper === true);
-  assert.ok(!auth.can(keeper, "enter_data") && !auth.can(keeper, "read"), "stock only, nothing else extra");
+  assert.ok(!auth.can(keeper, "stock"), "the old stock keeper tag gives no access: stock is managed only by the hub's coacher");
+  assert.ok(!auth.can(keeper, "enter_data") && !auth.can(keeper, "read"));
   const coach = await as(d, "coach");
   for (const p of ["read", "enter_data", "manage_team", "stock"]) assert.ok(auth.can(coach, p), p);
   assert.ok(!auth.can(coach, "view_pay"));
-  await svc.updateEntry(d, "staff", "M1", { stock_keeper: "" }, "owner");
-  assert.ok(!auth.can(await as(d, "man1"), "stock"), "taking the tag away takes the access away");
 });
 
 async function http(d) {
@@ -145,7 +143,7 @@ test("HTTP: Team sales gives a manager only the total of their team, never a per
   } finally { close(); }
 });
 
-test("HTTP: the coacher gives stock to the whole hub; a stock keeper may too; a plain manager may not", async () => {
+test("HTTP: only the hub's coacher gives stock out; a manager (even one tagged as a stock keeper) and the office may not", async () => {
   const { d, shine } = await setup();
   const { call, close } = await http(d);
   try {
@@ -154,11 +152,11 @@ test("HTTP: the coacher gives stock to the whole hub; a stock keeper may too; a 
     assert.equal((await give("coach", "D9")).status, 403, "but not another hub");
     assert.equal((await give("man1", "D1")).status, 403, "a plain manager cannot");
     await svc.updateEntry(d, "staff", "M1", { stock_keeper: true }, "owner");
-    assert.equal((await give("man1", "D3")).status, 200, "a stock keeper reaches a colleague's seller too");
-    assert.equal((await give("man1", "D9")).status, 403, "but only inside their hub");
-    const morning = (await call("man1", "GET", "/api/stock-issues")).json;
+    assert.equal((await give("man1", "D3")).status, 403, "the old stock keeper tag changes nothing");
+    assert.equal((await give("owner", "D3")).status, 403, "the office does not give stock out either: only the hub's coacher");
+    const morning = (await call("coach", "GET", "/api/stock-issues")).json;
     assert.deepEqual(morning.sellers.map((s) => s.employee_id).sort(), ["D1", "D2", "D3", "M1", "M2", "PM1"], "everyone who sells in the hub: the sellers, the managers and the promoting manager (he sells sometimes)");
-    // a stock keeper still cannot see the rest of the hub
+    assert.equal((await call("man1", "GET", "/api/stock-issues")).status, 403);
     assert.equal((await call("man1", "GET", "/api/daily")).status, 403);
     assert.equal((await call("man1", "GET", "/api/staff/D3/profile")).status, 403);
   } finally { close(); }
@@ -178,7 +176,7 @@ test("HTTP: the coacher can confirm days and enter data for the hub, but not for
   } finally { close(); }
 });
 
-test("HTTP: only the admin sends stock to a hub; a coacher or stock keeper sees their own hub's stock; a manager sees none", async () => {
+test("HTTP: only the admin sends stock to a hub; a coacher sees their own hub's stock; a manager sees none, even a tagged stock keeper", async () => {
   const { d, shine } = await setup();
   const { call, close } = await http(d);
   try {
@@ -192,7 +190,7 @@ test("HTTP: only the admin sends stock to a hub; a coacher or stock keeper sees 
     assert.deepEqual((await call("owner", "GET", "/api/hub-stock")).json.hubs.map((h) => h.code), ["H1", "H2"]);
     assert.equal((await call("man1", "GET", "/api/hub-stock")).status, 403, "a plain manager has no stock pages");
     await svc.updateEntry(d, "staff", "M1", { stock_keeper: true }, "owner");
-    assert.deepEqual((await call("man1", "GET", "/api/hub-stock")).json.hubs.map((h) => h.code), ["H1"], "a stock keeper sees the hub's stock");
+    assert.equal((await call("man1", "GET", "/api/hub-stock")).status, 403, "a stock keeper tag gives no stock pages");
     const id = (await call("owner", "GET", "/api/hub-stock")).json.hubs[0].recent[0].id;
     assert.equal((await call("coach", "DELETE", `/api/hub-stock/${id}`)).status, 403);
     assert.equal((await call("owner", "DELETE", `/api/hub-stock/${id}`)).status, 200);

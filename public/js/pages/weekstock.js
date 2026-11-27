@@ -29,7 +29,7 @@ export default {
     }
 
     const w = await get("/api/week-stock" + qs({ hub, date: weekDate }));
-    const editable = can("stock");
+    const editable = can("stock") && !!state.user.hub; // the hub's coacher counts; the office looks
     const end = addDays(w.week_start, 6);
     const bar = html`<div class="dl-daybar mb-4"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
         <button type="button" class="btn icon" id="ws-prev" aria-label="Previous week">${icon("left")}</button>
