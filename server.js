@@ -16,6 +16,7 @@ const handover = require("./handover");
 const cashbook = require("./cashbook");
 const payments = require("./payments");
 const weekstock = require("./weekstock");
+const productimport = require("./productimport");
 const pos = require("./pos");
 const team = require("./team");
 const exporter = require("./export");
@@ -295,6 +296,9 @@ function createHandler(dbReady) {
     // A manager's own people: their sales, today's sales and the stock they hold.
     ["GET", /^\/api\/team$/, "read_team", ({ user, q }) => team.overview(database, user, q.get("period") || new Date().toISOString().slice(0, 7))],
     ["POST", /^\/api\/sales\/confirm$/, "enter_data", ({ user, body }) => sales.confirm(database, user, body, user.hub)],
+    // Bulk product upload from an Excel or CSV file, with a sample template to fill in.
+    ["GET", /^\/api\/products\/template\.(xlsx|csv)$/, "manage_products", ({ m }) => ({ download: productimport.template(m[1]), type: m[1] === "csv" ? "text/csv; charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename: `product-import-template.${m[1]}` })],
+    ["POST", /^\/api\/products\/import$/, "manage_products", ({ user, body }) => (body.commit === true ? productimport.apply(database, user, body.filename, body.data) : productimport.preview(database, body.filename, body.data))],
     ["GET", /^\/api\/products\/names$/, "enter_data", () => products.names(database)],
     ["GET", /^\/api\/products$/, "manage_products", () => products.list(database)],
     ["POST", /^\/api\/products$/, "manage_products", ({ user, body }) => products.create(database, body, user.username)],

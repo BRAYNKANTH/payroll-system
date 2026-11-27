@@ -3195,3 +3195,10 @@ html.fx .org-toggle { animation: none; }
 /* ===== Weekly stock sheet ===== */
 .ws-count { width: 72px; min-height: 44px; text-align: right; font: 650 15px var(--font); font-variant-numeric: tabular-nums; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); padding: 0 8px; }
 .ws-count[aria-invalid] { border-color: var(--danger); }
+
+/* ===== Product import ===== */
+.imp-steps { padding-left: 20px; display: grid; gap: 14px; margin: 0 0 14px; }
+.imp-steps .muted { margin-top: 4px; font-size: 14px; }
+.imp-sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.imp-table { max-height: 46vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 8px; }
+.imp-table tr.error td { background: var(--danger-soft); }

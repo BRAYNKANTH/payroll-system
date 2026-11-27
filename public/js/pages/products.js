@@ -1,6 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { state } from "../app.js";
-import { exportButtons, confirmDialog, $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, pct, parseAmount } from "../ui.js";
+import { exportButtons, confirmDialog, esc, $, html, icon, money, badge, toast, busy, drawer, dataTable, emptyState, pct, parseAmount } from "../ui.js";
 
 // Of every sale the workers get a share (seller + manager, 45% at first); the company keeps the rest, and the purchase price comes out of that.
 const slToday = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -28,7 +28,7 @@ export default {
     el.innerHTML = html`
       <div class="page-head">
         <div><h1>Products</h1><p>What the company sells. Of every sale the workers get ${workers} (${pct(s.seller, 0)} to the seller, ${pct(s.manager, 0)} to their manager). The company keeps the rest, and the purchase price comes out of that.</p></div>
-        <div class="actions">${exportButtons("products")}<button class="btn primary" id="add">${icon("plus")} Add product</button></div>
+        <div class="actions">${exportButtons("products")}<button class="btn" id="import">${icon("upload")} Import from Excel</button><button class="btn primary" id="add">${icon("plus")} Add product</button></div>
       </div>
       <div class="card"><div class="card-body flush" id="list"></div></div>`;
 
@@ -174,5 +174,48 @@ export default {
       });
     }
     $("#add").onclick = () => open(null);
+
+    // ---------------------------------------------------------------- bulk upload from an Excel or CSV file
+    // 1. download the sample template and fill it in   2. choose the file: every row is checked and shown   3. import (only when no row has an error)
+    const base64 = (buf) => { let s = ""; const bytes = new Uint8Array(buf); for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
+    const ACTION = { new: ["green", "New"], update: ["amber", "Update"], same: ["plain", "No change"], skip: ["plain", "Ignored"], error: ["red", "Error"] };
+    $("#import").onclick = () => {
+      const d = drawer({
+        title: "Import products from Excel",
+        body: html`<ol class="imp-steps">
+            <li><b>Download the sample file</b> and fill it in: one product per row. <a href="/api/products/template.xlsx" download>Excel template</a> · <a href="/api/products/template.csv" download>CSV template</a>
+              <div class="muted">Columns: product name, selling price, purchase price, pieces to add to the office stock (optional), status (optional). Prices are in rupees. A product that already exists (same name) gets the new prices, and its pieces are added as a delivery. Rows starting with "Example:" are ignored.</div></li>
+            <li><b>Choose your file</b> (.xlsx or .csv). Every row is checked first and nothing changes yet.
+              <div class="mt-2"><input type="file" id="imp-file" class="input" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="max-width:380px;padding-top:6px" aria-label="Choose the Excel or CSV file"></div></li>
+            <li><b>Check the list</b> below, then press Import.</li></ol>
+          <div id="imp-out" aria-live="polite"></div>`.toString(),
+        foot: `<button class="btn" data-close>Close</button><button class="btn primary" id="imp-go" disabled>Import</button>`,
+      });
+      let file = null, last = null;
+      const out = $("#imp-out", d.panel), go = $("#imp-go", d.panel);
+      const send = async (commit) => post("/api/products/import", { filename: file.name, data: base64(await file.arrayBuffer()), commit });
+      $("#imp-file", d.panel).onchange = async (e) => {
+        file = e.target.files[0]; last = null; go.disabled = true;
+        if (!file) { out.innerHTML = ""; return; }
+        out.innerHTML = `<p class="muted">Checking ${esc(file.name)}…</p>`;
+        try { last = await send(false); } catch (err) { out.innerHTML = html`<div class="alert err" role="alert">${icon("alert")}<div>${err.message}</div></div>`.toString(); return; }
+        const c = last.counts, rows = last.rows.slice(0, 400);
+        const doable = c.new + c.update;
+        out.innerHTML = html`<div class="imp-sum">${badge("green", `${c.new} new`)} ${badge("amber", `${c.update} to update`)} ${c.same ? badge("plain", `${c.same} no change`) : ""} ${c.skip ? badge("plain", `${c.skip} ignored`) : ""} ${c.error ? badge("red", `${c.error} with errors`) : ""}</div>
+          ${c.error ? html`<div class="alert err" role="alert">${icon("alert")}<div><b>${c.error} ${c.error === 1 ? "row has" : "rows have"} an error.</b> Fix them in your file and choose it again. Nothing is imported until every row is right.</div></div>` : ""}
+          <div class="table-wrap imp-table" tabindex="0" role="region" aria-label="What the import will do"><table class="table"><thead><tr><th scope="col">Row</th><th scope="col">Product</th><th scope="col" class="r">Selling</th><th scope="col" class="r">Purchase</th><th scope="col" class="r">Pieces</th><th scope="col">What happens</th></tr></thead>
+            <tbody>${rows.map((r) => html`<tr class="${r.action === "error" ? "error" : ""}"><td>${r.line}</td><td><b>${r.name || "—"}</b></td><td class="r">${r.selling === null || r.selling === undefined ? "—" : money(Math.round(r.selling * 100))}</td><td class="r">${r.purchase === null || r.purchase === undefined ? "—" : money(Math.round(r.purchase * 100))}</td><td class="r">${r.stock || "—"}</td>
+              <td>${badge(...ACTION[r.action])}${r.message ? html`<div class="${r.action === "error" ? "neg" : "muted"} text-sm">${r.message}</div>` : ""}</td></tr>`)}</tbody></table></div>
+          ${last.rows.length > rows.length ? html`<p class="muted">Showing the first ${rows.length} of ${last.rows.length} rows. All are imported.</p>` : ""}`.toString();
+        go.disabled = c.error > 0 || doable === 0;
+        go.textContent = doable ? `Import ${doable} ${doable === 1 ? "product" : "products"}` : "Nothing to import";
+      };
+      go.onclick = (e) => busy(e.currentTarget, async () => {
+        const r = await send(true);
+        toast(`${r.created} added, ${r.updated} updated${r.stock_added ? `, ${r.stock_added} pieces added to the office stock` : ""}`);
+        d.close();
+        await reload();
+      });
+    };
   },
 };
